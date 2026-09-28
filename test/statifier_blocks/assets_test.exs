@@ -1,8 +1,10 @@
 defmodule StatifierBlocks.AssetsTest do
   @moduledoc """
-  ADR-0005 decisions 1, 7 and 14 - and decision 7's 2026-08-29 amendment,
-  "a second hook that only measures" - held against the files rather than
-  against reviewer memory.
+  ADR-0005 decisions 1, 7 and 14 - decision 7's 2026-08-29 amendment, "a
+  second hook that only measures", and its 2026-09-28 amendment, "one hook
+  pushes commands; any number of hooks may only measure or draw" - and
+  ADR-0018 (b)'s vendored elkjs, held against the files rather than against
+  reviewer memory.
 
   Deliberately **not** tagged `:liveview`. Everything here reads a file off
   disk, so it runs in the headless tree too - which is where it matters most,
@@ -15,27 +17,106 @@ defmodule StatifierBlocks.AssetsTest do
 
   @hook_source "assets/js/statifier_blocks.js"
   @measure_source "assets/js/statifier_blocks_measure.js"
+  @map_source "assets/js/statifier_blocks_map.js"
   @stylesheet "assets/css/statifier_blocks.css"
+  @elk "assets/vendor/elk.bundled.js"
+  @elk_licence "assets/vendor/elkjs-LICENSE.md"
+  @vendor_manifest ".claude/firewall-vendor.txt"
 
-  # Every file in `assets/js/`, so a third hook cannot arrive by arriving in a
-  # third file the scan below was never told about.
-  @sources [@hook_source, @measure_source]
+  # Every file in `assets/js/`, so a hook cannot arrive by arriving in a file
+  # the scan below was never told about.
+  @sources [@hook_source, @measure_source, @map_source]
 
-  describe "the two hooks, and no more (decision 7, as amended 2026-08-29)" do
-    # Sabotage: adding a third `export const SomethingElse = { mounted() ... }`
-    # to either source - `hooks/0` returns three names and this goes red with
-    # the record's own sentence.
-    test "exactly the two hooks the record names are exported" do
-      assert hooks() == ["StatifierBlocksDrag", "StatifierBlocksMeasure"], """
-      ADR-0005 decision 7 shipped exactly one JavaScript hook and made a second
-      one an amendment. The 2026-08-29 amendment made it, and admits exactly
-      one: `StatifierBlocksMeasure`, whose whole contract is measurement. A
-      THIRD hook, or a hook that pushes anything but geometry or a command,
-      is still a thing this record does not have - so amend
-      `docs/adr/0005-liveview-editor.md` first, then this test.
+  # The one hook that pushes commands (decision 7, 7e).
+  @command_hook "StatifierBlocksDrag"
 
-      Found: #{inspect(hooks())}
+  # The one event name a measuring hook pushes: the geometry (7a).
+  @measurement "measure"
+
+  # Decision 2's commands and every event name the command hook pushes,
+  # which is what a second command set would be made of, and the reference
+  # host's list event names: a draw-only hook names none of them, because
+  # every name it pushes is the host's.
+  @command_names ~w(dragstart dragend drop insert-drop insert-dragstart select remove undo
+                    redo config-change insert move)
+  @list_event_names ~w(select-row insert-open)
+
+  describe "one hook pushes commands; the others only measure or draw (decision 7, 7e)" do
+    # Sabotage: having the map hook push `this.pushEvent("select-row", ...)`
+    # - a literal it chose, so a hook other than the drag hook has a command
+    # set of its own - and this goes red with the record's sentence.
+    test "exactly one hook pushes commands, and it is the drag hook" do
+      assert command_pushers() == [@command_hook], """
+      ADR-0005 decision 7, as amended on 2026-09-28 (7e): one hook pushes
+      commands, and it is `StatifierBlocksDrag`; any number of hooks may only
+      measure or draw. A hook that pushes a second command set - one that
+      sends decision 2's commands or an event name of its own - is a thing
+      this record does not have, so amend `docs/adr/0005-liveview-editor.md`
+      first, then this test.
+
+      Hooks pushing an event name of their own: #{inspect(command_pushers())}
       """
+    end
+
+    # Every other hook is one of the two kinds 7e admits, read off what it
+    # pushes: the measurement and nothing else (7a), or only names the host
+    # handed it (7f) - never a literal. A hook that is neither fails here
+    # even when it pushes nothing the test above counts.
+    # Sabotage: having the map hook read its name from a local
+    # `const name = "select-row"` instead of the element - no push takes a
+    # literal, so the test above stays green, and this goes red naming the
+    # literal.
+    test "every other hook only measures or draws" do
+      for {hook, source} <- hook_sources(), hook != @command_hook do
+        case kind(source) do
+          :measure ->
+            :ok
+
+          :draw ->
+            text = File.read!(source)
+
+            for name <- @command_names ++ @list_event_names ++ [@measurement] do
+              refute text =~ ~s("#{name}"), """
+              7f: a draw-only hook pushes no event name of its own, so its
+              source names none. `#{hook}` (#{source}) spells `#{name}`.
+              """
+            end
+
+          other ->
+            flunk("""
+            7e admits a hook that pushes commands (only #{@command_hook}), one
+            that only measures, and any number that only draw. `#{hook}`
+            (#{source}) is none of these: #{inspect(other)}.
+            """)
+        end
+      end
+    end
+
+    # The permitted path, told apart from the forbidden one: a draw-only
+    # hook's pushes take their name from the element's data attributes, the
+    # host's list event names, and from nothing else.
+    # Sabotage: reading both names from `data-select-event` - the insert
+    # arms a selection - and this goes red; pushing `this.pushEvent(
+    # "select-row", ...)` instead - the test above goes red instead, which is
+    # the other half of telling the two apart.
+    test "the map hook pushes only the names the host stamped on its element" do
+      source = File.read!(@map_source)
+
+      assert kind(@map_source) == :draw
+      assert source =~ "select: el.dataset.selectEvent"
+      assert source =~ "insert: el.dataset.insertEvent"
+      assert [_one] = Regex.scan(~r/\bpushEvent(?:To)?\s*\(/, source)
+      assert source =~ "this.pushEvent(gesture.event, gesture.payload)"
+    end
+
+    # A hook the checks above classify per file must be alone in its file.
+    # Sabotage: adding a second `export const SomethingElse = { mounted() ...`
+    # to the map hook's file - its pushes would be counted against one name
+    # - and this goes red.
+    test "each file in assets/js exports at most one hook" do
+      for source <- @sources do
+        assert length(hooks_in(source)) <= 1, "#{source}: #{inspect(hooks_in(source))}"
+      end
     end
 
     # The defect this guards is the one found in every host seen:
@@ -43,10 +124,14 @@ defmodule StatifierBlocks.AssetsTest do
     # measurements, so the editor renders as stacked rows with no flow lines
     # and nothing anywhere reports an error. A default export carrying both is
     # what makes `hooks: { ...StatifierBlocks }` register both or neither.
+    # The Map hook is not in it: it has its own entry point, so a host that
+    # never mounts the Map never bundles elkjs.
     # Sabotage: dropping `StatifierBlocksMeasure` from the default export of
     # assets/js/statifier_blocks.js - the one-line registration in the README
     # silently goes back to registering the drag hook alone, and this goes red.
-    test "the entry point's default export carries both hooks" do
+    # Sabotage: adding `StatifierBlocksMap` to it - every host bundles the
+    # layout library whether or not it draws a map - and this goes red.
+    test "the entry point's default export carries both editor hooks" do
       assert default_export(@hook_source) == ["StatifierBlocksDrag", "StatifierBlocksMeasure"],
              """
              A host registers hooks from the default export
@@ -54,7 +139,9 @@ defmodule StatifierBlocks.AssetsTest do
              hook missing from it is a hook no host registers. `StatifierBlocksMeasure`
              is what feeds the server the geometry `connector_layer.ex` draws from:
              without it the editor renders stacked rows with no connectors and no
-             error to explain them.
+             error to explain them. `StatifierBlocksMap` stays out of it: it
+             imports the whole of the vendored elkjs build, and a host pays for
+             that only by importing `statifier_blocks/map`.
 
              Found: #{inspect(default_export(@hook_source))}
              """
@@ -74,7 +161,7 @@ defmodule StatifierBlocks.AssetsTest do
 
     # The corroborator: a scan over a hard-coded file list says nothing about
     # a file that is not on it.
-    # Sabotage: dropping either source from `@sources` - the check above goes
+    # Sabotage: dropping any source from `@sources` - the checks above go
     # quiet about a whole file and this notices.
     test "the scan covers every file in assets/js" do
       assert Enum.sort(Path.wildcard("assets/js/*.js")) == Enum.sort(@sources)
@@ -247,6 +334,74 @@ defmodule StatifierBlocks.AssetsTest do
     end
   end
 
+  describe "the map hook's entry point and its one import (ADR-0018, 7g)" do
+    # The bundle cost is the reason for the entry point: a host
+    # imports `statifier_blocks/map` to get the hook and the layout library,
+    # and nothing else pulls either in.
+    # Sabotage: dropping the `./map` export from assets/package.json - a
+    # host's `import StatifierBlocksMap from "statifier_blocks/map"` resolves
+    # to nothing, which no other test would notice.
+    test "the map hook is its own entry point, with its own default export" do
+      package = "assets/package.json" |> File.read!() |> Jason.decode!()
+
+      assert package["exports"]["./map"] == "./js/statifier_blocks_map.js"
+      assert "js/statifier_blocks_map.js" in package["files"]
+      assert File.read!(@map_source) =~ "export const StatifierBlocksMap = {"
+      assert default_export(@map_source) == ["StatifierBlocksMap"]
+    end
+
+    # 1c: the map hook is not "a genuinely self-contained hook with no
+    # imports"; its one import is the vendored layout library, by relative
+    # path inside this package, and never an npm dependency.
+    # Sabotage: importing `elkjs` by its bare package name - a host would
+    # have to install it - and this goes red.
+    test "its one import is the vendored layout library" do
+      assert imports(@map_source) == ["../vendor/elk.bundled.js"]
+      assert File.regular?(Path.expand("../vendor/elk.bundled.js", Path.dirname(@map_source)))
+    end
+
+    # The bundled build is UMD, which reads `module` and `exports`; in this
+    # `"type": "module"` package a `.js` file is an ES module and those are
+    # not defined, so Node (and a bundler that honours the field) would load
+    # it as a module with no default export. The directory's own
+    # package.json says CommonJS, which is what the file is.
+    # Sabotage: marking assets/vendor/package.json `"type": "module"` - the
+    # layout driver's import of the hook fails in Node with "does not provide
+    # an export named 'default'", every layout test goes red, and this goes
+    # red on the field.
+    test "the vendor directory is read as CommonJS" do
+      vendor = "assets/vendor/package.json" |> File.read!() |> Jason.decode!()
+
+      assert vendor == %{"type" => "commonjs"}
+      assert "vendor/package.json" in Jason.decode!(File.read!("assets/package.json"))["files"]
+    end
+
+    # ADR-0018 (b): elkjs 0.9.3 byte for byte, its licence beside it, and one
+    # manifest line whose digest is the file's. The pre-push scan trusts
+    # that line to skip the file's line checks, so a file that drifted from
+    # the digest must fail here before it fails there.
+    # Sabotage: appending one byte to assets/vendor/elk.bundled.js - the
+    # digest no longer matches the manifest line and this goes red.
+    test "the vendored elkjs matches its manifest line, with its licence beside it" do
+      [entry] =
+        @vendor_manifest
+        |> File.read!()
+        |> String.split("\n")
+        |> Enum.reject(&(String.trim(&1) == "" or String.starts_with?(&1, "#")))
+
+      assert [@elk, "sha256=" <> digest, "upstream=elkjs@0.9.3", "licence=" <> licence] =
+               String.split(entry, " ")
+
+      assert digest == :crypto.hash(:sha256, File.read!(@elk)) |> Base.encode16(case: :lower)
+      assert licence == @elk_licence
+      assert File.read!(@elk_licence) =~ "Eclipse Public License"
+
+      package = "assets/package.json" |> File.read!() |> Jason.decode!()
+      assert "vendor/elk.bundled.js" in package["files"]
+      assert "vendor/elkjs-LICENSE.md" in package["files"]
+    end
+  end
+
   describe "packaging (decision 1)" do
     # Sabotage: dropping "assets" from `files:` in mix.exs - source that ships
     # as source is only public API if it is actually in the hex tarball, and
@@ -264,6 +419,9 @@ defmodule StatifierBlocks.AssetsTest do
     test "the files the package promises are actually there" do
       assert File.regular?(@hook_source)
       assert File.regular?(@measure_source)
+      assert File.regular?(@map_source)
+      assert File.regular?(@elk)
+      assert File.regular?(@elk_licence)
       assert File.regular?("assets/css/statifier_blocks.css")
       assert File.regular?("assets/package.json")
     end
@@ -711,22 +869,57 @@ defmodule StatifierBlocks.AssetsTest do
     @stylesheet |> File.read!() |> StatifierBlocks.ThemeAudit.strip_comments()
   end
 
-  # Every hook exported by every file in `assets/js/`, in file order and then
-  # source order. Read off the files rather than off a list here: a list here
-  # is the thing that would silently need updating and would not get it.
-  defp hooks do
-    Enum.flat_map(@sources, fn source ->
-      ~r/^export const (\w+) = \{/m
-      |> Regex.scan(File.read!(source))
-      |> Enum.map(fn [_all, name] -> name end)
+  # Every hook exported by every file in `assets/js/`, with the file it is
+  # in, in file order and then source order. Read off the files rather than
+  # off a list here: a list here is the thing that would silently need
+  # updating and would not get it.
+  defp hook_sources do
+    for source <- @sources, hook <- hooks_in(source), do: {hook, source}
+  end
+
+  defp hooks_in(source) do
+    ~r/^export const (\w+) = \{/m
+    |> Regex.scan(File.read!(source))
+    |> Enum.map(fn [_all, name] -> name end)
+  end
+
+  # The event name each push in `source` sends: `{:literal, name}` for a
+  # string it spells, `{:expression, text}` for one it reads from elsewhere.
+  defp push_names(source) do
+    ~r/\bpushEvent(?:To)?\s*\(\s*(?:this\.el\s*,\s*)?("([^"]*)"|[^,)]+)/
+    |> Regex.scan(File.read!(source))
+    |> Enum.map(fn
+      [_all, _quoted, name] -> {:literal, name}
+      [_all, expression] -> {:expression, String.trim(expression)}
     end)
+  end
+
+  # The hooks that push an event name of their own: a literal other than the
+  # measurement.
+  defp command_pushers do
+    for {hook, source} <- hook_sources(),
+        Enum.any?(push_names(source), &match?({:literal, name} when name != @measurement, &1)),
+        do: hook
+  end
+
+  # What kind of hook `source` holds, by what it pushes: only the
+  # measurement is `:measure`; only names it did not spell is `:draw`;
+  # anything else is answered as the pushes themselves.
+  defp kind(source) do
+    names = push_names(source)
+
+    cond do
+      names != [] and Enum.all?(names, &(&1 == {:literal, @measurement})) -> :measure
+      Enum.all?(names, &match?({:expression, _text}, &1)) -> :draw
+      true -> names
+    end
   end
 
   # The names in a file's `export default { ... }`, sorted. This is the object
   # a host spreads into `hooks:`, so it is the list that decides what actually
   # gets registered.
   defp default_export(source) do
-    [_all, body] = Regex.run(~r/^export default \{([^}]*)\};/m, File.read!(source))
+    [_all, body] = Regex.run(~r/^export default \{([^}]*)\};?$/m, File.read!(source))
 
     body
     |> String.split(",")

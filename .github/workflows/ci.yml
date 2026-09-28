@@ -32,15 +32,25 @@ jobs:
           set -euo pipefail
           erlang="$(sed -n 's/^erlang *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
           elixir="$(sed -n 's/^elixir *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
+          node="$(sed -n 's/^node *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
           test -n "$erlang" || { echo "no erlang version in mise.toml" >&2; exit 1; }
           test -n "$elixir" || { echo "no elixir version in mise.toml" >&2; exit 1; }
+          test -n "$node" || { echo "no node version in mise.toml" >&2; exit 1; }
           echo "erlang=$erlang" >> "$GITHUB_OUTPUT"
           echo "elixir=$elixir" >> "$GITHUB_OUTPUT"
+          echo "node=$node" >> "$GITHUB_OUTPUT"
 
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ steps.toolchain.outputs.erlang }}
           elixir-version: ${{ steps.toolchain.outputs.elixir }}
+
+      # The Map hook's layout tests run it through the vendored elkjs with
+      # Node (ADR-0005's 2026-09-28 amendment on decision 1); nothing is
+      # installed from a registry and nothing Node builds ships.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.toolchain.outputs.node }}
 
       # _build carries the Dialyzer PLT
       # (_build/dev/dialyxir_erlang-*_elixir-*_deps-dev.plt), so this cache is
@@ -124,15 +134,25 @@ jobs:
           set -euo pipefail
           erlang="$(sed -n 's/^erlang *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
           elixir="$(sed -n 's/^elixir *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
+          node="$(sed -n 's/^node *= *"\(.*\)".*$/\1/p' mise.toml | head -1)"
           test -n "$erlang" || { echo "no erlang version in mise.toml" >&2; exit 1; }
           test -n "$elixir" || { echo "no elixir version in mise.toml" >&2; exit 1; }
+          test -n "$node" || { echo "no node version in mise.toml" >&2; exit 1; }
           echo "erlang=$erlang" >> "$GITHUB_OUTPUT"
           echo "elixir=$elixir" >> "$GITHUB_OUTPUT"
+          echo "node=$node" >> "$GITHUB_OUTPUT"
 
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{ steps.toolchain.outputs.erlang }}
           elixir-version: ${{ steps.toolchain.outputs.elixir }}
+
+      # The Map hook's layout tests run it through the vendored elkjs with
+      # Node (ADR-0005's 2026-09-28 amendment on decision 1); nothing is
+      # installed from a registry and nothing Node builds ships.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.toolchain.outputs.node }}
 
       - name: Resolve a Phoenix-free tree
         run: mix deps.get
