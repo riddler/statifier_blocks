@@ -277,6 +277,11 @@ defmodule StatifierBlocks.Core.Send do
       order: 10
     }
 
+  @impl true
+  def explain,
+    do:
+      "A send sends a named event to this execution, either now or after a delay such as 24h. The step finishes as soon as the event is on its way, so the flow carries on without waiting; an interrupt rule or a Wait for event step listening for the same event name reacts when it arrives, which is how a deadline is set. For example, a patron registration sends registration.deadline in 24 hours."
+
   @doc """
   The event name, or `nil` (ADR-0002 amendment H6).
 

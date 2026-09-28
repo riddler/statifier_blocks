@@ -159,6 +159,11 @@ defmodule StatifierBlocks.Core.Assign do
       order: 9
     }
 
+  @impl true
+  def explain,
+    do:
+      "An assign writes one literal value to one datamodel path and then carries on, for example setting loan.renewals to 0 when a loan starts."
+
   @doc """
   A compound state whose entry writes `expr` to `location` and immediately
   goes final.

@@ -184,6 +184,11 @@ defmodule StatifierBlocks.Core.Branch do
       layout: :stack
     }
 
+  @impl true
+  def explain,
+    do:
+      "A branch picks one path. Its arms are tried in the order they are listed, and the first whose condition holds runs its steps; when none holds, the Otherwise steps run. When no arm held but at least one condition could not be decided, such as one reading a value that was never set, the Cannot be decided steps run instead, if that slot has any. For example, a loan can branch on whether the patron's card is still valid."
+
   @doc """
   `N arms + otherwise`, counting the well-formed arms (ADR-0002 amendment
   H6).

@@ -570,7 +570,7 @@ defmodule StatifierBlocks.Palette do
       degrade a stateful type into the absent-callback path, which looks
       exactly like a type that declared nothing;
     * **the absent-callback default**, which is why this takes four
-      arguments and not three: nine of the fourteen callbacks are optional
+      arguments and not three: ten of the fifteen callbacks are optional
       and every site is a probe followed by a fallback, so folding the
       probe into the seam is what makes the arity arithmetic unrepeatable;
     * **the `state`-prepending**, which is the whole of what a caller must

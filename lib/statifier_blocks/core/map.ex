@@ -625,6 +625,11 @@ defmodule StatifierBlocks.Core.Map do
       slot_style: %{@error_slot => :failure}
     }
 
+  @impl true
+  def explain,
+    do:
+      "A map runs another chart once for every item in a datamodel list, all at the same time as separate executions, and waits for the whole batch; the answers can be collected into a list. When the batch is done its next steps run, and if the batch fails the failure steps run instead. For example, a library can run a reminder chart for every overdue loan at once."
+
   @doc """
   A compound state that runs the whole batch as one invocation in an
   inner state and finishes at the `<final>` of whichever outcome it

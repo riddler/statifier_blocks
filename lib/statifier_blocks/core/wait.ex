@@ -110,6 +110,11 @@ defmodule StatifierBlocks.Core.Wait do
       order: 5
     }
 
+  @impl true
+  def explain,
+    do:
+      "A wait pauses the flow for a fixed length of time, such as 30s or 2d, and then carries on with the next step. To hold until something happens rather than for a length of time, use Wait for event."
+
   @doc """
   `timer <duration>` for the stored duration, or `nil` (ADR-0002
   amendment H6).

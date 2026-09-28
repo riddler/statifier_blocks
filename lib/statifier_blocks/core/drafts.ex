@@ -109,6 +109,11 @@ defmodule StatifierBlocks.Core.Drafts do
       slot_style: %{"body" => :tray}
     }
 
+  @impl true
+  def explain,
+    do:
+      "Drafts is the document's shelf. Blocks put here are kept with the document but are not part of the flow: they never run and are not compiled, so an author can park a fragment and place it later. A document has at most one shelf."
+
   @doc """
   **The compiler never calls this.** ADR-0004's amendment of 2026-08-31,
   section D1, is explicit: the Emit stage does not call `emit/2` on the

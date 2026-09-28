@@ -212,6 +212,11 @@ defmodule StatifierBlocks.Core.Invoke do
       slot_style: %{"on_error" => :failure}
     }
 
+  @impl true
+  def explain,
+    do:
+      "An invoke calls a handler the host provides, named by its invoke type, and waits for the handler to answer before the flow carries on; the answer can be written to a datamodel path. If the call fails, the steps in If it fails run instead. For example, a parcel delivery can invoke a handler that books the courier."
+
   @doc """
   A compound state that runs the call in an inner state and finishes at
   the `<final>` of whichever outcome it reached.

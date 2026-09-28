@@ -379,6 +379,11 @@ defmodule StatifierBlocks.Core.Subchart do
       slot_style: %{(@slot_prefix <> @error_outcome) => :failure}
     }
 
+  @impl true
+  def explain,
+    do:
+      "A subchart runs another chart as a child and waits for it to finish, then runs the steps under the outcome the child finished with; the outcome can also be written to a datamodel path. For example, a loan can run the patron registration chart when the borrower has no card yet."
+
   @doc """
   A compound state that runs the child chart in an inner state and
   finishes at the `<final>` of whichever outcome the child reported.

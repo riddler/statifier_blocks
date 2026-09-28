@@ -91,6 +91,11 @@ defmodule StatifierBlocks.Core.ResumableGroup do
       slot_outcome_key: %{"interrupts" => "outcome"}
     }
 
+  @impl true
+  def explain,
+    do:
+      "A resumable group is a group that remembers where it was. Its interrupt rules abandon it or resume it as a plain group's do, but a resume returns to the step that was running when the interrupt came, either the top-level step (shallow) or the exact step however deeply nested (deep), instead of starting again from the first step."
+
   @doc """
   `StatifierBlocks.Core.Group`'s shape plus a `<history>` inside the body
   region, of the type `history` names. A `"resume"` handler targets that

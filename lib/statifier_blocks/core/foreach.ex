@@ -308,6 +308,11 @@ defmodule StatifierBlocks.Core.Foreach do
       badge: "for each"
     }
 
+  @impl true
+  def explain,
+    do:
+      "A for each runs its steps once for each item in a datamodel list, one item at a time and in order, giving the current item (and, if asked, its position) a name the steps can read. It is done when the last item is. For example, a parcel delivery can notify each recipient on a list in turn."
+
   @doc """
   The loop, emitted (F1-F5).
 

@@ -28,10 +28,10 @@ defmodule StatifierBlocks.BlockType do
   ## Required and optional callbacks
 
   Five callbacks are required; a module missing one of them is not a valid
-  `StatifierBlocks.BlockType` and fails to compile as one. Nine are
+  `StatifierBlocks.BlockType` and fails to compile as one. Ten are
   optional (`@optional_callbacks io: 1, migrate_config: 2, fixtures: 0,
   palette_entry: 0, outcomes: 1, failure_outcomes: 1, summary: 1,
-  donedata_type: 1, sentence: 1`); a
+  donedata_type: 1, sentence: 1, explain: 0`); a
   module that implements only the five required ones compiles cleanly, and
   each optional absence degrades to a stated default rather than an error:
 
@@ -51,6 +51,7 @@ defmodule StatifierBlocks.BlockType do
   | `summary/1` | no | the palette card has no second line |
   | `donedata_type/1` | no | the document's `<donedata>` carries only the params the compiler mints |
   | `sentence/1` | no | a block's one line of prose is the type's label |
+  | `explain/0` | no | the type's explanation is its palette entry's `description`, or none |
 
   ## Who owns what
 
@@ -67,6 +68,7 @@ defmodule StatifierBlocks.BlockType do
   | `failure_outcomes/1` | this record's 2026-09-06 Note; the reserved `<donedata>` key is `statifier_persistence`'s ADR-0008 |
   | `donedata_type/1` | ADR-0013 (the typed child summary); where the params go is ADR-0004's C1 |
   | `sentence/1` | this record's 2026-09-07 amendment; where the line is drawn is ADR-0005's |
+  | `explain/0` | ADR-0017 decision 1; where the paragraph is drawn is that record's decision 4 |
 
   ## Declaring the defaults instead of spelling them (ADR-0007)
 
@@ -836,6 +838,24 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback sentence(Block.config()) :: String.t()
 
+  @doc """
+  What every block of this type does, as one short paragraph for a reader
+  meeting the type for the first time (ADR-0017 decision 1).
+
+  Optional, and deliberately **not** injected by `use
+  StatifierBlocks.BlockType`: a type that does not declare it is explained
+  by its palette entry's `description`, or not at all, at `explain/1` on
+  this module, which is the resolver every consumer reads it through.
+
+  It takes no config because the paragraph is the same for every block of
+  the type; what one block does with its own config is `sentence/1`'s. It
+  is **pure** and it has **no cap**. Its line rule is `sentence/1`'s and no
+  other: a non-blank string carrying no newline, carriage return or tab.
+  An answer outside that rule, or a callback that raises, throws or exits,
+  is treated as though the type declared none.
+  """
+  @callback explain() :: String.t()
+
   @optional_callbacks io: 1,
                       migrate_config: 2,
                       fixtures: 0,
@@ -844,7 +864,8 @@ defmodule StatifierBlocks.BlockType do
                       failure_outcomes: 1,
                       summary: 1,
                       donedata_type: 1,
-                      sentence: 1
+                      sentence: 1,
+                      explain: 0
 
   # ADR-0002 amendment A1's default: a type that declares no outcomes has
   # exactly one, named `done`. Named once, here, so the compiler and the
@@ -1651,6 +1672,42 @@ defmodule StatifierBlocks.BlockType do
   end
 
   @doc """
+  The type's `explain/0` paragraph, or its palette entry's `description`,
+  or `nil` (ADR-0017 decision 1).
+
+  | The type | This answers |
+  |---|---|
+  | declares `explain/0`, and it answers a usable paragraph | that paragraph, verbatim, uncapped |
+  | declares none, or its answer is refused | the palette entry's `description`, when that is itself a usable line |
+  | neither of the above | `nil` |
+
+  "Usable" is the refusal set `sentence/2` holds a type's `sentence/1` to:
+  a non-string, a blank string, and a string carrying a newline, carriage
+  return or tab are refused, and a callback that raises, throws or exits
+  is treated as refused. Declaredness and the call go through
+  `StatifierBlocks.Palette.declares?/3` and `StatifierBlocks.Palette.call/4`,
+  so a stateful `{module, state}` reference resolves the way a bare module
+  does, and a module that is not loadable comes back `nil`.
+
+  Every shipped `core.*` type declares one, so for the core palette this
+  is always the type's own paragraph.
+
+      iex> text = StatifierBlocks.BlockType.explain(StatifierBlocks.Core.Sequence)
+      iex> text == StatifierBlocks.Core.Sequence.explain()
+      true
+
+      iex> StatifierBlocks.BlockType.explain(NoSuchModule)
+      nil
+  """
+  @spec explain(Palette.type_ref()) :: String.t() | nil
+  def explain(ref) do
+    declared =
+      if Palette.declares?(ref, :explain, 0), do: ref |> call_explain() |> line()
+
+    declared || description(ref)
+  end
+
+  @doc """
   The chips the palette entry's `summary(config)` declares, or `[]`
   (ADR-0002 amendment H2).
 
@@ -2035,6 +2092,28 @@ defmodule StatifierBlocks.BlockType do
   catch
     :throw, _thrown -> nil
     :exit, _reason -> nil
+  end
+
+  # `call_sentence/2`'s bounded rescue, for `explain/1`: a raise, a throw
+  # or an exit is a refused answer, and the resolver falls through to the
+  # palette description exactly as it does for any other refusal.
+  defp call_explain(ref) do
+    Palette.call(ref, :explain, [], nil)
+  rescue
+    _raised -> nil
+  catch
+    :throw, _thrown -> nil
+    :exit, _reason -> nil
+  end
+
+  # The palette entry's `description`, held to `line/1`. `explain/1`'s
+  # fallback, reached through the one seam like `label/1`.
+  @spec description(Palette.type_ref()) :: String.t() | nil
+  defp description(ref) do
+    case Palette.call(ref, :palette_entry, [], nil) do
+      %{description: description} -> line(description)
+      _no_description -> nil
+    end
   end
 
   # `chip/1`'s refusal set with the length arm removed, which is the whole
