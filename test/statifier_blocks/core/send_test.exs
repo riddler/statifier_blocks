@@ -356,6 +356,64 @@ defmodule StatifierBlocks.Core.SendTest do
     end
   end
 
+  describe "sentence/1" do
+    # Sabotage: named any binary `delay` rather than only one the duration
+    # grammar reads -> an empty or unreadable delay gained a clause, taking
+    # this red (verified).
+    test "is today's answer, byte for byte, when no delay is configured" do
+      assert Send.sentence(%{"event" => "loan.checked_out"}) == "Send loan.checked_out"
+
+      assert Send.sentence(%{"event" => "loan.checked_out", "delay" => ""}) ==
+               "Send loan.checked_out"
+
+      assert Send.sentence(%{"event" => "loan.checked_out", "delay" => "soon"}) ==
+               "Send loan.checked_out"
+
+      assert Send.sentence(%{"event" => "loan.checked_out", "delay" => nil}) ==
+               "Send loan.checked_out"
+
+      assert Send.sentence(%{"delay" => ""}) == "Send an event"
+      assert Send.sentence(%{}) == "Send an event"
+    end
+
+    # Sabotage: dropped the delay clause from `sentence/1` (answered
+    # `"Send " <> event` always) -> red on every row here (verified).
+    test "names a configured delay ahead of the event" do
+      assert Send.sentence(%{"event" => "loan.fines_notice", "delay" => "7d"}) ==
+               "In 7 days, send loan.fines_notice"
+
+      assert Send.sentence(%{"event" => "", "delay" => "7d"}) == "In 7 days, send an event"
+    end
+
+    # Sabotage: took the singular at zero rather than at one -> "1 hours"
+    # and "0 second", red (verified).
+    test "phrases the short duration form in words, one word per unit, singular at one" do
+      phrased = fn delay -> Send.sentence(%{"event" => "parcel.delivered", "delay" => delay}) end
+
+      assert phrased.("24h") == "In 24 hours, send parcel.delivered"
+      assert phrased.("1h30m") == "In 1 hour 30 minutes, send parcel.delivered"
+
+      assert phrased.("1y1mo1w1d1h1m1s1ms") ==
+               "In 1 year 1 month 1 week 1 day 1 hour 1 minute 1 second 1 millisecond, " <>
+                 "send parcel.delivered"
+
+      assert phrased.("2y3mo2w3d") == "In 2 years 3 months 2 weeks 3 days, send parcel.delivered"
+      assert phrased.("45s500ms") == "In 45 seconds 500 milliseconds, send parcel.delivered"
+      assert phrased.("0s") == "In 0 seconds, send parcel.delivered"
+    end
+
+    # Sabotage: dropped the largest-first check from the short-form match
+    # -> "3h2h" phrased as "3 hours 2 hours" and "30m1h" out of order, red
+    # (verified).
+    test "phrases any other stored duration spelling exactly as stored" do
+      phrased = fn delay -> Send.sentence(%{"event" => "parcel.delivered", "delay" => delay}) end
+
+      assert phrased.("1.5s") == "In 1.5s, send parcel.delivered"
+      assert phrased.("3h2h") == "In 3h2h, send parcel.delivered"
+      assert phrased.("30m1h") == "In 30m1h, send parcel.delivered"
+    end
+  end
+
   defp send_block(config), do: Block.new("core.send", id: "blk_SND", config: config)
 
   defp compile!(root) do

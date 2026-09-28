@@ -33,6 +33,7 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
   # callback's contract without a test of its own.
   @speaking_core [
     StatifierBlocks.Core.Sequence,
+    StatifierBlocks.Core.Send,
     StatifierBlocks.Core.Group,
     StatifierBlocks.Core.Await
   ]
@@ -283,7 +284,9 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
   describe "the core types' sentence/1 over generated configs" do
     # sabotage: interpolate the stored `timeout` unchecked in
     # `Core.Await.sentence/1` -> a generated "14d\n" or a non-binary
-    # reaches the line (a newline, or a raise on interpolation) -> red
+    # reaches the line (a newline, or a raise on interpolation) -> red;
+    # and `Core.Send.sentence/1` naming a stored `delay` the duration
+    # grammar does not read -> a generated "14d\n" reaches the line -> red
     test "is total, never raises and answers one non-blank line for any config" do
       for index <- 0..499, module <- @speaking_core do
         config = generated_config(index)
@@ -307,7 +310,7 @@ defmodule StatifierBlocks.ViewModel.SentenceTest do
     end
   end
 
-  @config_keys ["event", "timeout", "label", "duration", "outcome", "lanes", ""]
+  @config_keys ["event", "delay", "timeout", "label", "duration", "outcome", "lanes", ""]
   @config_values [
     "copy.returned",
     "email.verified",
