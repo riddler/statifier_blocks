@@ -1,0 +1,448 @@
+{
+  "children": [
+    {
+      "children": [
+        {
+          "height": 14,
+          "id": "blk_pr_root/start",
+          "kind": "start",
+          "width": 14
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_pr_deadline",
+                  "kind": "block",
+                  "lines": [
+                    "In 7 days, send word that the",
+                    "registration week is up"
+                  ],
+                  "mark": "clock",
+                  "title": "Send",
+                  "width": 227
+                },
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_pr_email",
+                  "kind": "block",
+                  "lines": [
+                    "Wait until the email address is",
+                    "verified"
+                  ],
+                  "mark": "wait",
+                  "title": "Wait for event",
+                  "width": 241
+                },
+                {
+                  "band": true,
+                  "caption": "A branch picks one path.",
+                  "caption_width": 218,
+                  "children": [
+                    {
+                      "children": [
+                        {
+                          "gap": true,
+                          "height": 60,
+                          "id": "blk_pr_guardian",
+                          "kind": "block",
+                          "lines": [
+                            "Wait until a guardian consents,",
+                            "giving up after 14d"
+                          ],
+                          "mark": "wait",
+                          "title": "Wait for event",
+                          "width": 241
+                        }
+                      ],
+                      "edges": [],
+                      "id": "blk_pr_age/arm_child",
+                      "kind": "slot",
+                      "layoutOptions": {
+                        "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                        "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                        "org.eclipse.elk.nodeSize.minimum": "(56,227)",
+                        "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+                      },
+                      "lines": [
+                        "When \"child\": patron.age < 13"
+                      ],
+                      "style": "arm",
+                      "title": "When \"child\""
+                    },
+                    {
+                      "children": [
+                        {
+                          "gap": true,
+                          "height": 44,
+                          "id": "blk_pr_card_ready",
+                          "kind": "block",
+                          "lines": [
+                            "Send word that the card is ready"
+                          ],
+                          "title": "Send",
+                          "width": 248
+                        }
+                      ],
+                      "edges": [],
+                      "id": "blk_pr_age/arm_adult",
+                      "kind": "slot",
+                      "layoutOptions": {
+                        "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                        "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                        "org.eclipse.elk.nodeSize.minimum": "(56,234)",
+                        "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+                      },
+                      "lines": [
+                        "When \"adult\": patron.age >= 13"
+                      ],
+                      "style": "arm",
+                      "title": "When \"adult\""
+                    },
+                    {
+                      "children": [
+                        {
+                          "height": 28,
+                          "id": "blk_pr_age/otherwise/empty",
+                          "kind": "empty",
+                          "lines": [],
+                          "parent": "blk_pr_age",
+                          "slot": "otherwise",
+                          "title": "Nothing here yet",
+                          "width": 150
+                        }
+                      ],
+                      "edges": [],
+                      "id": "blk_pr_age/otherwise",
+                      "kind": "slot",
+                      "layoutOptions": {
+                        "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                        "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                        "org.eclipse.elk.nodeSize.minimum": "(56,87)",
+                        "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+                      },
+                      "lines": [
+                        "Otherwise"
+                      ],
+                      "style": "arm",
+                      "title": "Otherwise"
+                    },
+                    {
+                      "children": [
+                        {
+                          "gap": true,
+                          "height": 60,
+                          "id": "blk_pr_visit",
+                          "kind": "block",
+                          "lines": [
+                            "Send word that the patron is",
+                            "asked to visit"
+                          ],
+                          "title": "Send",
+                          "width": 220
+                        }
+                      ],
+                      "edges": [],
+                      "id": "blk_pr_age/undecided",
+                      "kind": "slot",
+                      "layoutOptions": {
+                        "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                        "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                        "org.eclipse.elk.nodeSize.minimum": "(56,143)",
+                        "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+                      },
+                      "lines": [
+                        "Cannot be decided"
+                      ],
+                      "style": "arm",
+                      "title": "Cannot be decided"
+                    }
+                  ],
+                  "edges": [],
+                  "gap": true,
+                  "id": "blk_pr_age",
+                  "kind": "block",
+                  "layoutOptions": {
+                    "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                    "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                    "org.eclipse.elk.nodeSize.minimum": "(144,255)",
+                    "org.eclipse.elk.padding": "[top=132,left=12,bottom=12,right=12]"
+                  },
+                  "lines": [
+                    "One of, in order:",
+                    "1. When \"child\": patron.age < 13",
+                    "2. When \"adult\": patron.age >= 13",
+                    "3. Otherwise",
+                    "4. Cannot be decided"
+                  ],
+                  "title": "Branch"
+                },
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_pr_welcome",
+                  "kind": "block",
+                  "lines": [
+                    "Send word that the patron is",
+                    "welcomed"
+                  ],
+                  "title": "Send",
+                  "width": 220
+                }
+              ],
+              "edges": [
+                {
+                  "id": "blk_pr_deadline->blk_pr_email",
+                  "kind": "sequence",
+                  "sources": [
+                    "blk_pr_deadline"
+                  ],
+                  "targets": [
+                    "blk_pr_email"
+                  ]
+                },
+                {
+                  "id": "blk_pr_email->blk_pr_age",
+                  "kind": "sequence",
+                  "sources": [
+                    "blk_pr_email"
+                  ],
+                  "targets": [
+                    "blk_pr_age"
+                  ]
+                },
+                {
+                  "id": "blk_pr_age->blk_pr_welcome",
+                  "kind": "rejoin",
+                  "sources": [
+                    "blk_pr_age"
+                  ],
+                  "targets": [
+                    "blk_pr_welcome"
+                  ]
+                }
+              ],
+              "id": "blk_pr_verify/body",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(216,327)",
+                "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+              },
+              "lines": [
+                "Steps"
+              ],
+              "style": "body",
+              "title": "Steps"
+            },
+            {
+              "caption": "A group holds a run of steps...",
+              "children": [
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_pr_abandoned",
+                  "kind": "block",
+                  "lines": [
+                    "When the registration is",
+                    "abandoned, abandon"
+                  ],
+                  "title": "On event",
+                  "width": 192
+                },
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_pr_expired",
+                  "kind": "block",
+                  "lines": [
+                    "When the registration week is up,",
+                    "abandon"
+                  ],
+                  "title": "On event",
+                  "width": 255
+                }
+              ],
+              "edges": [],
+              "id": "blk_pr_verify/interrupts",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.algorithm": "layered",
+                "org.eclipse.elk.direction": "RIGHT",
+                "org.eclipse.elk.hierarchyHandling": "SEPARATE_CHILDREN",
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.layered.layering.layerConstraint": "LAST",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(241,72)",
+                "org.eclipse.elk.padding": "[top=60,left=12,bottom=12,right=12]",
+                "org.eclipse.elk.separateConnectedComponents": "false",
+                "org.eclipse.elk.spacing.nodeNode": "24"
+              },
+              "lines": [
+                "Interrupt rules"
+              ],
+              "style": "rail",
+              "title": "Interrupt rules"
+            }
+          ],
+          "edges": [],
+          "gap": true,
+          "id": "blk_pr_verify",
+          "interrupts": [
+            {
+              "head": "blk_pr_deadline",
+              "id": "blk_pr_abandoned->blk_pr_verify/exit",
+              "kind": "interrupt",
+              "sources": [
+                "blk_pr_abandoned"
+              ],
+              "targets": [
+                "blk_pr_verify"
+              ],
+              "to": "exit"
+            },
+            {
+              "head": "blk_pr_deadline",
+              "id": "blk_pr_expired->blk_pr_verify/exit",
+              "kind": "interrupt",
+              "sources": [
+                "blk_pr_expired"
+              ],
+              "targets": [
+                "blk_pr_verify"
+              ],
+              "to": "exit"
+            }
+          ],
+          "kind": "block",
+          "layoutOptions": {
+            "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+            "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+            "org.eclipse.elk.nodeSize.minimum": "(56,185)",
+            "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+          },
+          "lines": [
+            "Run interruptible steps"
+          ],
+          "title": "Group"
+        },
+        {
+          "height": 20,
+          "id": "blk_pr_root/end/done",
+          "kind": "end",
+          "outcome": "done",
+          "width": 20
+        },
+        {
+          "height": 20,
+          "id": "blk_pr_root/end/abandon",
+          "kind": "end",
+          "outcome": "abandon",
+          "width": 20
+        }
+      ],
+      "edges": [
+        {
+          "id": "blk_pr_root/start->blk_pr_verify",
+          "kind": "start",
+          "labels": [
+            {
+              "height": 16,
+              "id": "blk_pr_root/start/caption",
+              "text": "Starts when told to",
+              "width": 157
+            }
+          ],
+          "sources": [
+            "blk_pr_root/start"
+          ],
+          "targets": [
+            "blk_pr_verify"
+          ]
+        },
+        {
+          "id": "blk_pr_verify->blk_pr_root/end/done",
+          "kind": "end",
+          "labels": [
+            {
+              "height": 16,
+              "id": "blk_pr_verify->blk_pr_root/end/done/caption",
+              "text": "done",
+              "width": 52
+            }
+          ],
+          "outcome": "done",
+          "sources": [
+            "blk_pr_verify"
+          ],
+          "targets": [
+            "blk_pr_root/end/done"
+          ]
+        },
+        {
+          "id": "blk_pr_verify->blk_pr_root/end/abandon",
+          "kind": "end",
+          "labels": [
+            {
+              "height": 16,
+              "id": "blk_pr_verify->blk_pr_root/end/abandon/caption",
+              "text": "abandon",
+              "width": 73
+            }
+          ],
+          "outcome": "abandon",
+          "sources": [
+            "blk_pr_verify"
+          ],
+          "targets": [
+            "blk_pr_root/end/abandon"
+          ]
+        }
+      ],
+      "gap": false,
+      "id": "blk_pr_root",
+      "kind": "block",
+      "layoutOptions": {
+        "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+        "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+        "org.eclipse.elk.nodeSize.minimum": "(56,178)",
+        "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+      },
+      "lines": [
+        "Run its steps in order"
+      ],
+      "title": "Sequence"
+    }
+  ],
+  "edges": [],
+  "id": "plan-map",
+  "layoutOptions": {
+    "org.eclipse.elk.algorithm": "layered",
+    "org.eclipse.elk.direction": "DOWN",
+    "org.eclipse.elk.edgeRouting": "ORTHOGONAL",
+    "org.eclipse.elk.hierarchyHandling": "INCLUDE_CHILDREN",
+    "org.eclipse.elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+    "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+    "org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers": "28",
+    "org.eclipse.elk.spacing.nodeNode": "24"
+  },
+  "timers": [
+    {
+      "delay": "7d",
+      "event": "registration.deadline",
+      "id": "blk_pr_deadline->blk_pr_expired/timer",
+      "kind": "timer",
+      "sources": [
+        "blk_pr_deadline"
+      ],
+      "targets": [
+        "blk_pr_expired"
+      ]
+    }
+  ]
+}
