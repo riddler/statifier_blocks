@@ -1135,8 +1135,15 @@
  * It reclaims them by WRAPPING inside the column rather than by widening it.
  * The column's width comes from the grid template, which no state
  * redeclares, and from the members' own boxes, which are the same in every
- * state; so the title keeps the width it had at rest, and what a reveal can
- * change is the strip's height, by the rows its wrapped members take. */
+ * state. That holds the width under one condition (ADR-0005's Note of
+ * 2026-09-27, item 1): the `overflow` is not the same in every state. At rest
+ * `overflow: hidden` lets the strip's track shrink to nothing; here
+ * `overflow: visible` floors it at the widest single member. So the title
+ * keeps the width it had at rest WHILE THE WIDEST SINGLE STRIP MEMBER FITS in
+ * the width the title's minimum leaves the strip, and then what a reveal can
+ * change is the strip's height, by the rows its wrapped members take. A
+ * member wider than that would widen the revealed track and the widths would
+ * move. */
 .sb-node__chrome:hover > .sb-node__strip,
 .sb-node--selected > .sb-node__chrome > .sb-node__strip,
 .sb-node__chrome > .sb-node__strip:focus-within,
