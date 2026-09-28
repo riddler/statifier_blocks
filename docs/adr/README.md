@@ -9,6 +9,8 @@
 | [0003](0003-assignability.md) | Assignability is opaque-string identity plus a host-supplied widening relation | accepted |
 | [0004](0004-compiler-provenance.md) | One block, one state - a deterministic compile carrying a provenance map | accepted |
 | [0005](0005-liveview-editor.md) | The editor is a pure command algebra and view model with a thin LiveView shell | accepted |
+| [0005 Amendment 2026-09-28](0005-liveview-editor.md#amendment-2026-09-28-decision-7-one-hook-pushes-commands-any-number-of-hooks-may-only-measure-or-draw) | Decision 7: one hook pushes commands; any number of hooks may only measure or draw, and the Map's hook is the first that only draws | proposed |
+| [0005 Amendment 2026-09-28](0005-liveview-editor.md#amendment-2026-09-28-decision-1-the-repositorys-tests-run-node-for-the-map-hook-the-package-still-bundles-nothing-and-a-host-needs-no-node) | Decision 1: the repository's tests run Node for the Map hook; the package still bundles nothing and a host needs no Node | proposed |
 | [0006](0006-datamodel-document.md) | The datamodel document is a typed, three-scope declaration, and the declared-path set is its projection | accepted |
 | [0007](0007-block-type-defaults.md) | A block type declares its defaults with `use`, and the leaf invoke step is one declaration | accepted |
 | [0008](0008-durable-subchart-handler.md) | The durable subchart handler answers at dispatch time, not from a pure `start/2`, and its refusal set gains exactly one reason | accepted |
@@ -22,6 +24,7 @@
 | [0015 Amendment 2026-09-28](0015-block-document-json-schema.md#amendment-2026-09-28-decision-6-generated-host-definitions-type-their-declared-fields) | Decision 6: a host type's generated definition types its declared fields through the same mapping, and the invariant is restated on the binding check | accepted |
 | [0016](0016-document-describes-itself.md) | A document describes itself deterministically - block sentences joined by flow-graph edges read from structure, a host phrasing seam, and no model anywhere | accepted |
 | [0017](0017-block-types-explain-themselves.md) | Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe | accepted |
+| [0018](0018-the-map-reads-the-view-model.md) | The Map is a reader of the view model - a drawn projection beside a host's list, elkjs vendored whole, draw-only hooks, and one struct in | proposed |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
