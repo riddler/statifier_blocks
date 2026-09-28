@@ -361,3 +361,77 @@ They are met here, not edited.
   that a dated Note at the foot of the note says where the computation is.
   `docs/block-level-flow-graph.md` carries that Note (`## Note (2026-09-26):
   where the graph is computed`), and the module has shipped.
+
+## Amendment (2026-09-27): decision 1's event-name rule gains one named exception - the `:timer` edge
+
+**Status: proposed (2026-09-27, drafted under the operator's campaign
+consent on the operator's ruling of that date).** It merges at proposed;
+flipping this section's status line to accepted is a separate request
+through the same `docs/adr/` gate, after the code that builds it has shipped
+in a published version. The record's own `Status:` line (`:3`) is not
+changed by it.
+
+Code cites below were read at `91fd2a1` and carry their anchors; re-locate
+by anchor, not by number.
+
+### Why this is an amendment
+
+Decision 1 says: "No edge joins two blocks by an event name alone. A
+`core.send` and a handler listening for the same name share a string, not a
+transition, and the describe draws nothing between them". `ADR-0017`
+decision 3 draws exactly such an edge for one pair, a delayed `core.send`
+and the rule or await that names its event. That changes what decision 1
+decides, so it is recorded here as an amendment with a status line rather
+than as a Note, and `ADR-0017` does not decide it alone.
+
+### The amendment
+
+1. **One named exception.** Decision 1's event-name rule holds for every
+   pair except one: a `core.send` whose `delay` is a duration
+   `StatifierBlocks.Core.Duration.duration?/1` accepts
+   (`lib/statifier_blocks/core/duration.ex:81`, `def duration?`), and a
+   `core.on_event` or `core.await` in the same document whose `event` config
+   is the send's `event`. For that pair `outline/3` answers one `:timer`
+   edge from `{:block, send}` to `{:block, rule_or_await}`, whose
+   `container` is the send's parent block. The shapes and the order are
+   `ADR-0017` decision 3's. An undelayed send, and any other pair sharing a
+   name, still draws nothing.
+2. **A sixth edge kind, found outside the four container types.** Decision
+   1 finds edges "for exactly the four `core.*` types the note works
+   through"; the timer edge is found across the whole document instead,
+   over blocks the palette resolved, and a block inside a `core.drafts`
+   shelf takes part in none. The four container types' edges are
+   unchanged, and every other type is still described by containment only.
+3. **A field for the label.** `StatifierBlocks.Describe.Edge`
+   (`lib/statifier_blocks/describe/edge.ex:49`, `defstruct`) gains `delay`,
+   the send's delay as its config holds it, set on a `:timer` edge and `nil`
+   on every other kind; the edge's existing `event` field carries the sent
+   event. The `kind` type (`edge.ex:30`, `@type kind`) admits `:timer`.
+4. **Decision 2's order and words.** Timer edges follow every edge decision
+   2 orders, in the outline's order of their sends and then of their
+   targets. Their default line is `In <delay>, <event> reaches <S(to)>`,
+   with the delay written as `ADR-0017` decision 2 writes it, under the line
+   contract decision 2 states.
+5. **Decision 3 gains `timer/2`.** `StatifierBlocks.Describe.Phrasing`
+   (`lib/statifier_blocks/describe/phrasing.ex:72`, `@optional_callbacks`)
+   gains one optional callback, `timer/2`, asked for a `:timer` edge, with
+   the same arguments, answers and refusal set as the other nine.
+
+### What this amendment does not change
+
+- **No existing edge or line changes.** A document with no delayed send
+  describes and renders byte for byte as before; a document with one gains
+  its timer edges after all the others and loses nothing.
+- **Still no compile.** The edge is read from the document's config;
+  decision 4's "no model anywhere" and the inputs the Note of 2026-09-27
+  names are unchanged.
+- **Not a chart edge.** The timer edge is not a transition, and
+  `docs/block-level-flow-graph.md`'s sentence that a send and a handler
+  sharing a name are not an edge stays true of the chart and of the graph
+  the note lifts. The note is not edited by this amendment.
+- **The acceptance shape grows by one edge.** The patron registration
+  document's describe gains the timer edge from `blk_PDLN` to `blk_PEXP`
+  beyond the note's lifted listing; the library loan has no delayed send
+  and gains none. The building request asserts both.
+
+Filed with `sb-q9d7`; `sb-1vro` builds it.
