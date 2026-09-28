@@ -1116,6 +1116,18 @@ palette_refuses =
 #=> true
 ```
 
+The package holds a config to the same declared field types: a value its
+field's declared type does not admit is refused at compile, at the edit gate
+and in the view model, ahead of the type's own `validate_config/1` findings.
+Before taking the version that made that so, run
+`StatifierBlocks.Palette.preflight/1` over your palette. It lists every host
+type whose own defaults, or the block `Palette.new_block/2` builds from them,
+disagree with their declared field types, each finding naming the type, the
+field's key, its declared type and the value; a type whose callbacks raise is
+listed, not raised. `StatifierBlocks.Palette.preflight/2` takes the documents
+you store as well and also lists every block of a type the palette carries
+whose config would be refused, by block id. An empty list means you are ready.
+
 ### Describing a document
 
 `StatifierBlocks.Describe.outline/3` reads a document under a palette into

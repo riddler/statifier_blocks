@@ -107,6 +107,7 @@ defmodule StatifierBlocks.Palette do
   """
 
   alias StatifierBlocks.{Block, Core}
+  alias StatifierBlocks.Palette.Preflight
 
   @typedoc "A recipe's name, as the palette browser and a pick name it."
   @type recipe_name :: String.t()
@@ -704,6 +705,91 @@ defmodule StatifierBlocks.Palette do
       _error ->
         :error
     end
+  end
+
+  @typedoc """
+  One finding of `preflight/1` or `preflight/2`: a plain map a host can
+  match on. Every finding carries the block type's name under `:type`, the
+  block's id under `:block_id` (`nil` when the finding is about the type
+  itself rather than a block of a document), and an author-facing
+  `:message`. The rest says which of two things it is:
+
+    * a **field type the value disagrees with**: `:key` is the field's key,
+      `:declared_type` its declared field type as `config_schema/1` spells
+      it, and `:value` the value its declared type does not admit. The
+      `:message` is the binding check's own, the one a compile of that
+      config reports under the field;
+    * a **callback that raised**: `:raised` names the step the pre-flight
+      was taking - `:config_schema` (reading the type's declarations, for
+      its defaults or for a document block's config), `:new_block`
+      (building a fresh block of it with `new_block/2`) or `:resolve`
+      (resolving a document's block with `resolve/2`, which may migrate
+      it) - and the `:message` is the raise's banner.
+  """
+  @type preflight_finding ::
+          %{
+            type: Block.type_name(),
+            block_id: Block.id() | nil,
+            key: String.t(),
+            declared_type: StatifierBlocks.BlockType.field_type(),
+            value: Block.json(),
+            message: String.t()
+          }
+          | %{
+              type: Block.type_name(),
+              block_id: Block.id() | nil,
+              raised: :config_schema | :new_block | :resolve,
+              message: String.t()
+            }
+
+  @doc """
+  Lists every host type in `palette` whose own defaults disagree with its
+  declared field types: the question to ask before taking the minor that
+  makes a declared field type binding (ADR-0002 decision 7, amended
+  2026-09-28). An empty list means the palette is ready.
+
+  A **host type** is every entry except this package's own core module
+  under its core name (`core_types/0`), so `Palette.core()` answers `[]`; a
+  host's own module registered under a `core.*` name is a host type. For
+  each one, in type-name order, it judges through the same binding check
+  the compiler, the edit gate and the view model run:
+
+    * each field's `default` in `config_schema(%{})`, against the
+      declaration that carries it, and
+    * the config of the block `new_block/2` builds for the type.
+
+  The two usually find one value; a value is listed once. Every rule past
+  a field's type stays the type's own `validate_config/1`, which the
+  pre-flight does not call. See `t:preflight_finding/0` for the shape.
+
+  Pure over `palette`, and it never raises on a type: a type whose
+  `config_schema/1` or `new_block/2` raises is a finding of its own, and
+  the rest of the palette is still judged.
+
+      iex> StatifierBlocks.Palette.preflight(StatifierBlocks.Palette.core())
+      []
+  """
+  @spec preflight(t()) :: [preflight_finding()]
+  def preflight(%__MODULE__{} = palette), do: Preflight.palette(palette)
+
+  @doc """
+  `preflight/1`, then every block of `documents` whose type `palette`
+  carries, judged as a compile judges it: resolved through `resolve/2`
+  first (so an older stored block is judged as migrated in memory), then
+  its config through the binding check. Each such finding names the block
+  under `:block_id`. Hand it the documents a host already stores to find
+  the configs the binding minor will refuse.
+
+  A block whose type `palette` does not carry is not judged, and nor is a
+  block `resolve/2` refuses: that refusal is already `resolve/2`'s. Core
+  types' blocks are judged like any other, since the binding holds for
+  them too. Findings come in `documents` order, each document's blocks in
+  `StatifierBlocks.Document.blocks/1` order. Pure over its arguments; a
+  raising callback is a finding, never a raise.
+  """
+  @spec preflight(t(), [StatifierBlocks.Document.t()]) :: [preflight_finding()]
+  def preflight(%__MODULE__{} = palette, documents) when is_list(documents) do
+    preflight(palette) ++ Preflight.documents(palette, documents)
   end
 
   @doc """

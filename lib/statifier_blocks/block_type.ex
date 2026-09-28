@@ -1232,10 +1232,24 @@ defmodule StatifierBlocks.BlockType do
   def field_type_findings(ref, config) do
     ref
     |> Palette.call(:config_schema, [config], [])
-    |> Enum.flat_map(&field_type_finding(&1, config))
+    |> field_type_violations(config)
+    |> Enum.map(fn {_decl, _value, finding} -> finding end)
   end
 
-  @spec field_type_finding(field_decl(), Block.config()) :: [finding()]
+  # The same check over declarations the caller already holds, answering
+  # each refusal with the declaration and the value it refused beside the
+  # finding. `StatifierBlocks.Palette.preflight/1` reads a type's defaults
+  # through it, where the declarations come from `config_schema(%{})` and
+  # the value judged is each field's own `default`.
+  @doc false
+  @spec field_type_violations([field_decl()], Block.config()) ::
+          [{field_decl(), Block.json(), finding()}]
+  def field_type_violations(declarations, config) do
+    Enum.flat_map(declarations, &field_type_finding(&1, config))
+  end
+
+  @spec field_type_finding(field_decl(), Block.config()) ::
+          [{field_decl(), Block.json(), finding()}]
   defp field_type_finding(%{type: {:type_expr, _opts}}, _config), do: []
 
   defp field_type_finding(%{key: key, type: type} = decl, config) when is_binary(key) do
@@ -1245,7 +1259,7 @@ defmodule StatifierBlocks.BlockType do
          {:ok, value} when not is_nil(value) <- fetch_value(config, path),
          {:ok, fragment} <- FieldType.binding_schema(type),
          false <- FieldType.admits?(fragment, value) do
-      [{key, field_type_message(key, type, value)}]
+      [{decl, value, {key, field_type_message(key, type, value)}}]
     else
       _judged_or_not_judged -> []
     end
