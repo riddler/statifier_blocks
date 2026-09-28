@@ -1093,10 +1093,12 @@ also judged by its own type's definition: a `core.*` type's from
 `definitions/core`, and a host type's generated from its declared
 `config_schema/1` and `slots/1`, each declared field typed from its declared
 field type (or `null`) with its label as `title` and its default as
-`default`. A block of a type the palette does not carry is judged by the
-generic shape alone, and nothing past a field's type is checked: bounds,
-cross-field rules and whether a field must be present stay with the type's
-`validate_config/1`.
+`default`. A `core.*` type is judged by its `definitions/core` entry as
+shipped, required keys and identifier patterns included. For a host type,
+nothing past a field's declared type is checked: bounds, cross-field rules and
+whether a field must be present stay with the type's `validate_config/1`. A
+block of a type the palette does not carry is judged by the generic shape
+alone.
 
 ```elixir
 palette_schema =
