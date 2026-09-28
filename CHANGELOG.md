@@ -11,6 +11,31 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.37.0] 2026-09-28
+
+0.37.0 is a minor, because it adds to the public surface and changes no
+existing signature. A block type can now say what every block of it does:
+`StatifierBlocks.BlockType` gains an optional `explain/0` callback and the
+resolver `explain/1`, and every `core.*` type declares one.
+`StatifierBlocks.Describe` draws a new edge kind, `:timer`, from a delayed
+`core.send` to the rule or await that names its event, carrying the delay
+in `StatifierBlocks.Describe.Edge`'s new `delay` field, which a host
+rewords through the new optional `Phrasing.timer/2` callback. The one
+change to an existing answer is `core.send`'s card line for a delayed
+send, which now names the delay, under Changed. Upgrading a host: nothing
+needs migrating, the package gains no dependency, and a document with no
+delayed `core.send` reads and describes exactly as it did in 0.36.1.
+
+### Added
+
+- `StatifierBlocks.BlockType` gains an optional `explain/0` callback, one short paragraph saying what every block of the type does, and the resolver `StatifierBlocks.BlockType.explain/1`, which answers that paragraph, else the palette entry's `description`, else `nil`, through the palette so a `{module, state}` type resolves the same way; every `core.*` type declares one.
+
+- `StatifierBlocks.Describe.outline/3` answers a new edge kind, `:timer`, from a delayed `core.send` to every `core.on_event` and `core.await` in the document that names its event, after every other edge and carrying the delay in `StatifierBlocks.Describe.Edge`'s new `delay` field; `render/2` writes it as `In 24 hours, registration.deadline reaches ...`, and a phrasing module rewords it through the new optional `StatifierBlocks.Describe.Phrasing.timer/2` callback. A document with no delayed send describes exactly as before.
+
+### Changed
+
+- A `core.send` block with a delay names that delay on its card line: `sentence/1` answers `In 7 days, send loan.fines_notice` where it answered `Send loan.fines_notice`, the short duration form put in words and any other stored spelling shown as stored, and the `StatifierBlocks.Describe` lines built from that sentence change with it; a send with no delay reads exactly as before.
+
 ## [0.36.1] 2026-09-27
 
 0.36.1 is a patch, because it changes no public function, option or
@@ -3581,6 +3606,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.37.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.37.0
 [0.36.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.1
 [0.36.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.0
 [0.35.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.35.1
