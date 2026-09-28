@@ -802,6 +802,40 @@ defmodule StatifierBlocks.DescribeTest do
     end
   end
 
+  describe "a palette's document validators" do
+    # A validator that records each call by messaging the calling process -
+    # the side effect the moduledoc says the describe cannot prevent - and
+    # answers a finding on the root and one on the document.
+    defmodule Recorder do
+      @behaviour StatifierBlocks.DocumentValidator
+
+      @impl true
+      def validate_document(%Document{root: root} = document) do
+        send(self(), {:validated, document.id})
+        [{{:block, root.id}, "recorded"}, {:document, "recorded"}]
+      end
+    end
+
+    # Sabotage: in `Describe.outline/3`, build the view model with
+    # `%{palette | validators: []}` -> the recorder is never called, red.
+    test "outline/3 runs them, and the outline is the same with or without them" do
+      palette =
+        Palette.new(Palette.core_types(), recipes: Palette.core_recipes(), validators: [Recorder])
+
+      for document <- [
+            decode!(@library_loan)
+            | Enum.map(0..19, &DocumentGenerator.generate(20_260_928, &1))
+          ] do
+        id = document.id
+        with_validator = Describe.outline(document, palette, [])
+
+        assert_received {:validated, ^id}
+        assert with_validator == outline(document)
+        assert Describe.render(with_validator, []) == document |> outline() |> Describe.render([])
+      end
+    end
+  end
+
   describe "determinism" do
     # Sabotage: in `Describe.node_line/1`'s first clause, append
     # `:erlang.unique_integer()` -> two renders differ, red.
