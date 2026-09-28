@@ -1460,6 +1460,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       String.trim(Enum.at(match, 1))
     end
 
+    # A property's declared value in a rule body, `nil` when the rule leaves
+    # it undeclared - which is what the cascade reads as "the rest rule's
+    # value stands" when the body is the reclaim rule's.
+    defp declared(body, property) do
+      case Regex.run(~r/^\s*#{Regex.escape(property)}:\s*(.*?);/m, body) do
+        [_, value] -> String.trim(value)
+        nil -> nil
+      end
+    end
+
+    # A library loan's renewal steps under a group the author has not named:
+    # the group's card is titled by its type's label alone, so it has one
+    # line of text and no second line, and its strip holds the Save stand-in,
+    # the fold and the `x`.
+    defp strip_rows_document do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_loan_root",
+          slots: %{
+            "body" => [
+              Block.new("core.group",
+                id: "blk_renewal",
+                slots: %{"body" => [EditorFixtures.wait("blk_due_date", "14d")]}
+              )
+            ]
+          }
+        ),
+        id: "doc_loan_renewal"
+      )
+    end
+
     defp strip_member?(view, id, class) do
       has_element?(
         view,
@@ -1715,26 +1746,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                "the minimum is written against a type size the title does not use"
       end
 
-      # The yield. At rest the strip lays its members out on one line and
-      # clips what the minimum leaves no room for, so the title keeps its
-      # minimum and a clipped member - hidden at rest - cannot take a pointer
-      # outside the card.
+      # The yield. At rest the strip clips what the minimum leaves no room
+      # for, so the title keeps its minimum and a clipped member - hidden at
+      # rest - cannot take a pointer outside the card. It wraps its members
+      # at rest as well (ADR-0005's Amendment of 2026-09-28 on item 4's
+      # strip), so the rows they take are held while they are hidden.
       # Sabotage (run): dropped `overflow: hidden` - the strip's clipped
       # members spill past the card at rest and this goes red.
-      test "at rest the strip keeps one line and clips what the title's minimum leaves no room for" do
+      test "at rest the strip wraps its members and clips what the title's minimum leaves no room for" do
         css = File.read!(@stylesheet)
 
         strip = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-node__strip\s*\{(.*?)\n\}/ms)
 
-        assert declaration!(strip, "flex-wrap") == "nowrap"
+        assert declaration!(strip, "flex-wrap") == "wrap"
         assert declaration!(strip, "overflow") == "hidden"
       end
 
       # The reclaim. On hover, on the selected card, under keyboard focus and
       # whenever a member is revealed at all times, the strip gives every
-      # member back by wrapping inside its column. It declares nothing else:
-      # no width and no template, so the title's column is the same width at
-      # rest and revealed.
+      # member back by giving up its clip. It declares nothing else: no
+      # width, no template and no wrap of its own, so the title's column is
+      # the same width at rest and revealed and the strip's rows are the ones
+      # it already had at rest.
       # Sabotage (run): removed the selected-card selector from the list - a
       # selected card keeps its strip clipped and this goes red naming it.
       test "on hover, selection, focus and an always-revealed member the strip reclaims every member" do
@@ -1747,9 +1780,64 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "the strip does not reclaim its members under `#{selector}`"
         end
 
-        assert declared_properties(body) == ["flex-wrap", "overflow"]
-        assert declaration!(body, "flex-wrap") == "wrap"
+        assert declared_properties(body) == ["overflow"]
         assert declaration!(body, "overflow") == "visible"
+      end
+
+      # The card shape the hover growth was reported for, small: a one-line
+      # title, no second line, and a strip of three members (the Save
+      # stand-in, the fold and the `x`), which wraps to more than one row
+      # whenever its members together are wider than the width the title's
+      # minimum leaves it. Where the strip's rows stand taller than the one
+      # line of text, the card's height follows the strip's, so the card is
+      # the same height at rest and on hover when the strip's box is. This
+      # pins that on the rules the card's strip resolves: every declaration
+      # that sizes the strip's height resolves the same at rest and revealed,
+      # and the members' own boxes are the same in every state (the describe
+      # "the reservation holds across SELECTION too", below).
+      # No pixel height is read: there is no browser in this suite.
+      # Sabotage (run): `flex-wrap: nowrap` back on the rest rule - the strip
+      # keeps one row at rest and wraps only when revealed, and this goes red
+      # on `flex-wrap`.
+      test "a card whose text is shorter than its wrapped strip is the same height at rest and on hover",
+           %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: strip_rows_document(),
+            palette: Palette.from_modules([], core: true)
+          )
+
+        card = ~s([data-block-id="blk_renewal"] > .sb-node__chrome)
+
+        assert has_element?(view, card <> " > .sb-node__label", "Group")
+
+        for second_line <- ~w(.sb-node__type .sb-node__summary .sb-node__invoke) do
+          refute has_element?(view, card <> " > " <> second_line),
+                 "the fixture card draws a second line (#{second_line})"
+        end
+
+        for member <- ~w(.sb-node__strip-reserve .sb-node__fold .sb-node__remove) do
+          assert has_element?(view, card <> " > .sb-node__strip > " <> member),
+                 "the fixture card's strip lacks #{member}"
+        end
+
+        css = File.read!(@stylesheet)
+        rest = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-node__strip\s*\{(.*?)\n\}/ms)
+        {_selectors, revealed} = reclaim_rule!(css)
+
+        for property <-
+              ~w(display flex-direction flex-wrap align-content align-items gap row-gap
+                 height min-height max-height padding line-height font-size) do
+          at_rest = declared(rest, property)
+          on_hover = declared(revealed, property) || at_rest
+
+          assert on_hover == at_rest,
+                 "the strip's `#{property}` is #{inspect(at_rest)} at rest and " <>
+                   "#{inspect(on_hover)} on hover, so its height moves"
+        end
+
+        assert declared(rest, "flex-wrap") == "wrap",
+               "the strip keeps one row at rest, so its wrapped rows are not reserved"
       end
 
       # A reveal rule for a strip control is only safe while the strip
