@@ -1,0 +1,408 @@
+{
+  "children": [
+    {
+      "children": [
+        {
+          "height": 14,
+          "id": "blk_ll_root/start",
+          "kind": "start",
+          "width": 14
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "gap": true,
+                  "height": 44,
+                  "id": "blk_ll_loan_period",
+                  "kind": "block",
+                  "lines": [
+                    "Wait 21d"
+                  ],
+                  "title": "Wait",
+                  "width": 150
+                }
+              ],
+              "edges": [],
+              "id": "blk_ll_on_loan/body",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(216,313)",
+                "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+              },
+              "lines": [
+                "Steps"
+              ],
+              "style": "body",
+              "title": "Steps"
+            },
+            {
+              "caption": "A group holds a run of steps...",
+              "children": [
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_ll_returned_early",
+                  "kind": "block",
+                  "lines": [
+                    "When the copy is returned,",
+                    "abandon"
+                  ],
+                  "title": "On event",
+                  "width": 206
+                },
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_ll_reported_lost",
+                  "kind": "block",
+                  "lines": [
+                    "When the copy is reported lost,",
+                    "abandon"
+                  ],
+                  "title": "On event",
+                  "width": 241
+                }
+              ],
+              "edges": [],
+              "id": "blk_ll_on_loan/interrupts",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.algorithm": "layered",
+                "org.eclipse.elk.direction": "RIGHT",
+                "org.eclipse.elk.hierarchyHandling": "SEPARATE_CHILDREN",
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.layered.layering.layerConstraint": "LAST",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(241,72)",
+                "org.eclipse.elk.padding": "[top=60,left=12,bottom=12,right=12]",
+                "org.eclipse.elk.separateConnectedComponents": "false",
+                "org.eclipse.elk.spacing.nodeNode": "24"
+              },
+              "lines": [
+                "Interrupt rules"
+              ],
+              "style": "rail",
+              "title": "Interrupt rules"
+            }
+          ],
+          "edges": [],
+          "gap": true,
+          "id": "blk_ll_on_loan",
+          "interrupts": [
+            {
+              "head": "blk_ll_loan_period",
+              "id": "blk_ll_returned_early->blk_ll_on_loan/exit",
+              "kind": "interrupt",
+              "sources": [
+                "blk_ll_returned_early"
+              ],
+              "targets": [
+                "blk_ll_on_loan"
+              ],
+              "to": "exit"
+            },
+            {
+              "head": "blk_ll_loan_period",
+              "id": "blk_ll_reported_lost->blk_ll_on_loan/exit",
+              "kind": "interrupt",
+              "sources": [
+                "blk_ll_reported_lost"
+              ],
+              "targets": [
+                "blk_ll_on_loan"
+              ],
+              "to": "exit"
+            }
+          ],
+          "kind": "block",
+          "layoutOptions": {
+            "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+            "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+            "org.eclipse.elk.nodeSize.minimum": "(56,185)",
+            "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]",
+            "org.eclipse.elk.portConstraints": "FIXED_POS"
+          },
+          "lines": [
+            "Run interruptible steps"
+          ],
+          "ports": [
+            {
+              "height": 0,
+              "id": "blk_ll_on_loan#in",
+              "layoutOptions": {
+                "org.eclipse.elk.port.side": "NORTH"
+              },
+              "width": 0,
+              "x": 99.0,
+              "y": 0
+            },
+            {
+              "height": 0,
+              "id": "blk_ll_on_loan#out",
+              "layoutOptions": {
+                "org.eclipse.elk.port.side": "SOUTH"
+              },
+              "width": 0,
+              "x": 99.0,
+              "y": 0
+            }
+          ],
+          "title": "Group"
+        },
+        {
+          "band": true,
+          "caption": "A branch picks one path.",
+          "caption_width": 218,
+          "children": [
+            {
+              "children": [
+                {
+                  "gap": true,
+                  "height": 44,
+                  "id": "blk_ll_close",
+                  "kind": "block",
+                  "lines": [
+                    "Send word that the loan is closed"
+                  ],
+                  "title": "Send",
+                  "width": 255
+                }
+              ],
+              "edges": [],
+              "id": "blk_ll_due/arm_returned",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(56,234)",
+                "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+              },
+              "lines": [
+                "When \"returned\": loan.returned"
+              ],
+              "style": "arm",
+              "title": "When \"returned\""
+            },
+            {
+              "children": [
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_ll_renewed",
+                  "kind": "block",
+                  "lines": [
+                    "Send word that the loan is",
+                    "renewed"
+                  ],
+                  "title": "Send",
+                  "width": 206
+                }
+              ],
+              "edges": [],
+              "id": "blk_ll_due/arm_renew",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(72,255)",
+                "org.eclipse.elk.padding": "[top=60,left=12,bottom=12,right=12]"
+              },
+              "lines": [
+                "When \"renew\": copy.holds == 0 AND",
+                "loan.renewals < 2"
+              ],
+              "style": "arm",
+              "title": "When \"renew\""
+            },
+            {
+              "children": [
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_ll_overdue_notice",
+                  "kind": "block",
+                  "lines": [
+                    "Send word that the loan is",
+                    "overdue"
+                  ],
+                  "title": "Send",
+                  "width": 206
+                },
+                {
+                  "gap": true,
+                  "height": 60,
+                  "id": "blk_ll_late_return",
+                  "kind": "block",
+                  "lines": [
+                    "Wait until the copy is returned,",
+                    "giving up after 14d"
+                  ],
+                  "mark": "wait",
+                  "title": "Wait for event",
+                  "width": 248
+                }
+              ],
+              "edges": [
+                {
+                  "id": "blk_ll_overdue_notice->blk_ll_late_return",
+                  "kind": "sequence",
+                  "sources": [
+                    "blk_ll_overdue_notice"
+                  ],
+                  "targets": [
+                    "blk_ll_late_return"
+                  ]
+                }
+              ],
+              "id": "blk_ll_due/otherwise",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(56,87)",
+                "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+              },
+              "lines": [
+                "Otherwise"
+              ],
+              "style": "arm",
+              "title": "Otherwise"
+            },
+            {
+              "children": [
+                {
+                  "height": 28,
+                  "id": "blk_ll_due/undecided/empty",
+                  "kind": "empty",
+                  "lines": [],
+                  "parent": "blk_ll_due",
+                  "slot": "undecided",
+                  "title": "Nothing here yet",
+                  "width": 150
+                }
+              ],
+              "edges": [],
+              "id": "blk_ll_due/undecided",
+              "kind": "slot",
+              "layoutOptions": {
+                "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+                "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+                "org.eclipse.elk.nodeSize.minimum": "(56,143)",
+                "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+              },
+              "lines": [
+                "Cannot be decided"
+              ],
+              "style": "arm",
+              "title": "Cannot be decided"
+            }
+          ],
+          "edges": [],
+          "gap": true,
+          "id": "blk_ll_due",
+          "kind": "block",
+          "layoutOptions": {
+            "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+            "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+            "org.eclipse.elk.nodeSize.minimum": "(160,255)",
+            "org.eclipse.elk.padding": "[top=148,left=12,bottom=12,right=12]"
+          },
+          "lines": [
+            "One of, in order:",
+            "1. When \"returned\": loan.returned",
+            "2. When \"renew\": copy.holds == 0",
+            "AND loan.renewals < 2",
+            "3. Otherwise",
+            "4. Cannot be decided"
+          ],
+          "title": "Branch"
+        },
+        {
+          "height": 20,
+          "id": "blk_ll_root/end/done",
+          "kind": "end",
+          "outcome": "done",
+          "width": 20
+        }
+      ],
+      "edges": [
+        {
+          "id": "blk_ll_root/start->blk_ll_on_loan",
+          "kind": "start",
+          "labels": [
+            {
+              "height": 16,
+              "id": "blk_ll_root/start/caption",
+              "text": "Starts when told to",
+              "width": 157
+            }
+          ],
+          "sources": [
+            "blk_ll_root/start"
+          ],
+          "targets": [
+            "blk_ll_on_loan"
+          ]
+        },
+        {
+          "id": "blk_ll_on_loan->blk_ll_due",
+          "kind": "sequence",
+          "sources": [
+            "blk_ll_on_loan"
+          ],
+          "targets": [
+            "blk_ll_due"
+          ]
+        },
+        {
+          "id": "blk_ll_due->blk_ll_root/end/done",
+          "kind": "rejoin",
+          "labels": [
+            {
+              "height": 16,
+              "id": "blk_ll_due->blk_ll_root/end/done/caption",
+              "text": "done",
+              "width": 52
+            }
+          ],
+          "outcome": "done",
+          "sources": [
+            "blk_ll_due"
+          ],
+          "targets": [
+            "blk_ll_root/end/done"
+          ]
+        }
+      ],
+      "gap": false,
+      "id": "blk_ll_root",
+      "kind": "block",
+      "layoutOptions": {
+        "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+        "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
+        "org.eclipse.elk.nodeSize.minimum": "(56,178)",
+        "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
+      },
+      "lines": [
+        "Run its steps in order"
+      ],
+      "title": "Sequence"
+    }
+  ],
+  "edges": [],
+  "id": "plan-map",
+  "layoutOptions": {
+    "org.eclipse.elk.algorithm": "layered",
+    "org.eclipse.elk.direction": "DOWN",
+    "org.eclipse.elk.edgeRouting": "ORTHOGONAL",
+    "org.eclipse.elk.hierarchyHandling": "INCLUDE_CHILDREN",
+    "org.eclipse.elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
+    "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
+    "org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers": "28",
+    "org.eclipse.elk.spacing.nodeNode": "24"
+  }
+}
