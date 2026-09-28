@@ -1,6 +1,6 @@
 # ADR-0015: The block document ships a JSON Schema whose root admits exactly what the package admits, and a palette can generate its own
 
-Status: proposed (2026-09-26, drafted under the operator's campaign consent;
+Status: accepted (2026-09-26, drafted under the operator's campaign consent;
 the rulings it records were taken by the operator on 2026-09-26). It merges
 at proposed; flipping it to accepted is a separate request through the same
 `docs/adr/` gate, after the code that builds it has shipped in a published
@@ -285,7 +285,7 @@ loudly rather than admitting a key it cannot describe.
 
 ## Amendment (2026-09-28): decision 6, generated host definitions type their declared fields
 
-**Status: proposed (2026-09-28).** Drafted for `sb-0zsz` under the operator's
+**Status: accepted (2026-09-28).** Drafted for `sb-0zsz` under the operator's
 campaign consent, recording the operator's ruling of 2026-09-27 that a block
 type's declared field types are binding for every host type and that
 `for_palette/1` emits them. It merges at proposed. This record is itself at
@@ -410,3 +410,110 @@ definition or in the binding check, never a reason to tighten `Decode` or
 - The `if`/`then` keyed on `type`, and the empty palette's answer.
 - A way for a block type to declare a JSON Schema of its own. That is still
   not added.
+
+## Note (2026-09-28): D4's invariant holds for a host type whose declared field types do not depend on its config
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It narrows one sentence of the Amendment above,
+"decision 6, generated host definitions type their declared fields", to what
+the code does. The operator ruled on 2026-09-28 that the code is the rule.
+
+D4 closes: "`for_palette/1` never refuses such a document." That holds for a
+host type whose `config_schema/1` declares the same field types for every
+config. It does not hold for a host type whose declared field types depend
+on the config, which `ADR-0002` decision 7 allows ("a select's choices can
+depend on an earlier field's value"):
+
+- The generated host definition is read from one declaration.
+  `StatifierBlocks.Schema.HostDefinition`'s `defp read_fields/1`
+  (`lib/statifier_blocks/schema/host_definition.ex:63`, read at `eef85a6`)
+  asks `config_schema/1` about `%{}`, so each field is typed as that answer
+  declares it (`:64`).
+- The binding check reads the declaration for each block's own config
+  (`StatifierBlocks.BlockType.field_type_findings/2`,
+  `lib/statifier_blocks/block_type.ex:1232`; `ADR-0002`'s amendment of this
+  date, `T1`, as the Note on its `T5` of this date reads it).
+
+So a `{:select, choices}` field whose choices depend on another field can
+hold a value the package accepts for that block's config and that the
+generated definition's `enum`, read from `config_schema(%{})`, refuses.
+
+`for_palette/1`'s own documentation already states the narrower condition
+(`StatifierBlocks.Schema.for_palette/1`'s `@doc`,
+`lib/statifier_blocks/schema.ex:120-124`): every document the package admits
+validates against it when every block whose type the palette carries answers
+`:ok` from `validate_config/1` and holds, in each field its `config_schema/1`
+declares for the config `Palette.new_block/2` builds, a value the field's
+type admits.
+
+D4 reads with that scope: for `Palette.core()`, and for a palette whose host
+types each declare the same field types for every config, `for_palette/1`
+never refuses a document the package admits and accepts. A host type whose
+declared field types vary with its config is outside that guarantee today.
+A test will pin the narrowed scope. D4's closing sentence, that a document
+the package accepts and this schema refuses is a defect in the generated
+definition or in the binding check, stays as written; for a config-dependent
+declaration, this Note is where that case is recorded.
+
+## Note (2026-09-28): this record and its amendment of 2026-09-28 are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it
+are this record's head Status line (`:3`) and the Amendment's Status line
+(`:288`), each by one word, `proposed` to `accepted`. Everything else is this
+Note and the one above it, at the foot of the file.
+
+The code that builds this record and its amendment shipped in
+statifier_blocks 0.38.0, published on Hex on 2026-09-28 from the `v0.38.0`
+tag at `eef85a6`. Every claim was checked against `main` at `eef85a6`, with
+D4 read as the Note above narrows it. Every `lib/` and `test/` cite below was
+read there and is written anchor first, line second.
+
+### Each decision, and where it reads today
+
+| Decision | Read at `eef85a6` |
+|---|---|
+| Context | `Decode`'s `decode/1`, `@block_keys`, `@envelope_keys`, `@entry_keys`, `ensure_known_envelope_keys/1`, `decode_block/1` and `reject_explicit_null/4` (`decode.ex:55`, `:50-52`, `:113`, `:128`, `:274`) and `Validation`'s `validate/1`, `check_schema_version/1`, `check_revision/1`, the float clause of `canonical_json_check/2`, `validate_slot/4`, `validate_unique_ids/1`, `check_datamodel_unique_ids/1` and `check_accepts_unique/1` (`validation.ex:50`, `:72`, `:90`, `:416`, `:354`, `:380`, `:193`, `:258`) read as cited; `Core.Wait.validate_config/1` (`core/wait.ex:79`) refuses a config with no `duration`; `gen_block/1` and `@type_names` (`test/support/document_generator.ex:285`, `:50`) draw `core.*` names with arbitrary config |
+| 1, draft-07 and a test-only validator | the file's `$schema` is draft-07; `{:ex_json_schema, "~> 0.11", only: :test, runtime: false}` in `mix.exs`; no module under `lib/` names `ExJsonSchema` |
+| 2, hand-written, held by a drift test | `test/statifier_blocks/schema_test.exs` validates every fixture, the canonical encodings, the byte corpus and generated documents, refuses each expressible refusal arm with the package ("the package and the schema both refuse ..."), and pins the `$id` ("the $id names the schema_version the package writes"); `test/statifier_blocks/schema_drift_test.exs` holds `definitions/core` to `Palette.core_types/0` by name, field and slot |
+| 3, the root | envelope `required` is `schema_version`, `id`, `revision`, `root`, with `additionalProperties: false`; `definitions/block` requires `id`, `type`, `type_version` (`minimum: 1`), closes other keys and gives `slots` `propertyNames` `minLength: 1`; `definitions/json_value` has no `number`; `definitions/datamodel_entry` has the id `pattern`, non-empty `expr` and `description`, and no other key; `accepts` has `minLength: 1` items and `uniqueItems: true`. `check_metadata/1` (`validation.ex:99`) runs the value check; `SlotValidation.validate/2` (`slot_validation.ex:64`) is palette-aware |
+| 4, core definitions the root does not apply | `definitions/core` names the same seventeen types as `Palette.core_types/0` (`palette.ex:220`); no `$ref` in the file points into `definitions/core`, and no core definition sets `config`'s `additionalProperties` to `false` |
+| 5, `datamodel` described here | every `$ref` in the file is a local `#/definitions/...` reference |
+| 6, as amended: `for_palette/1` | `Schema.for_palette/1` (`schema.ex:132`) applies one `if`/`then` per entry keyed on `type`, takes a core entry's definition from `definitions/core` verbatim (`defp definition/2`) and generates any other through `HostDefinition.generate/2` (`host_definition.ex:32`), reached through `Palette.call/4`; an empty palette answers the root without `$id` |
+| Amendment D1-D3 | `defp field_property/1` in `HostDefinition` types each field with `FieldType.binding_schema/1` beside `null`, with `title` and `default` and no `required`; `defp config_properties/1` names a string-key `value_path` as nested `properties` and skips a positional one; an `:error` from the mapping gives no type; `binding_schema/1` drops the `{:type_expr, opts}` member constraint (`field_type.ex:62`, `defp loosen/2`); `core.map`'s `collect_type` and `core.on_event`'s `payload` in the shipped file carry no type |
+| Amendment D4 | as narrowed by the Note above; the test "every generated host document whose blocks the package accepts validates" (`test/statifier_blocks/schema_for_palette_test.exs:438`) holds it for host types whose declarations do not vary with config |
+| 7, the module, the file, the `$id` | `priv/schemas/block-document.schema.json`; `priv/schemas` is in `defp package/0`'s `files:` (`mix.exs:108`); `$id` is `urn:statifier-blocks:block-document:1`; `Schema.path/0` (`schema.ex:94`), `Schema.json/0` (`:104`) and `for_palette/1` |
+| 8, when the schema changes | a rule for later requests; nothing on `main` contradicts it |
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The head Status paragraph says the record "merges at proposed; flipping it
+  to accepted is a separate request through the same `docs/adr/` gate, after
+  the code that builds it has shipped in a published version" (`:3-7`). This
+  is that request, and 0.38.0 is that version.
+- The Amendment's Status paragraph says "This record is itself at proposed,
+  and the two flip together ... once `for_palette/1` and the binding check
+  have shipped in a published version" (`:288-293`). They flip together
+  here.
+- Decision 7's "No existing function changes what it answers" (`:249-250`)
+  describes the request that added `StatifierBlocks.Schema`. The later
+  change to what the config checks answer is `ADR-0002`'s amendment of
+  2026-09-28, `T7`.
+
+### Sentences that no longer hold as written
+
+- D4's "`for_palette/1` never refuses such a document" is narrowed by the
+  Note above, for a host type whose declared field types depend on its
+  config.
+- Cites that have moved, each anchor still naming the thing cited: read at
+  `2033622`, `@callback slots` is at `block_type.ex:338`,
+  `@callback config_schema` at `:472`, `@callback validate_config` at
+  `:484`, `Palette.core_types/0` at `palette.ex:220`, `Palette.new_block/2`
+  at `:691`, `Palette.call/4` at `:607` and `defp package/0` at
+  `mix.exs:108`; read at `a26bf9f`, `json_schema/1` is at
+  `field_type.ex:28-54`, its `{:type_expr, opts}` clause at `:51`, and
+  `type_expr_findings/2` at `block_type.ex:1151`.
+
+Filed with `sb-ods3`.

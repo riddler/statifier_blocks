@@ -17,8 +17,8 @@
 | [0012](0012-undecided-branch-arm.md) | A condition that could not be decided is a third slot on `core.branch`, and an unwired one falls to `otherwise` | accepted |
 | [0013](0013-typed-fan-out-child-summary.md) | A fan-out child's summary is typed by the parent's declaration, with an optional child-side one and a dormant agreement check | accepted |
 | [0014](0014-document-accepts-declaration.md) | A document declares the external events it accepts - a list of names on the envelope, carried through compile, and judged against the chart by the engine's check at publish | accepted |
-| [0015](0015-block-document-json-schema.md) | The block document ships a JSON Schema whose root admits exactly what the package admits, and a palette can generate its own | proposed |
-| [0015 Amendment 2026-09-28](0015-block-document-json-schema.md#amendment-2026-09-28-decision-6-generated-host-definitions-type-their-declared-fields) | Decision 6: a host type's generated definition types its declared fields through the same mapping, and the invariant is restated on the binding check | proposed |
+| [0015](0015-block-document-json-schema.md) | The block document ships a JSON Schema whose root admits exactly what the package admits, and a palette can generate its own | accepted |
+| [0015 Amendment 2026-09-28](0015-block-document-json-schema.md#amendment-2026-09-28-decision-6-generated-host-definitions-type-their-declared-fields) | Decision 6: a host type's generated definition types its declared fields through the same mapping, and the invariant is restated on the binding check | accepted |
 | [0016](0016-document-describes-itself.md) | A document describes itself deterministically - block sentences joined by flow-graph edges read from structure, a host phrasing seam, and no model anywhere | accepted |
 | [0017](0017-block-types-explain-themselves.md) | Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe | accepted |
 
