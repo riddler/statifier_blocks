@@ -54,6 +54,28 @@ defmodule StatifierBlocks.Core.AssignLocationTest do
     end
   end
 
+  describe "the whitespace a datamodel path refuses" do
+    # The rule refuses the six ASCII whitespace characters and nothing
+    # wider: a non-breaking space or an em space inside a path is not
+    # whitespace to it, matching the shipped schema's datamodel-path
+    # pattern.
+    #
+    # sabotage: gave `@whitespace` the `u` flag (`~r/\s/u`) -> Unicode
+    # spaces become whitespace, the non-breaking and em space cases are
+    # refused and this goes red (verified); a second mutation narrowing it
+    # to `~r/[ \t\n]/` lets the vertical tab through and goes red too
+    # (verified)
+    test "only ASCII whitespace is refused; a Unicode space passes" do
+      for char <- [" ", "\t", "\n", "\v", "\f", "\r"] do
+        refute Config.datamodel_path?("patron" <> char <> "full_name"), inspect(char)
+      end
+
+      for char <- ["\u00A0", "\u2003"] do
+        assert Config.datamodel_path?("patron" <> char <> "full_name"), inspect(char)
+      end
+    end
+  end
+
   describe "the four sites it is shared across" do
     # sabotage: pointed `core.invoke` at `Config.identifier?/1` -> the four
     # datamodel-path sites stop agreeing and this goes red (verified)
