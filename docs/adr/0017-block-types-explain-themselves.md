@@ -1,6 +1,6 @@
 # ADR-0017: Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe
 
-Status: proposed (2026-09-27, drafted under the operator's campaign consent;
+Status: accepted (2026-09-27, drafted under the operator's campaign consent;
 the rulings it records were taken by the operator on 2026-09-27). It merges
 at proposed; flipping it to accepted is a separate request through the same
 `docs/adr/` gate, after the code that builds it has shipped in a published
@@ -209,3 +209,67 @@ describes, edge for edge and line for line, as it did.
   description region carries the rest.
 - The changelog fragment for the sentence change names the visible
   card-line change for delayed sends.
+
+## Note (2026-09-28): this record is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the record's own `Status:` line (`:3`), by one word, `proposed` to
+`accepted`; the index row in `README.md` changes its status cell with it.
+Everything else is this Note, at the foot of the file, so no line another
+record cites moves.
+
+The code this record decides shipped in `statifier_blocks` 0.37.0 (tag
+`v0.37.0`, `12d3d22`), the published version that carries it. Every claim
+below was read at `12d3d22`, which is both the `v0.37.0` tag and `main` when
+this request was written.
+
+### Each decision, and where it reads today
+
+| Decision | Read at `12d3d22` |
+|---|---|
+| 1, the callback | `StatifierBlocks.BlockType` declares `@callback explain() :: String.t()` (`block_type.ex:857`) and lists `explain: 0` among its `@optional_callbacks` (`block_type.ex:859`). The test `explain/0 is declared, and declared optional` pins both |
+| 1, the resolver | `StatifierBlocks.BlockType.explain/1` (`block_type.ex:1703`, `def explain`) answers the declared paragraph held to `defp line/1` (`block_type.ex:2124`), the refusal set `sentence/2` uses, else the palette entry's `description` held to the same set (`defp description/1`, `block_type.ex:2112`), else `nil`. A raise, throw or exit is a refused answer (`defp call_explain/1`, `block_type.ex:2100`). Declaredness and the call go through `Palette.declares?/3` (`palette.ex:648`, `def declares?`) and `Palette.call/4` (`palette.ex:606`, `def call`). The tests under `the resolver` in `test/statifier_blocks/block_type/explain_test.exs` pin each row of the table, the refusals and a `{module, state}` reference |
+| 1, not injected | `defmacro __using__` (`block_type.ex:112`) injects no `explain/0`; the test `use StatifierBlocks.BlockType does not inject one` pins it |
+| 1, every core type | each of the seventeen `core.*` types `Palette.core_types/0` lists (`palette.ex:221-237`) declares `def explain`; the test `the core palette's every type answers its own non-empty, one-line paragraph` pins it over the core palette |
+| 2, the sentence | `core.send`'s `sentence/1` (`core/send.ex:216`, `def sentence`) answers `In <delay>, send <event>` when `delay_words/1` (`core/send.ex:249`) names a delay, and `Send <event>` or `Send an event` otherwise. `delay_words/1` answers `nil` unless `Duration.duration?/1` (`core/duration.ex:81`, `def duration?`) accepts the delay, writes a delay matching `@short_form` (`core/send.ex:229`) in words and any other accepted spelling as stored. The tests under `sentence/1` in `test/statifier_blocks/core/send_test.exs` pin the unchanged undelayed line, the delayed line, the words and the stored spelling |
+| 3, the edge | `StatifierBlocks.Describe.outline/3` (`describe.ex:153`, `def outline`) appends the timer edges after every other edge; `defp timer_edges/2` (`describe.ex:437`) pairs each delayed `core.send` with every `core.on_event` and `core.await` naming its event, sends then targets in the outline's order, over blocks `defp timer_party/2` (`describe.ex:456`) admits, resolved and outside a drafts shelf; `defp timer_edge/3` (`describe.ex:466`) sets `container` to the send's parent, `event` and `delay`. `StatifierBlocks.Describe.Edge` carries `delay: nil` (`describe/edge.ex:58`, `defstruct`) and its `kind` admits `:timer` (`describe/edge.ex:38`, `@type kind`) |
+| 3, the line and the callback | `defp edge_line/2`'s timer clause (`describe.ex:534`) writes `In <delay>, <event> reaches <S(to)>`, the delay through `core.send`'s `delay_words/1` and the event through `defp flat/1` (`describe.ex:569`). `StatifierBlocks.Describe.Phrasing` declares `@callback timer` (`describe/phrasing.ex:73`) among its `@optional_callbacks` (`describe/phrasing.ex:75`), asked by kind in `render/2` like the other nine |
+| 3, the worked examples | the tests `patron registration produces the note's edges` and `patron registration renders the timer edge's line last` in `test/statifier_blocks/describe_test.exs` pin the one timer edge from `blk_PDLN` to `blk_PEXP`, with container `blk_PGRP`, and its line `In 24 hours, registration.deadline reaches When registration.deadline, abandon`; `a document with no delayed send answers no timer edge` pins that the library loan gains none. The tests under `the timer edge` pin the order, the drafts shelf and an unresolved block |
+| 4, what a renderer draws | the package ships no renderer of the outline, and the marks decision 4 names are read from a block's type and config, needing nothing further from this package |
+| 5, what changes | the three requests landed as the commits `133b1af` (the callback, the resolver and every core type's paragraph), `99b5383` (the sentence) and `40cb469` (the edge kind, the `delay` field, the line and `timer/2`); the `0.37.0` section of `CHANGELOG.md` lists them, with the delayed send's card line under Changed as the one changed answer |
+
+### Cites that moved, and one that changed shape
+
+The record's cites were read at `91fd2a1` and `99b5383`. Re-located by
+anchor at `12d3d22`: `def sentence` in `block_type.ex` is at `:1666`
+(`:1645` above), `optional(:description)` at `:633` (`:631` above) and
+`defmacro __using__` at `:112` (`:110` above); `defstruct` in
+`describe/edge.ex` is at `:58` (`:49` above) and `@type kind` at `:38`
+(`:30` above); `@optional_callbacks` in `describe/phrasing.ex` is at `:75`
+(`:72` above). The cites into `palette.ex`, `core/duration.ex`, and
+`core/send.ex`'s `def sentence` and `@short_form` have not moved.
+
+Decision 2 names `delay_words/1` as `core.send`'s private helper, anchored
+`defp delay_words` at `core/send.ex:246`. At `12d3d22` it is
+`def delay_words` at `core/send.ex:249`, carrying `@doc false`: the request
+that built decision 3 made it public so the describe writes a timer edge's
+delay in the words the sentence uses, which decision 3 requires. Its comment
+says it is not part of the public API, and it has no documentation entry, so
+it remains private to the package in the sense the record uses; what
+decision 2 decides reads as written.
+
+### Sentences that name their own status, and one that is superseded
+
+- The status paragraph says the record "merges at proposed; flipping it to
+  accepted is a separate request through the same `docs/adr/` gate, after
+  the code that builds it has shipped in a published version" (`:4-7`).
+  This request is that one, and 0.37.0 is that version.
+- Context says a card's chips are capped at "24 characters (ADR-0005
+  decision 10's `10n`)" (`:17-18`). `ADR-0005`'s Note of 2026-09-08, item 2,
+  moved that number to 32, and the code's `@presentation_cap` is 32
+  (`block_type.ex:1436`); the sentence's point, that a capped chip cannot
+  carry a paragraph, holds at either number.
+- Consequences names `ADR-0016`'s Amendment of 2026-09-27 and a dated Note
+  on `ADR-0002` pointing here; both are on main. The Amendment is flipped
+  to accepted by the same request as this Note.
