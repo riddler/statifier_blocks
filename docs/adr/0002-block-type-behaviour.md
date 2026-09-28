@@ -14257,7 +14257,7 @@ Note. Filed with `sb-q9d7`; `sb-111v` builds the callback and the resolver.
 
 ## Amendment (2026-09-28): decision 7, declared field types are binding for every block type
 
-**Status: proposed (2026-09-28).** Drafted for `sb-0zsz` under the operator's
+**Status: accepted (2026-09-28).** Drafted for `sb-0zsz` under the operator's
 campaign consent, recording the operator's ruling of 2026-09-27: a block
 type's declared field types are binding for every block type, core and host
 alike, the package enforces them before `validate_config/1`, and a host gets a
@@ -14426,3 +14426,148 @@ that calls none of the new surface.
   (`lib/statifier_blocks/block_type.ex:472`), which still calls
   `config_schema/1` "a rendering hint only". The code that builds this
   section amends that text in the same request.
+
+## Note (2026-09-28): five wording points in decision 7's binding-types Amendment, answered by addition
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The first review of the Amendment above,
+"decision 7, declared field types are binding for every block type", raised
+five points about its wording, none of them blocking. Each is answered here,
+and the Amendment's text stays as written.
+
+Every `lib/` cite below was read at `eef85a6`, the `v0.38.0` tag, and is
+written anchor first, line second.
+
+1. **The declarations the mapping cannot read are more than T5 lists.** T5
+   names a `{:select, choices}` with no choices or with a choice whose value
+   is not a string, and a `{:list, inner}` over one of those. The set T5
+   means is every declaration
+   `StatifierBlocks.Schema.FieldType.json_schema/1` answers `:error` for
+   (`lib/statifier_blocks/schema/field_type.ex:28-54`, `def json_schema/1`).
+   Beside T5's two, that is a `{:path, opts}` or a `{:type_expr, opts}` whose
+   `opts` is not a map (both clauses guard `is_map(opts)`, `:32` and `:51`),
+   any term outside the nine arms of
+   `t:StatifierBlocks.BlockType.field_type/0` (the catch-all clause, `:54`),
+   and a `{:list, inner}` over any of those (the `{:list, inner}` clause,
+   `:42`). T5's rule holds for all of them: the binding check does not judge
+   the field, because its `FieldType.binding_schema/1` step answers `:error`
+   (`defp field_type_finding/2`,
+   `lib/statifier_blocks/block_type.ex:1255-1266`).
+
+2. **T6's integer-segment sentence is the binding check's, not the
+   `{:type_expr, opts}` arm's.** T6 says a field whose `value_path` carries
+   an integer segment "is left to `validate_config/1`". That holds for the
+   binding check, which judges only a path of string keys (the
+   `Enum.all?(path, &is_binary/1)` step of `defp field_type_finding/2`,
+   `block_type.ex:1258`). It does not hold for the `{:type_expr, opts}` arm,
+   which T4 governs: `StatifierBlocks.BlockType.type_expr_findings/2`
+   (`block_type.ex:1151`) reads the stored value through `defp stored_arm/2`
+   (`block_type.ex:1200`), which fetches at the whole `value_path`, a list
+   position included, so a positional `{:type_expr, opts}` field is judged
+   today. Read T6's sentence with "except the `{:type_expr, opts}` arm, which
+   T4 governs".
+
+3. **The pre-flight's inputs are its own, and `fixtures/0` is not one.** T7
+   says the package gives a host "a palette pre-flight that lists the types
+   whose fixtures disagree with their declarations". The pre-flight was
+   built to the operator's ruling of 2026-09-28, and it reads no fixture.
+   `StatifierBlocks.Palette.preflight/1` (`lib/statifier_blocks/palette.ex:773`)
+   judges every host type in the palette - every entry except this
+   package's own core module under its core name - on two inputs: each
+   field's `default` in `config_schema(%{})`, against the declaration that
+   carries it, and the config of the block `Palette.new_block/2` builds for
+   the type. `StatifierBlocks.Palette.preflight/2` (`palette.ex:791`) adds a
+   third: every block of the documents a host hands it whose type the
+   palette carries, resolved first and named by block id. All three are
+   judged through the binding check the compiler, the edit gate and the view
+   model run. T7's sentence stays as written; read "whose fixtures disagree
+   with their declarations" as "whose defaults, fresh blocks or stored
+   blocks disagree with their declared field types". The 0.38.0 changelog's
+   upgrade note names both functions.
+
+4. **The code and this record restate the split in more places than the
+   section names.** "What this section does not change" names
+   `@callback validate_config/1`'s documentation. Two more places carry the
+   same split, and both read with T1's exception:
+   - `@callback config_schema/1`'s documentation
+     (`lib/statifier_blocks/block_type.ex:345`, "This is a rendering hint,
+     not the authority"). The code that built the Amendment amended it as
+     well: from `:346` it says that one thing in the field list binds, a
+     field's declared type.
+   - This record's own restatements that the schema "is still not a
+     validation language": in the `datamodel_path?` amendment of 2026-08-29
+     (`:1078`), in the `{:path, opts}` amendment of 2026-09-05 (`:2859`) and
+     in the `field_candidates` Note of 2026-09-06 (`:3486`). Each reads as
+     decision 7's own sentences do under "What this amends": the field list
+     is still not a validation language for anything past a field's type.
+     They stay as written.
+
+5. **The `stored_arm` cite names the `@spec` line.** T4 cites
+   `defp stored_arm/2` at `lib/statifier_blocks/block_type.ex:1187`, read at
+   `a26bf9f`. At that commit `:1187` is the function's `@spec` and the head
+   is `:1188`. At `eef85a6` the `@spec` is `:1199` and the head `:1200`.
+
+## Note (2026-09-28): decision 7's binding-types Amendment is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Status line of the Amendment "decision 7, declared field types are
+binding for every block type" (`:14260`), by one word, `proposed` to
+`accepted`. Everything else is this Note and the one above it, at the foot of
+the file.
+
+The code that enforces the Amendment shipped in statifier_blocks 0.38.0,
+published on Hex on 2026-09-28 from the `v0.38.0` tag at `eef85a6`. Every
+claim the Amendment makes was checked against `main` at `eef85a6`, as read
+with the Note above. Every `lib/` cite below was read there and is written
+anchor first, line second.
+
+### Each item, and where it reads today
+
+| Item | Read at `eef85a6` |
+|---|---|
+| T1, a declared field type binds | `StatifierBlocks.BlockType.field_type_findings/2` (`block_type.ex:1232`) asks the type's `config_schema/1` about the config through `Palette.call/4` and names each field whose value its declared type does not admit, by `key` and declared type. No clause reads whether a type is core or host |
+| T2, the three seams | `defp config_findings/2` in `StatifierBlocks.Compiler` (`compiler.ex:1558`), `StatifierBlocks.Edit.check_config/3`'s `:update_config` clause (`edit.ex:305`) and `defp config_findings/3` in `StatifierBlocks.ViewModel` (`view_model.ex:1961`) each list `type_expr_findings/2`'s findings, then `field_type_findings/2`'s, then the type's own `validate_config/1` findings, which run either way. The compiler's list also carries `defp declaration_findings/2` (`compiler.ex:1625`) ahead of them |
+| T3, the one mapping | the binding check reads `FieldType.binding_schema/1` (`field_type.ex:62`), which is `json_schema/1`'s fragment with only the `{:type_expr, opts}` member constraint dropped (`defp loosen/2`), T4's one place. `@type field_type` (`block_type.ex:196`) has the nine arms, and `json_schema/1`'s clauses answer the table's JSON types. A float in a config is refused by `Validation` (`defp canonical_json_check/2`'s float clause, `validation.ex:416`) |
+| T4, the `{:type_expr, opts}` arm | `defp field_type_finding/2`'s first clause (`block_type.ex:1253`) answers no finding for the arm; `type_expr_findings/2` (`:1151`) judges it by `defp stored_arm/2` (`:1200`) |
+| T5, what is not judged | the `{:ok, value} when not is_nil(value)` step of `defp field_type_finding/2` (`block_type.ex:1259`) leaves an absent key and a `null` alone, and the `binding_schema/1` step leaves an unreadable declaration alone (the Note above, item 1). `defp declaration_finding/1` (`compiler.ex:1632`) refuses a field with no `default:` and a `hidden?: true` field with an empty one, and nothing about a malformed select |
+| T6, the `value_path` rule | `value_path/1` (`block_type.ex:1120`) and `fetch_value/2` (`:1359`); a path with a list position is not judged, and one that reaches no value answers `:error` and is not judged (the Note above, item 2) |
+| T7, the one behaviour change | the three seams above; `Palette.preflight/1` and `preflight/2` (`palette.ex:773`, `:791`), whose inputs the Note above, item 3, names; the 0.38.0 changelog's lead paragraph and its `Changed` bullet name both functions |
+| What this section does not change | `Decode` and `Validation` have no change between `v0.37.0` and `v0.38.0`; `@callback validate_config/1`'s documentation (`block_type.ex:474-484`) now says a declared type binds and is checked before the callback runs |
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The Amendment's Status paragraph says it "merges at proposed; flipping it
+  to accepted is a separate request through the same `docs/adr/` gate, once
+  the code that enforces it has shipped in a published version of this
+  package" (`:14264-14266`). This is that request, and 0.38.0 is that
+  version.
+- "What this section does not change" says "The code that builds this
+  section amends that text in the same request" (`:14427-14428`). It
+  describes the day it was written; the row above is where that text reads
+  now.
+- This file's head `Status:` line (`:3`) is not extended.
+
+### Sentences that no longer hold as written
+
+- T7's "whose fixtures disagree with their declarations" is answered by the
+  Note above, item 3; the pre-flight reads no fixture.
+- Cites that have moved since `a26bf9f`, each anchor still naming the thing
+  the Amendment says: `Edit.check_config/3`'s `:update_config` clause is at
+  `edit.ex:305`, `ViewModel`'s `defp config_findings/3` at
+  `view_model.ex:1961`, `type_expr_findings/2` at `block_type.ex:1151`,
+  `defp stored_arm/2` at `:1200`, `json_schema/1` at `field_type.ex:28-54`
+  and its `{:type_expr, opts}` clause at `:51`, `@type field_type` at
+  `block_type.ex:196`, `value_path/1` at `:1120`, `fetch_value/2` at
+  `:1359`, `defp declaration_finding/1` at `compiler.ex:1632` and
+  `@callback validate_config/1` at `block_type.ex:484`.
+- "What this amends" cites decision 7's "is not a validation language" at
+  `:180-181`; the words are at `:179-180`, as they were when the Amendment
+  was written.
+
+`ADR-0015` and its amendment of the same date, which the Amendment names as
+its schema half, are not flipped by this request and stay proposed.
+
+Filed with `sb-ods3`.

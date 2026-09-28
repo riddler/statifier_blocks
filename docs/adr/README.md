@@ -4,7 +4,7 @@
 |---|---|---|
 | [0001](0001-block-document-schema.md) | The block document is a tree of typed blocks with named slots | accepted |
 | [0002](0002-block-type-behaviour.md) | A block type is a behaviour module resolved through a caller-supplied palette | accepted |
-| [0002 Amendment 2026-09-28](0002-block-type-behaviour.md#amendment-2026-09-28-decision-7-declared-field-types-are-binding-for-every-block-type) | Decision 7: a block type's declared field types are binding for every block type, checked before `validate_config/1` through the one field-type mapping | proposed |
+| [0002 Amendment 2026-09-28](0002-block-type-behaviour.md#amendment-2026-09-28-decision-7-declared-field-types-are-binding-for-every-block-type) | Decision 7: a block type's declared field types are binding for every block type, checked before `validate_config/1` through the one field-type mapping | accepted |
 | [0003](0003-assignability.md) | Assignability is opaque-string identity plus a host-supplied widening relation | accepted |
 | [0004](0004-compiler-provenance.md) | One block, one state - a deterministic compile carrying a provenance map | accepted |
 | [0005](0005-liveview-editor.md) | The editor is a pure command algebra and view model with a thin LiveView shell | accepted |
