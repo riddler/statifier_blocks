@@ -18,19 +18,26 @@
 // decision: feed it a different measurement and the same document comes back;
 // feed this hook a different drop and a different document does.
 //
+// A second amendment, "decision 7, one hook pushes commands; any number of
+// hooks may only measure or draw" (2026-09-28), writes that invariant as the
+// rule: `StatifierBlocksMap` in statifier_blocks_map.js is a draw-only hook,
+// with its own entry point.
+//
 // The bar is still enforced mechanically as well as socially:
-// test/statifier_blocks/assets_test.exs reads assets/js/, asserts the exported
-// hooks are exactly the two the record names, and fails with a message naming
-// it. A third hook, or a hook that pushes anything but geometry or a command,
-// is a thing this record does not have.
+// test/statifier_blocks/assets_test.exs reads assets/js/, asserts this is the
+// one hook that pushes an event name of its own and that every other hook
+// only measures or draws, and fails with a message naming the record. A hook
+// that pushes a second command set is a thing this record does not have.
 //
 // Delivery is source, per sui-ADR-0009: a host adds
 //
 //   "statifier_blocks": "file:../deps/statifier_blocks"
 //
 // to assets/package.json and imports the hooks in app.js. This repository
-// bundles nothing and has no Node toolchain. The entry point, the export names
-// and the hook names are versioned public API.
+// bundles nothing, and a host needs no Node for it; only this repository's
+// tests run Node, for the Map hook's layout (ADR-0005's 2026-09-28 amendment
+// on decision 1). The entry point, the export names and the hook names are
+// versioned public API.
 //
 // THE DEFAULT EXPORT CARRIES BOTH HOOKS, so `hooks: { ...StatifierBlocks }`
 // registers both and a host cannot get one without the other. That shape is

@@ -6,7 +6,13 @@
 # documents into. The corpus and spec tasks that repo carries have no
 # counterpart here, and neither does its Java entry - nothing in lib/ or
 # test/ needs a JRE.
+#
+# Node runs tests only: the Map hook's layout tests lay a graph out through
+# the vendored elkjs outside the browser (ADR-0005's 2026-09-28 amendment on
+# decision 1). Nothing here builds or ships with it, and a host needs none.
+# Pinned to the current LTS line.
 
 [tools]
 erlang = "27.3"
 elixir = "1.18.3-otp-27"
+node = "24"
