@@ -37,9 +37,17 @@ defmodule StatifierBlocks.Describe do
   module by `StatifierBlocks.Palette.declares?/3`, the host's phrasing
   module by `render/2` - and a module not yet loaded is loaded by the
   runtime's code server. The only code either runs that this package does
-  not own is the palette's block-type callbacks and the host's phrasing
-  module, each held to be a pure function of its arguments by its own
-  contract (`StatifierBlocks.BlockType`, `StatifierBlocks.Describe.Phrasing`).
+  not own is the palette's block-type callbacks, the host's phrasing
+  module and, because `outline/3` builds the document's view model with
+  `StatifierBlocks.ViewModel.build/3`, every
+  `StatifierBlocks.DocumentValidator` in the palette's `validators` list.
+  Each is held to be a pure function of its arguments by its own contract
+  (`StatifierBlocks.BlockType`, `StatifierBlocks.Describe.Phrasing`,
+  `StatifierBlocks.DocumentValidator`), and by contract only: nothing here
+  enforces it, so a host callback that reads a clock or sends a message
+  does so inside `outline/3` or `render/2`. A validator's findings take no
+  part in the outline: a document describes the same with or without its
+  palette's validators.
 
   ## Nodes
 
