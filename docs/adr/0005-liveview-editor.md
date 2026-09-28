@@ -13414,3 +13414,154 @@ It edits no line above it, moves no status line, takes no browser reading,
 and changes no code, test or changelog fragment.
 
 Filed with `sb-f7y4`.
+
+## Amendment (2026-09-28): decision 7, one hook pushes commands; any number of hooks may only measure or draw
+
+**Status: proposed (2026-09-28, bead `sb-7v78`, ruled by the operator,
+2026-09-28).** A decision record merges at proposed and is flipped to
+accepted by a separate request once the code below has shipped in a
+published version of this package. Additive: decision 7, the Amendment of
+2026-08-29 that admitted the measurement hook (`:2098`) with its clauses
+7a to 7d, and every clause above this line stand as printed. **No text
+above this line is edited by this section**, no line above it is removed,
+and the head `Status:` line at `:3` is not extended. `ADR-0018` is the
+record this Amendment serves.
+
+**Why this is an Amendment and not a Note.** `docs/adr/README.md`, its
+paragraph on Notes and Amendments, gives the test: an amendment "changes what
+the record decides and a note does not". The Amendment of 2026-08-29
+closes on "A third hook still requires amending this record, and a hook
+that pushes anything but geometry or a command is still a thing this
+record does not have" (`:2249-2251`). This section admits a third hook,
+and lets any number more of its kind in without a further amendment.
+
+### Context
+
+`ADR-0018` moves the Map, a drawn projection of the block document, into
+this package. Its hook, `StatifierBlocksMap` at
+`assets/js/statifier_blocks_map.js`, lays out a graph the server built and
+draws it as SVG. It is neither the drag hook, which reports an author's
+intent, nor the measurement hook, which "never mutates the DOM" (7a) - it
+exists to draw. The count the Amendment of 2026-08-29 kept ("A third hook
+still requires amending this record") was, by its own 7b, the proxy: "The
+rule underneath it is that **behaviour does not move to the client**". This
+section writes the rule in terms of what a hook does, not how many there
+are.
+
+### Decision
+
+**7e. The rule: one hook pushes commands; any number of hooks may only
+measure or draw.** `StatifierBlocksDrag` stays the one hook that pushes
+commands. `StatifierBlocksMeasure` measures, under 7a to 7d, unchanged.
+Every other hook the package ships may only measure or draw, and a new hook
+of either kind needs no further amendment of this record. A hook that
+pushes a second command set - a hook other than the drag hook that sends
+decision 2's commands or an author intent of its own - is still a thing
+this record does not have, and adding one requires amending it.
+
+**7f. What a draw-only hook is.** A draw-only hook:
+
+- **draws what the server computed.** It may write the DOM, and only in
+  three ways: the drawing, into an element the server keeps out of
+  LiveView's patching, from data the server rendered onto the page; a
+  swap of one server-rendered text for another in a region the server
+  rendered, put back when the pointer leaves; and a mark on the element
+  the server named as selected. Anything it writes in an element LiveView
+  patches, the next patch overwrites;
+- **pushes no command and no event of its own.** It sends none of
+  decision 2's commands, no geometry, and no event name it chose. A click
+  on the drawing may be sent to the server only as the host list's own
+  event - the event name the host passed in, with the payload the list
+  sends for the same gesture - so the server cannot tell a gesture from
+  the drawing from the same gesture on the list, and nothing reaches it
+  that the list could not already send. Which event a click sends is read
+  from the stamp on the element clicked, never from state the hook kept;
+- **holds no behaviour.** No validity rule, no document state, and nothing
+  that survives a re-render except what it needs to skip a layout it has
+  already drawn, to drop one a newer graph has overtaken, and to scroll
+  into view, on the next patch, what a click it sent has opened. A
+  position it lays out lives only in the drawing and is never pushed;
+- **passes the absent-hook test.** A page with the hook absent loses the
+  drawing and nothing else: every event the drawing sends is one the
+  host's list already sends.
+
+**7g. The Map hook is the first draw-only hook.** `StatifierBlocksMap`
+draws the Map's graph, marks the selection the host names without laying
+the graph out again, sends a click as the host list's select or
+insert-open event, and swaps the description region's text on hover from
+entries the server rendered. It pushes nothing else. It ships as source in
+`assets/` under sui-ADR-0009 with the obligations decision 7 places on the
+drag hook: its file, its export name and its hook name are versioned public
+API, and its name carries the `StatifierBlocks` prefix for decision 7's
+reason.
+
+### Consequences
+
+- **The hook-count test states the rule, not a count.** It asserts one hook
+  that pushes commands and any number that only measure or draw, and it
+  fails on a hook that pushes a second command set.
+- **7b's absent-hook test now covers every hook but the drag hook.** The
+  editor is fully usable with the measurement hook absent (7b, property
+  3), and a page is fully usable with a draw-only hook absent (7f).
+- **Nothing in decisions 2, 5, 6 or 8 changes.** No command, no
+  droppability rule, no round-trip of the drag interaction and no keyboard
+  path is touched by a hook that only draws.
+
+## Amendment (2026-09-28): decision 1, the repository's tests run Node for the Map hook; the package still bundles nothing and a host needs no Node
+
+**Status: proposed (2026-09-28, bead `sb-7v78`, ruled by the operator,
+2026-09-28).** A decision record merges
+at proposed and is flipped to accepted by a separate request once the code
+below has shipped in a published version of this package. Additive:
+decision 1, decision 7's delivery paragraphs and every clause above this
+line stand as printed, the Amendment of the same date on decision 7
+directly above included. **No text above this line is edited by this
+section**, no line above it is removed, and the head `Status:` line at
+`:3` is not extended.
+
+**Why this is an Amendment and not a Note.** Decision 1 says "this
+repository's toolchain stays Node-free for the same reasons sui-ADR-0009
+gives" (`:129-130`), and decision 7 that "this repository never bundles
+anything and never acquires a Node toolchain" (`:302-303`). This section
+narrows the second half of each: the repository's test suite runs Node.
+
+### Context
+
+`ADR-0018` vendors elkjs 0.9.3 as `assets/vendor/elk.bundled.js` and ships
+the Map hook, which imports it. The hook's layout tests - arm order kept, a
+failed layout drawing the error pane, a straight happy path, no layout on a
+selection - are only meaningful through the real layout library, and the
+library is JavaScript. The reference host already runs such tests, with
+`node` on the path. Decision 7 also leans on sui-ADR-0009's permission for
+"a genuinely self-contained hook with no imports" (`:314`) when it names the
+colocated-hook route as "the first thing to revisit" if the LiveView floor
+moves (`:320`); the Map hook has one import.
+
+### Decision
+
+**1a. The package still bundles nothing.** `assets/` ships as source, as
+decision 7 says; the Map hook imports the vendored file by relative path,
+and the host's own bundler resolves both from the dependency's directory.
+The package gains no npm dependency, no `package-lock`, and no build step,
+and a host needs no Node for it.
+
+**1b. The repository's test suite runs Node.** The Map hook's tests run the
+hook through the vendored elkjs outside the browser, so the gate needs
+`node` on the path and CI installs it. Node runs tests only: it builds
+nothing that ships and installs nothing from a registry.
+
+**1c. The no-imports carve-out does not reach the Map hook.** The Map hook
+imports the vendored elkjs file, so it is not "a genuinely self-contained
+hook with no imports", and the colocated-hook route decision 7 names is not
+open to it if the LiveView floor moves; it ships as source like the other
+two. The drag hook and the measurement hook keep the carve-out's standing
+exactly as decision 7 records it.
+
+### Consequences
+
+- **A contributor needs Node on the path to run the full gate**, beside
+  Elixir; the request that adds the Map hook's tests says so where the
+  README tells a host or a contributor what the Map needs.
+- **A host's side is unchanged.** Decision 7's delivery - a `file:`
+  dependency and an import in `app.js` - is still the whole of what a host
+  does to get the package's JavaScript.
