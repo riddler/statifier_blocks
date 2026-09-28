@@ -1756,10 +1756,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # reclaims in the same state; otherwise the control is revealed inside a
       # box that clips it. Every reveal rule's state must be one the reclaim
       # rule names.
-      # Sabotage (run): removed the selected-card selector from the reclaim
-      # rule's list - a selected card reveals its controls inside a clipped
-      # strip and this goes red naming the first control, beside the test
-      # above.
+      # Sabotage (run): dropped `.sb-node--selected > .sb-node__chrome
+      # .sb-node__expand` from the Expand control's reveal rule, leaving the
+      # reclaim rule whole - Expand is no longer revealed on the selected card
+      # and this goes red naming it, where the test above stays green.
       test "every state that reveals a strip control is a state the strip reclaims in" do
         css = File.read!(@stylesheet)
         {selectors, _body} = reclaim_rule!(css)
