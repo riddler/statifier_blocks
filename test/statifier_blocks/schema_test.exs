@@ -91,6 +91,12 @@ defmodule StatifierBlocks.SchemaTest do
 
   defp put_root(document, key, value), do: put_in(document, ["root", key], value)
 
+  # One change to a document: no keys replaces the whole of it, and
+  # :absent removes the key the path ends on.
+  defp change(_document, [], value), do: value
+  defp change(document, keys, :absent), do: document |> pop_in(keys) |> elem(1)
+  defp change(document, keys, value), do: put_in(document, keys, value)
+
   # Every block object in a decoded JSON tree, pre-order.
   defp block_maps(%{} = block) do
     children =
@@ -236,7 +242,37 @@ defmodule StatifierBlocks.SchemaTest do
     # Sabotage: type_version's "minimum": 1 deleted -> this case goes red.
     {"type_version 0", ["root", "type_version"], 0},
     # Sabotage: block id's "$ref" to non_empty_string deleted -> this case goes red.
-    {"an empty block id", ["root", "id"], ""}
+    {"an empty block id", ["root", "id"], ""},
+    # Sabotage: datamodel_entry's "additionalProperties": false deleted -> this case goes red.
+    {"an unknown datamodel entry key", ["datamodel"], [%{"id" => "patron", "kind" => "list"}]},
+    # Sabotage: accepts' items losing "minLength": 1 -> this case goes red.
+    {"an empty accepts entry", ["accepts"], [""]},
+    # Sabotage: expr's "$ref" to non_empty_string replaced by "type": "string" -> this case goes red.
+    {"an empty entry expr", ["datamodel"], [%{"id" => "patron", "expr" => ""}]},
+    # Sabotage: description's "$ref" to non_empty_string replaced by "type": "string" -> this case goes red.
+    {"an empty entry description", ["datamodel"], [%{"id" => "patron", "description" => ""}]},
+    # Sabotage: block type's "$ref" to non_empty_string replaced by "type": "string" -> this case goes red.
+    {"an empty block type", ["root", "type"], ""},
+    # Sabotage: the root id's "$ref" to non_empty_string replaced by "type": "string" -> this case goes red.
+    {"an empty document id", ["id"], ""},
+    # Sabotage: json_object's "type": "object" deleted -> this case goes red.
+    {"a list as config", ["root", "config"], []},
+    # Sabotage: json_object's "type": "object" deleted -> this case goes red.
+    {"a string as metadata", ["metadata"], "patron"},
+    # Sabotage: slots' "type": "object" deleted -> this case goes red.
+    {"a list as slots", ["root", "slots"], []},
+    # Sabotage: block_list's "type": "array" deleted -> this case goes red.
+    {"an object as a slot's block list", ["root", "slots"], %{"body" => %{}}},
+    # Sabotage: "revision" deleted from the root's "required" -> this case goes red.
+    {"a document with no revision", ["revision"], :absent},
+    # Sabotage: "type" deleted from block's "required" -> this case goes red.
+    {"a block with no type", ["root", "type"], :absent},
+    # Sabotage: "id" deleted from datamodel_entry's "required" -> this case goes red.
+    {"a datamodel entry with no id", ["datamodel"], [%{"expr" => "1"}]},
+    # Sabotage: block's "type": "object" deleted -> this case goes red.
+    {"a string as the root block", ["root"], "blk_ROOT"},
+    # Sabotage: the root's "type": "object" deleted -> this case goes red.
+    {"a list as the whole document", [], []}
   ]
 
   # The negatives below each change one thing in this document, so it has
@@ -252,7 +288,7 @@ defmodule StatifierBlocks.SchemaTest do
   for {name, keys, value} <- @negatives do
     # Sabotage: per case, the note above its entry in @negatives.
     test "the package and the schema both refuse #{name}" do
-      document = put_in(valid_document(), unquote(keys), unquote(Macro.escape(value)))
+      document = change(valid_document(), unquote(keys), unquote(Macro.escape(value)))
 
       assert {:error, _reason} = Document.from_json(JSON.encode!(document))
       assert {:error, _errors} = validate(root_schema(), document)
@@ -291,6 +327,12 @@ defmodule StatifierBlocks.SchemaTest do
     assert root_map()["$id"] == "urn:statifier-blocks:block-document:#{version}"
   end
 
+  # Schema's moduledoc claims a core definition is never stricter than its
+  # type's validate_config/1. schema_drift_test.exs holds that claim now:
+  # every definition's property names, JSON types, enums and slot names
+  # against its type's own config_schema/1 and slots/1. What it does not
+  # compare - a pattern, a required key - this test still samples, over the
+  # fixtures, the flow-graph note and the generated documents.
   # Sabotage: core.sequence's config gaining "additionalProperties": false -> generated core.sequence blocks go red.
   test "no core definition refuses a block its type's validate_config/1 accepts" do
     fixture_documents = Enum.map(block_documents(), &File.read!/1)
