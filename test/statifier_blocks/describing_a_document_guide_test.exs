@@ -43,6 +43,9 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
     draft: "http://json-schema.org/draft-07/schema#",
     checked: :ok,
     refused: true,
+    typed: :ok,
+    root_admits: :ok,
+    palette_refuses: true,
     lines: @loan_default_lines,
     edge_kinds: [:entry, :sequence, :exit],
     reworded: List.replace_at(@loan_default_lines, 4, "Once the book is out, wait for its return")

@@ -1087,6 +1087,33 @@ block of a host type validates. `StatifierBlocks.Schema`'s docs list every
 difference, and [ADR-0015](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0015-block-document-json-schema.md)
 is the record.
 
+A host that knows its palette can ask for a stricter schema.
+`StatifierBlocks.Schema.for_palette/1` answers the same root with every block
+also judged by its own type's definition: a `core.*` type's from
+`definitions/core`, and a host type's generated from its declared
+`config_schema/1` and `slots/1`, each declared field typed from its declared
+field type (or `null`) with its label as `title` and its default as
+`default`. A block of a type the palette does not carry is judged by the
+generic shape alone, and nothing past a field's type is checked: bounds,
+cross-field rules and whether a field must be present stay with the type's
+`validate_config/1`.
+
+```elixir
+palette_schema =
+  StatifierBlocks.Palette.core() |> Schema.for_palette() |> ExJsonSchema.Schema.resolve()
+
+typed = ExJsonSchema.Validator.validate(palette_schema, JSON.decode!(stored))
+#=> :ok
+
+numbered = put_in(JSON.decode!(stored), ["root", "config", "event"], 5)
+root_admits = ExJsonSchema.Validator.validate(schema, numbered)
+#=> :ok
+
+palette_refuses =
+  match?({:error, [_ | _]}, ExJsonSchema.Validator.validate(palette_schema, numbered))
+#=> true
+```
+
 ### Describing a document
 
 `StatifierBlocks.Describe.outline/3` reads a document under a palette into
