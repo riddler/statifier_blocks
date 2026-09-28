@@ -404,7 +404,9 @@ defmodule StatifierBlocks.ViewModelTest do
 
       session = %Session{palette: palette, document: document, history: History.new()}
 
-      {:error, refused} = Session.change_config(session, "blk_MAP", %{"label" => 42})
+      # `null`, which the declared field type leaves to `validate_config/1`,
+      # so the map that callback answers reaches the view model on its own.
+      {:error, refused} = Session.change_config(session, "blk_MAP", %{"label" => nil})
 
       node =
         document

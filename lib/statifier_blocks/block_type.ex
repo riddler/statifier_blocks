@@ -103,6 +103,7 @@ defmodule StatifierBlocks.BlockType do
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.StateId
   alias StatifierBlocks.Palette
+  alias StatifierBlocks.Schema.FieldType
 
   @doc """
   Declares the behaviour and injects the overridable defaults ADR-0007
@@ -342,6 +343,13 @@ defmodule StatifierBlocks.BlockType do
   config-parameterized the same way slots are.
 
   This is a rendering hint, not the authority - `validate_config/1` is.
+  One thing in it binds: a field's declared **type** (decision 7, amended
+  2026-09-28). The package holds a config to the field types declared for
+  it before `validate_config/1` runs, and a value its field type does not
+  admit is a finding naming the field's `key` and the declared type, at
+  compile, at the edit gate and under the field. An absent key and a
+  `null` stay `validate_config/1`'s, and so does everything past a field's
+  type.
   The nine closed `field_type/0` values are `:string`, `:integer`,
   `:boolean`, `{:select, options}`, `:expression`, `:duration`,
   `{:list, field_type()}`, `{:path, opts}`, and `{:type_expr, opts}`.
@@ -464,10 +472,14 @@ defmodule StatifierBlocks.BlockType do
   @callback config_schema(Block.config()) :: [field_decl()]
 
   @doc """
-  The authority on config validity (ADR-0002 decision 7). `config_schema/1`
-  is a rendering hint only; this callback is where the real rules -
-  bounds, cross-field checks, identifier syntax - live. Findings name a
-  config key and carry author-facing text.
+  The authority on config validity past a field's type (ADR-0002 decision
+  7). A field's declared type in `config_schema/1` binds, and the package
+  checks it before this callback runs (decision 7, amended 2026-09-28);
+  the rest of `config_schema/1` is a rendering hint only, and this callback
+  is where the real rules - bounds, cross-field checks, identifier syntax -
+  live. It still runs when the type check has findings, and its findings
+  follow that check's. Findings name a config key and carry author-facing
+  text.
   """
   @callback validate_config(Block.config()) :: :ok | {:error, [finding()]}
 
@@ -1194,6 +1206,84 @@ defmodule StatifierBlocks.BlockType do
       :error -> :absent
     end
   end
+
+  # The binding check (ADR-0002 decision 7, amended 2026-09-28): every field
+  # of `ref`'s schema whose stored value its declared field type does not
+  # admit, in the shape `c:validate_config/1` returns, each finding naming
+  # the field's `key` and its declared type.
+  #
+  # The compiler's `:config` stage, the edit gate and the view model list
+  # these beside `type_expr_findings/2`'s and ahead of the type's own
+  # `validate_config/1` findings, which still follow: an order, not a short
+  # circuit. The value is judged through
+  # `StatifierBlocks.Schema.FieldType.binding_schema/1`, the one field-type
+  # mapping a generated host definition also reads, so the package and a
+  # per-palette schema refuse one set of values.
+  #
+  # Not judged: a `{:type_expr, opts}` field, whose value
+  # `type_expr_findings/2` already holds to its arms; an absent key or a
+  # `null`, which stay `validate_config/1`'s; a declaration the mapping
+  # cannot read; and a field whose `value_path` carries a list position,
+  # which the generated schema does not name either. A path that reaches no
+  # value is the absent case. Types only: every rule past a field's type
+  # stays `validate_config/1`'s.
+  @doc false
+  @spec field_type_findings(Palette.type_ref(), Block.config()) :: [finding()]
+  def field_type_findings(ref, config) do
+    ref
+    |> Palette.call(:config_schema, [config], [])
+    |> Enum.flat_map(&field_type_finding(&1, config))
+  end
+
+  @spec field_type_finding(field_decl(), Block.config()) :: [finding()]
+  defp field_type_finding(%{type: {:type_expr, _opts}}, _config), do: []
+
+  defp field_type_finding(%{key: key, type: type} = decl, config) when is_binary(key) do
+    path = value_path(decl)
+
+    with true <- Enum.all?(path, &is_binary/1),
+         {:ok, value} when not is_nil(value) <- fetch_value(config, path),
+         {:ok, fragment} <- FieldType.binding_schema(type),
+         false <- FieldType.admits?(fragment, value) do
+      [{key, field_type_message(key, type, value)}]
+    else
+      _judged_or_not_judged -> []
+    end
+  end
+
+  defp field_type_finding(_not_a_declaration, _config), do: []
+
+  @spec field_type_message(String.t(), field_type(), Block.json()) :: String.t()
+  defp field_type_message(key, type, value) do
+    "the #{key} field is declared #{declared(type)}, and holds #{held(type, value)}"
+  end
+
+  @spec declared(field_type()) :: String.t()
+  defp declared(:string), do: "a string"
+  defp declared(:expression), do: "an expression, stored as a string"
+  defp declared(:duration), do: "a duration, stored as a string"
+  defp declared({:path, _opts}), do: "a datamodel path, stored as a string"
+  defp declared(:integer), do: "an integer"
+  defp declared(:boolean), do: "a boolean"
+
+  defp declared({:select, choices}),
+    do: "one of " <> Enum.map_join(choices, ", ", fn {value, _label} -> inspect(value) end)
+
+  defp declared({:list, inner}), do: "a list, each element " <> declared(inner)
+  defp declared({:type_expr, _opts}), do: "a type name or an inline shape"
+
+  @spec held(field_type(), Block.json()) :: String.t()
+  defp held({:select, _choices}, value) when is_binary(value), do: inspect(value)
+
+  defp held({:list, _inner}, value) when is_list(value),
+    do: "a list with an element it does not admit"
+
+  defp held(_type, value) when is_binary(value), do: "a string"
+  defp held(_type, value) when is_integer(value), do: "an integer"
+  defp held(_type, value) when is_boolean(value), do: "a boolean"
+  defp held(_type, value) when is_list(value), do: "a list"
+  defp held(_type, value) when is_map(value), do: "an object"
+  defp held(_type, _value), do: "a number"
 
   @doc """
   Whether a field declaration says its value is a datamodel path - the two

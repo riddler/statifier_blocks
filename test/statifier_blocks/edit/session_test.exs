@@ -155,7 +155,13 @@ defmodule StatifierBlocks.Edit.SessionTest do
     test "the findings the refusal carried are kept beside the draft" do
       assert {:error, drafted} = Session.change_config(session(), "blk_LIST", %{"label" => 42})
 
-      assert drafted.draft_findings == %{"blk_LIST" => [{"label", "must be a string"}]}
+      # The declared field type's finding first, then the type's own.
+      assert drafted.draft_findings == %{
+               "blk_LIST" => [
+                 {"label", "the label field is declared a string, and holds an integer"},
+                 {"label", "must be a string"}
+               ]
+             }
     end
 
     # Sabotage: the success arm deleting the draft and keeping the findings -

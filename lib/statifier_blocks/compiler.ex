@@ -1567,9 +1567,10 @@ defmodule StatifierBlocks.Compiler do
 
     declared = declaration_findings(block, ref)
     expressions = BlockType.type_expr_findings(ref, block.config)
+    types = BlockType.field_type_findings(ref, block.config)
     typed = declared_payload_findings(node, declarations)
 
-    Enum.map(declared ++ expressions ++ own ++ typed, fn {key, message} ->
+    Enum.map(declared ++ expressions ++ types ++ own ++ typed, fn {key, message} ->
       Finding.new(:config, {:invalid_config, key}, message,
         block_id: block.id,
         config_key: key
