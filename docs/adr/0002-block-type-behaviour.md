@@ -14216,3 +14216,41 @@ the only later sections that name it are the Note of 2026-09-19, met above,
 and this Note.
 
 Filed with `sb-b4yk`.
+
+## Note (2026-09-27): an optional `explain/0`, decided by `ADR-0017`
+
+A dated Note rather than an amendment. It edits nothing above this line and
+does not touch decision 5: the five required callbacks are still the five it
+names, and no row of its table gains or loses a word. What it records is a
+new optional callback beside those, `explain/0`, decided by `ADR-0017`
+(`docs/adr/0017-block-types-explain-themselves.md`, decision 1, proposed
+2026-09-27 on the operator's ruling of that date), and why it takes this
+shape.
+
+The test is the one the Note on `donedata_type/1` states: a new optional
+callback that decides nothing this record owns is additive to decision 5,
+and takes a Note; one that decides something this record owns takes an
+amendment, as `summary/1` and `sentence/1` did. `explain/0` falls on the
+Note's side:
+
+- **It changes no card line.** It answers one paragraph per type, the same
+  for every block of the type, and nothing this record decides about a
+  card, a chip or a sentence reads it. Where a renderer shows it is
+  `ADR-0017` decision 4's.
+- **It is not a carve-out from B3.** Its answer is held to the refusal set
+  `sentence/1` already sits under - a non-string, a blank string and one
+  carrying a newline, carriage return or tab are refused, and no length arm
+  applies - so no rule this record states is narrowed by it.
+- **It changes nothing `use StatifierBlocks.BlockType` injects.** `ADR-0017`
+  decision 1 leaves `explain/0` out of the injected defaults: a type that
+  does not declare one falls to its palette entry's `description` at the
+  resolver, `StatifierBlocks.BlockType.explain/1`, and then to `nil`.
+
+It is pure, it takes no config, and it is resolved through
+`StatifierBlocks.Palette.declares?/3` and `Palette.call/4` the way the other
+optional callbacks are, so a `{module, state}` entry answers through the
+same seam. Nothing in the compiler, the emission or any compiled byte reads
+it.
+
+This Note carries no `Status:` line, which is this file's convention for a
+Note. Filed with `sb-q9d7`; `sb-111v` builds the callback and the resolver.
