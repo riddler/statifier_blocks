@@ -187,21 +187,78 @@ defmodule StatifierBlocks.Core.Send do
 
   The event name, held to the same test `summary/1` holds it to: a name
   that is not well formed is a finding on the card and does not belong in
-  a line that reads as though it were settled. The delay is deliberately
-  left out - the sentence says what goes out, and when it goes out is the
-  chip's.
+  a line that reads as though it were settled.
+
+  When the block carries a delay the line names it first, because when
+  the event goes out is half of what this block does: `In 7 days, send
+  loan.fines_notice`. The short duration form is put in words, one word
+  per unit and largest first (`1h30m` reads as `1 hour 30 minutes`); any
+  other spelling the field accepts, a fraction or a repeated unit, is
+  shown exactly as stored. An absent, empty or unreadable delay is no
+  delay, and the line is then `Send <event>`, unchanged.
 
       iex> StatifierBlocks.Core.Send.sentence(%{"event" => "order.paid"})
       "Send order.paid"
 
       iex> StatifierBlocks.Core.Send.sentence(%{})
       "Send an event"
+
+      iex> StatifierBlocks.Core.Send.sentence(%{"event" => "order.paid", "delay" => ""})
+      "Send order.paid"
+
+      iex> StatifierBlocks.Core.Send.sentence(%{"event" => "loan.fines_notice", "delay" => "7d"})
+      "In 7 days, send loan.fines_notice"
+
+      iex> StatifierBlocks.Core.Send.sentence(%{"event" => "order.paid", "delay" => "1h30m"})
+      "In 1 hour 30 minutes, send order.paid"
   """
   @impl true
   def sentence(config) do
     event = Map.get(config, "event")
-    if Config.event_name?(event), do: "Send " <> event, else: "Send an event"
+    event = if Config.event_name?(event), do: event, else: "an event"
+
+    case delay_words(Map.get(config, "delay")) do
+      nil -> "Send " <> event
+      words -> "In " <> words <> ", send " <> event
+    end
   end
+
+  # The short form: whole numbers, each unit at most once, largest first -
+  # the spelling a person types and `Duration.to_delay/1` renders. `mo`
+  # and `ms` are tried before `m`, the order predicator's lexer reads them.
+  @short_form ~r/\A(?:[0-9]+y)?(?:[0-9]+mo)?(?:[0-9]+w)?(?:[0-9]+d)?(?:[0-9]+h)?(?:[0-9]+m)?(?:[0-9]+s)?(?:[0-9]+ms)?\z/
+  @component ~r/([0-9]+)(mo|ms|y|w|d|h|m|s)/
+  @unit_words %{
+    "y" => "year",
+    "mo" => "month",
+    "w" => "week",
+    "d" => "day",
+    "h" => "hour",
+    "m" => "minute",
+    "s" => "second",
+    "ms" => "millisecond"
+  }
+
+  # `nil` is "no delay to name": absent, empty, or a value the duration
+  # grammar does not read. A valid duration never holds whitespace, so
+  # what comes back is always one line.
+  @spec delay_words(term()) :: String.t() | nil
+  defp delay_words(delay) do
+    cond do
+      not Duration.duration?(delay) -> nil
+      Regex.match?(@short_form, delay) -> in_words(delay)
+      true -> delay
+    end
+  end
+
+  defp in_words(delay) do
+    @component
+    |> Regex.scan(delay, capture: :all_but_first)
+    |> Enum.map_join(" ", fn [digits, unit] -> unit_phrase(String.to_integer(digits), unit) end)
+  end
+
+  defp unit_phrase(1, unit), do: "1 " <> Map.fetch!(@unit_words, unit)
+  defp unit_phrase(count, unit), do: "#{count} #{Map.fetch!(@unit_words, unit)}s"
 
   @doc """
   The spike's descriptor declares a static `sends` badge here. ADR-0005
@@ -224,10 +281,10 @@ defmodule StatifierBlocks.Core.Send do
   The event name, or `nil` (ADR-0002 amendment H6).
 
   Only the event. The delay is the other half of what this block does and
-  it is deliberately not on the card: `core.wait` already owns the timer
-  chip, and a second line reading `signup.abandoned after 2h` is a
-  sentence rather than a summary and would not fit under the presentation
-  cap in any case.
+  it is deliberately not on the chip: `core.wait` already owns the timer
+  chip, and a chip reading `signup.abandoned after 2h` is a sentence
+  rather than a summary and would not fit under the presentation cap in
+  any case. The delay is named where sentences belong, in `sentence/1`.
 
   A value that is not an event name is no chip rather than a chip nobody
   can read - the same reading `emit/2` gives it.
