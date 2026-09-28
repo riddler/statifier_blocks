@@ -282,3 +282,127 @@ loudly rather than admitting a key it cannot describe.
 - The block document's `datamodel` key and the datamodel package's document
   can version independently: nothing in this file changes when that package's
   schema does.
+
+## Amendment (2026-09-28): decision 6, generated host definitions type their declared fields
+
+**Status: proposed (2026-09-28).** Drafted for `sb-0zsz` under the operator's
+campaign consent, recording the operator's ruling of 2026-09-27 that a block
+type's declared field types are binding for every host type and that
+`for_palette/1` emits them. It merges at proposed. This record is itself at
+proposed, and the two flip together, through the same `docs/adr/` gate, once
+`for_palette/1` and the binding check have shipped in a published version.
+Additive: no text above this line is edited by this section. Decisions 1 to
+5, 7 and 8 stand as written, and **decision 4 is unchanged**: the core
+definitions stay hand-written, open wherever `validate_config/1` and
+`Validation` are open, and unreferenced by the root.
+
+Its premise is `ADR-0002`'s amendment of the same date to its decision 7,
+headed "decision 7, declared field types are binding for every block type"
+at the foot of `docs/adr/0002-block-type-behaviour.md`. That section makes a
+declared field type binding, checked before `validate_config/1` through the
+one field-type mapping. It is cited below by its item labels, `T1` to `T7`.
+
+Code cites below were read at `a26bf9f` and carry their anchors; re-locate by
+anchor, not by number.
+
+### What this amends
+
+Four sentences above rest on a premise `ADR-0002`'s amendment removes: that
+the package never holds a config to `config_schema/1`. From this date each is
+superseded as this section says, and each stays as written.
+
+- Decision 6's host-entry bullet says a generated definition "constrains
+  nothing the generic block shape does not", because `config_schema/1` is a
+  rendering hint "that the package never holds to `validate_config/1`, so a
+  type constraint read from it could refuse a config the type accepts"
+  (`:211-214`). The package now holds every config to its declared types
+  (`T1`), so a type read from the declaration refuses only what the package
+  itself refuses.
+- The same bullet's parenthesis, "(a field with a `value_path` is not
+  named)" (`:209-210`), is superseded for a `value_path` of string keys
+  (`D2` below). A positional one is still not named.
+- The invariant's closing clause, "the generated definitions' constraining
+  nothing past the generic shape is what makes it hold for host types"
+  (`:229-230`), is superseded by `D4` below: the binding declaration makes it
+  hold for host types.
+- The Consequences line "For host types, `for_palette/1` adds names, titles
+  and defaults and no refusals" (`:276-277`) now reads: for host types,
+  `for_palette/1` adds names, titles, defaults and the type refusals the
+  binding check makes, and no other refusal.
+
+### Decision
+
+**D1. A host definition types each declared field through the same
+mapping.** For every palette entry that is not a core entry, the generated
+definition gives each declared field the fragment that
+`StatifierBlocks.Schema.FieldType.json_schema/1`
+(`lib/statifier_blocks/schema/field_type.ex:22-47`, `def json_schema/1`)
+answers for its field type. That is the mapping the binding check judges
+through (`T3`). The field's `label` is still its `title` and its `default`
+still its `default`. `required?` is still not carried into `required`.
+Beside the fragment the definition also admits `null`, because the binding
+check leaves a `null` value to `validate_config/1` (`T5`). An absent key is
+admitted as before, since nothing is required. How the definition is asked
+for is unchanged: `config_schema/1` is reached through `Palette.call/4`
+(`lib/statifier_blocks/palette.ex:606`) about the config
+`Palette.new_block/2` (`palette.ex:690`) builds for the type.
+
+**D2. Where a field is named.** A field at `config[key]` is named under the
+config's `properties`, as before. A field whose `value_path` segments are
+all string keys is named at that path, as nested `properties`, and the
+objects on the way are given no type. Draft-07's `properties` judges only an
+object, so a step that is not an object is never reached. That matches the
+binding check's reading of such a path as the absent case (`T6`, `T5`). A
+field whose `value_path` carries an integer segment is still not named: the
+binding check leaves it to `validate_config/1` (`T6`), and so does the
+schema.
+
+**D3. A generated definition is never stricter than the binding check.**
+Where a fragment would refuse a value the binding check admits, the
+definition carries the looser reading. There are two such places:
+
+- A declaration `json_schema/1` cannot read answers `:error`, and the
+  binding check does not judge that field (`T5`). The definition names the
+  field with its title and default and gives it no type.
+- A `{:type_expr, opts}` field is typed as a string or an array, without the
+  fragment's `items` member constraint (`field_type.ex:44`, the
+  `{:type_expr, opts}` clause). The binding check for that arm is
+  `StatifierBlocks.BlockType.type_expr_findings/2`
+  (`lib/statifier_blocks/block_type.ex:1139`, `def type_expr_findings/2`),
+  which judges the arm by JSON type alone and leaves a member's shape to
+  `statifier_datamodel` (`T4`). The shipped file's hand-written core
+  definitions already leave both core `{:type_expr, opts}` fields
+  unconstrained: `core.map`'s `collect_type` and `core.on_event`'s `payload`
+  in `priv/schemas/block-document.schema.json`. So a host type gets here
+  what a core type already gets.
+
+**D4. The invariant, restated.** For `Palette.core()` and for a palette
+carrying test-only host types, every document the package admits, in which
+every block whose type the palette carries passes the package's config
+check, validates against `for_palette/1`'s schema. That check is the binding
+check of `ADR-0002`'s amendment followed by `validate_config/1` answering
+`:ok`. `for_palette/1` never refuses such a document.
+
+Decision 6 stated the invariant on `validate_config/1` alone (`:224-230`).
+Under that wording a host type whose `validate_config/1` accepts a value its
+own declaration refuses would be a counterexample. The package now refuses
+that config through the binding check, whatever `validate_config/1` answers
+(`T2`), so it is no longer a config the package accepts, and the restated
+premise names the check that refuses it. That binding declaration is what makes the invariant
+hold for host types. It already held for core types by decision 4's
+openness, which this section leaves as it is. A document the package admits
+and accepts that this schema refuses is a defect in the generated
+definition or in the binding check, never a reason to tighten `Decode` or
+`Validation`.
+
+### What this section does not change
+
+- The shipped root. It still admits exactly what `Decode` plus `Validation`
+  admit (decision 3), and it applies no definition.
+- Decision 4 and the core definitions in the shipped file. A core entry
+  still takes its definition from `definitions/core` verbatim.
+- A name the palette does not carry, which still takes the generic block
+  shape.
+- The `if`/`then` keyed on `type`, and the empty palette's answer.
+- A way for a block type to declare a JSON Schema of its own. That is still
+  not added.

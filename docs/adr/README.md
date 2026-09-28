@@ -4,6 +4,7 @@
 |---|---|---|
 | [0001](0001-block-document-schema.md) | The block document is a tree of typed blocks with named slots | accepted |
 | [0002](0002-block-type-behaviour.md) | A block type is a behaviour module resolved through a caller-supplied palette | accepted |
+| [0002 Amendment 2026-09-28](0002-block-type-behaviour.md#amendment-2026-09-28-decision-7-declared-field-types-are-binding-for-every-block-type) | Decision 7: a block type's declared field types are binding for every block type, checked before `validate_config/1` through the one field-type mapping | proposed |
 | [0003](0003-assignability.md) | Assignability is opaque-string identity plus a host-supplied widening relation | accepted |
 | [0004](0004-compiler-provenance.md) | One block, one state - a deterministic compile carrying a provenance map | accepted |
 | [0005](0005-liveview-editor.md) | The editor is a pure command algebra and view model with a thin LiveView shell | accepted |
@@ -17,6 +18,7 @@
 | [0013](0013-typed-fan-out-child-summary.md) | A fan-out child's summary is typed by the parent's declaration, with an optional child-side one and a dormant agreement check | accepted |
 | [0014](0014-document-accepts-declaration.md) | A document declares the external events it accepts - a list of names on the envelope, carried through compile, and judged against the chart by the engine's check at publish | accepted |
 | [0015](0015-block-document-json-schema.md) | The block document ships a JSON Schema whose root admits exactly what the package admits, and a palette can generate its own | proposed |
+| [0015 Amendment 2026-09-28](0015-block-document-json-schema.md#amendment-2026-09-28-decision-6-generated-host-definitions-type-their-declared-fields) | Decision 6: a host type's generated definition types its declared fields through the same mapping, and the invariant is restated on the binding check | proposed |
 | [0016](0016-document-describes-itself.md) | A document describes itself deterministically - block sentences joined by flow-graph edges read from structure, a host phrasing seam, and no model anywhere | accepted |
 | [0017](0017-block-types-explain-themselves.md) | Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe | accepted |
 
