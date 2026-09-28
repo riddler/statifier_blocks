@@ -40,16 +40,29 @@ defmodule StatifierBlocks.SchemaDriftTest do
   # are hand-written, and this test holds them to each core type's own
   # declarations, in both directions:
   #
-  #   * the names under definitions/core equal Palette.core_types/0's keys;
+  #   * the names under definitions/core equal Palette.core_types/0's keys
+  #     (this test is the one that checks them);
   #   * every field config_schema/1 declares, for every config below, lands
   #     by its value_path on a property its type's definition describes,
   #     with the JSON type StatifierBlocks.Schema.FieldType maps the field
-  #     type to (a property left untyped, which decision 4 allows for a
-  #     value validate_config/1 does not check, is compatible with any);
-  #   * every config property a definition describes is some declared
-  #     field's, apart from the keys @validated_not_declared names;
+  #     type to, and, where the mapped fragment describes an array's items,
+  #     with items that agree in turn (a property with no items does not);
+  #   * a property left untyped, which decision 4 allows for a value
+  #     validate_config/1 does not check, is compatible with any field only
+  #     where @untyped_by_design names it; any other untyped property a
+  #     field lands on, an array's items included, is drift;
+  #   * every property a definition describes on a declared field's
+  #     value_path is some declared field's, apart from the keys
+  #     @validated_not_declared names: the config's own properties, and
+  #     those of every object a longer value_path passes through (a branch
+  #     arm's, under config/arms/*);
+  #   * every key either pin names is one the file describes, and every key
+  #     @untyped_by_design names the file leaves untyped;
   #   * every slot slots/1 declares is named by its type's definition, and
   #     every slot name the definition gives is declared by slots/1.
+  #
+  # A path in a finding or a pin writes an array's items as *, so
+  # arms/*/slot is the slot key of any arm.
   #
   # The configs are every core block's in every block document fixture,
   # each core type's defaults as Palette.new_block/2 builds them, and
@@ -81,8 +94,20 @@ defmodule StatifierBlocks.SchemaDriftTest do
   # config_schema/1 does not declare as a form field. Each is described in
   # the file because the definition types config as validate_config/1
   # requires it (ADR-0015 decision 4), and each has no field to hold it to.
+  # A branch arm's slot is its condition field's key and its slot's name,
+  # never a field of its own.
   @validated_not_declared %{
+    "core.branch" => ["arms/*/slot"],
     "core.on_event" => ["capture"]
+  }
+
+  # Declared fields the file leaves untyped by design: each holds a value
+  # validate_config/1 does not check, and the file types a config key only
+  # as validate_config/1 requires it (ADR-0015 decision 4). Any other
+  # untyped property a field lands on is drift.
+  @untyped_by_design %{
+    "core.map" => ["collect_type"],
+    "core.on_event" => ["payload"]
   }
 
   # Configs reaching the fields and slots that exist only for some config:
@@ -170,6 +195,7 @@ defmodule StatifierBlocks.SchemaDriftTest do
 
     Enum.flat_map(fields, &field_drift(root, type, definition, &1)) ++
       undeclared_properties(root, type, definition, fields) ++
+      stale_pins(root, type, definition) ++
       Enum.flat_map(slots, &slot_drift(root, type, definition, &1)) ++
       undeclared_slots(root, type, definition, slots)
   end
@@ -178,9 +204,11 @@ defmodule StatifierBlocks.SchemaDriftTest do
     path = BlockType.value_path(field)
     where = "config/" <> Enum.map_join(path, "/", &to_string/1)
 
+    untyped_allowed? = pattern(path) in Map.get(@untyped_by_design, type, [])
+
     with {:mapping, {:ok, wanted}} <- {:mapping, FieldType.json_schema(field_type)},
          {:ok, property} <- locate(root, definition, path),
-         :ok <- compatible(root, property, wanted) do
+         :ok <- compatible(root, property, wanted, untyped_allowed?) do
       []
     else
       {:mapping, :error} ->
@@ -200,20 +228,85 @@ defmodule StatifierBlocks.SchemaDriftTest do
           "#{@schema_file}: #{type}'s definition types #{where} as #{have}, " <>
             "and config_schema/1 declares #{key} as #{inspect(field_type)}, which is #{want}"
         ]
+
+      {:untyped, want} ->
+        [
+          "#{@schema_file}: #{type}'s definition leaves #{where} untyped, " <>
+            "and config_schema/1 declares #{key} as #{inspect(field_type)}, which is #{want}; " <>
+            "only a key @untyped_by_design names may be untyped"
+        ]
     end
   end
 
+  # Every property the definition describes on a declared field's
+  # value_path: the config's own, and those of each object a longer
+  # value_path passes through. Paths are compared as pattern/1 writes them.
   defp undeclared_properties(root, type, definition, fields) do
-    declared = fields |> Enum.map(&hd(BlockType.value_path(&1))) |> MapSet.new()
+    paths = Enum.map(fields, &segments(BlockType.value_path(&1)))
+    declared = paths |> Enum.flat_map(&prefixes/1) |> MapSet.new()
     allowed = Map.get(@validated_not_declared, type, [])
+    containers = Enum.uniq([[] | Enum.flat_map(paths, &(&1 |> prefixes() |> Enum.drop(-1)))])
 
-    config = effective(root, get_in(definition, ["properties", "config"]) || %{})
-
-    for name <- config |> Map.get("properties", %{}) |> Map.keys() |> Enum.sort(),
-        name not in declared,
-        name not in allowed do
-      "#{@schema_file}: #{type}'s definition describes config/#{name}, " <>
+    for container <- Enum.sort(containers),
+        {:ok, node} <- [walk(root, definition, container)],
+        name <- node |> Map.get("properties", %{}) |> Map.keys() |> Enum.sort(),
+        path = container ++ [name],
+        path not in declared,
+        Enum.join(path, "/") not in allowed do
+      "#{@schema_file}: #{type}'s definition describes config/#{Enum.join(path, "/")}, " <>
         "which no field config_schema/1 declares"
+    end
+  end
+
+  # A pin that names nothing the file describes, or an untyped pin the file
+  # has since typed, would hide the next drift at that key.
+  defp stale_pins(root, type, definition) do
+    validated =
+      for pin <- Map.get(@validated_not_declared, type, []),
+          walk(root, definition, String.split(pin, "/")) == :missing do
+        "#{@schema_file}: #{type}'s definition does not describe config/#{pin}, " <>
+          "which @validated_not_declared names"
+      end
+
+    untyped =
+      for pin <- Map.get(@untyped_by_design, type, []),
+          finding <- untyped_pin(root, type, definition, pin) do
+        finding
+      end
+
+    validated ++ untyped
+  end
+
+  defp untyped_pin(root, type, definition, pin) do
+    case walk(root, definition, String.split(pin, "/")) do
+      :missing ->
+        [
+          "#{@schema_file}: #{type}'s definition does not describe config/#{pin}, " <>
+            "which @untyped_by_design names"
+        ]
+
+      {:ok, property} ->
+        if untyped?(property),
+          do: [],
+          else: [
+            "#{@schema_file}: #{type}'s definition types config/#{pin}, " <>
+              "which @untyped_by_design names as untyped"
+          ]
+    end
+  end
+
+  # A value_path as a pin or a finding writes it: a list position is *.
+  defp segments(path), do: Enum.map(path, &if(is_integer(&1), do: "*", else: &1))
+  defp pattern(path), do: path |> segments() |> Enum.join("/")
+
+  # Every prefix of a path, the path itself included and [] excluded.
+  defp prefixes(path), do: for(n <- 1..length(path)//1, do: Enum.take(path, n))
+
+  # The node a segments/1 path reaches, effective: * reads an array's items.
+  defp walk(root, definition, path) do
+    case locate(root, definition, Enum.map(path, &if(&1 == "*", do: 0, else: &1))) do
+      {:ok, node} -> {:ok, effective(root, node)}
+      :missing -> :missing
     end
   end
 
@@ -297,12 +390,19 @@ defmodule StatifierBlocks.SchemaDriftTest do
 
   # A property is compatible with a mapped fragment when it admits exactly
   # the fragment's JSON types, plus null at most (a type's stored "none"),
-  # an enum holds the same values, and an array's items agree in turn. A
-  # property with neither type nor enum is untyped and admits any field.
-  defp compatible(root, property, wanted) do
+  # an enum holds the same values, and, where the fragment describes an
+  # array's items, the property describes items that agree in turn. A
+  # property with neither type nor enum is untyped: it admits any field
+  # where untyped_allowed? says a pin names it, and is drift anywhere else,
+  # an array's items included.
+  defp compatible(root, property, wanted, untyped_allowed?) do
     property = effective(root, property)
 
-    if untyped?(property), do: :ok, else: compare(root, property, wanted)
+    cond do
+      not untyped?(property) -> compare(root, property, wanted)
+      untyped_allowed? -> :ok
+      true -> {:untyped, json_summary(root, wanted)}
+    end
   end
 
   defp untyped?(schema), do: not Map.has_key?(schema, "type") and not Map.has_key?(schema, "enum")
@@ -310,15 +410,19 @@ defmodule StatifierBlocks.SchemaDriftTest do
   defp compare(root, property, wanted) do
     cond do
       json_types(property) -- ["null"] != json_types(wanted) ->
-        {:incompatible, describe(property), describe(wanted)}
+        {:incompatible, json_summary(root, property), json_summary(root, wanted)}
 
       Map.has_key?(wanted, "enum") or Map.has_key?(property, "enum") ->
         if enum_values(property) == enum_values(wanted),
           do: :ok,
-          else: {:incompatible, describe(property), describe(wanted)}
+          else: {:incompatible, json_summary(root, property), json_summary(root, wanted)}
 
-      Map.has_key?(wanted, "items") and Map.has_key?(property, "items") ->
-        compatible(root, property["items"], wanted["items"])
+      Map.has_key?(wanted, "items") ->
+        items = Map.get(property, "items")
+
+        if items != nil and compatible(root, items, wanted["items"], false) == :ok,
+          do: :ok,
+          else: {:incompatible, json_summary(root, property), json_summary(root, wanted)}
 
       true ->
         :ok
@@ -330,6 +434,8 @@ defmodule StatifierBlocks.SchemaDriftTest do
   defp json_types(%{"enum" => values}),
     do: values |> Enum.map(&json_type/1) |> Enum.uniq() |> Enum.sort()
 
+  defp json_types(_untyped), do: []
+
   defp enum_values(schema),
     do: schema |> Map.get("enum", []) |> Enum.reject(&is_nil/1) |> Enum.sort()
 
@@ -340,8 +446,22 @@ defmodule StatifierBlocks.SchemaDriftTest do
   defp json_type(value) when is_list(value), do: "array"
   defp json_type(value) when is_map(value), do: "object"
 
-  defp describe(%{"enum" => values}), do: "an enum of " <> Enum.map_join(values, ", ", &inspect/1)
-  defp describe(schema), do: schema |> json_types() |> Enum.join(" or ")
+  defp json_summary(_root, %{"enum" => values}),
+    do: "an enum of " <> Enum.map_join(values, ", ", &inspect/1)
+
+  defp json_summary(root, schema) do
+    types = json_types(schema)
+
+    cond do
+      untyped?(schema) -> "untyped"
+      "array" not in types -> Enum.join(types, " or ")
+      Map.has_key?(schema, "items") -> summary_array(root, types, schema["items"])
+      true -> Enum.join(types, " or ") <> " with no items described"
+    end
+  end
+
+  defp summary_array(root, types, items),
+    do: Enum.join(types, " or ") <> " of " <> json_summary(root, effective(root, items))
 
   defp drift_message(findings),
     do: Enum.join(["the schema file and the package disagree:" | findings], "\n  ")
@@ -350,6 +470,9 @@ defmodule StatifierBlocks.SchemaDriftTest do
 
   # Sabotage: the "core.drafts" definition deleted from the file -> red, naming core.drafts.
   # Sabotage: core.wait's "duration" given "type": "integer" in the file -> red, naming core.wait.
+  # Sabotage: core.parallel's "lanes" losing its "items" in the file -> red, naming core.parallel.
+  # Sabotage: the core.branch entry of @validated_not_declared deleted -> red, naming core.branch.
+  # Sabotage: the core.map entry of @untyped_by_design deleted -> red, naming core.map.
   test "the file's core definitions agree with each core type's fields and slots" do
     findings = drift(root_map(), Palette.core_types(), configs())
 
@@ -415,7 +538,7 @@ defmodule StatifierBlocks.SchemaDriftTest do
            ]
   end
 
-  # Sabotage: compatible/3 answering :ok whenever the property has a type -> this case goes red.
+  # Sabotage: compatible/4 answering :ok whenever the property has a type -> this case goes red.
   test "a field type the package changed names the file and the type" do
     core_types = Map.put(Palette.core_types(), "core.wait", WaitWithIntegerDuration)
 
@@ -425,7 +548,7 @@ defmodule StatifierBlocks.SchemaDriftTest do
            ]
   end
 
-  # Sabotage: compatible/3 answering :ok whenever the property has a type -> this case goes red.
+  # Sabotage: compatible/4 answering :ok whenever the property has a type -> this case goes red.
   test "a field type the file changed names the file and the type" do
     root =
       put_in(
@@ -440,7 +563,7 @@ defmodule StatifierBlocks.SchemaDriftTest do
            ]
   end
 
-  # Sabotage: the enum comparison in compatible/3 dropped -> this case goes red.
+  # Sabotage: the enum comparison in compare/3 dropped -> this case goes red.
   test "a select choice the file lacks names the file and the type" do
     root =
       put_in(
@@ -491,6 +614,120 @@ defmodule StatifierBlocks.SchemaDriftTest do
     assert drift(root, Palette.core_types(), configs()) == [
              "#{@schema_file}: core.sequence's definition names the slot finally, " <>
                "which slots/1 does not declare"
+           ]
+  end
+
+  # --- array items, untyped properties and nested properties ------------------------
+
+  # Sabotage: compare/3's items clause answering :ok when the property has no items -> this case goes red.
+  test "an array property the file leaves without items names the file and the type" do
+    root =
+      update_in(
+        root_map(),
+        ["definitions", "core", "core.parallel", "properties", "config", "properties", "lanes"],
+        &Map.delete(&1, "items")
+      )
+
+    assert drift(root, Palette.core_types(), configs()) == [
+             "#{@schema_file}: core.parallel's definition types config/lanes as array " <>
+               "with no items described, and config_schema/1 declares lanes as " <>
+               "{:list, :string}, which is array of string"
+           ]
+  end
+
+  # Sabotage: compatible/4 passing true for an array's items -> this case goes red.
+  test "an array property whose items the file leaves untyped names the file and the type" do
+    root =
+      put_in(
+        root_map(),
+        [
+          "definitions",
+          "core",
+          "core.parallel",
+          "properties",
+          "config",
+          "properties",
+          "lanes",
+          "items"
+        ],
+        %{"description" => "A lane name."}
+      )
+
+    assert drift(root, Palette.core_types(), configs()) == [
+             "#{@schema_file}: core.parallel's definition types config/lanes as array of untyped, " <>
+               "and config_schema/1 declares lanes as {:list, :string}, which is array of string"
+           ]
+  end
+
+  # Sabotage: compatible/4's untyped clause answering :ok whatever the pin says -> this case goes red.
+  test "an untyped property no pin names names the file and the type" do
+    root =
+      put_in(
+        root_map(),
+        ["definitions", "core", "core.wait", "properties", "config", "properties", "duration"],
+        %{"description" => "A predicator duration."}
+      )
+
+    assert drift(root, Palette.core_types(), configs()) == [
+             "#{@schema_file}: core.wait's definition leaves config/duration untyped, " <>
+               "and config_schema/1 declares duration as :duration, which is string; " <>
+               "only a key @untyped_by_design names may be untyped"
+           ]
+  end
+
+  # Sabotage: untyped_pin/4's typed arm answering [] -> this case goes red.
+  test "a pinned untyped property the file has typed names the file and the type" do
+    root =
+      put_in(
+        root_map(),
+        ["definitions", "core", "core.on_event", "properties", "config", "properties", "payload"],
+        %{"type" => ["string", "array"], "items" => %{"type" => "object"}}
+      )
+
+    assert drift(root, Palette.core_types(), configs()) == [
+             "#{@schema_file}: core.on_event's definition types config/payload, " <>
+               "which @untyped_by_design names as untyped"
+           ]
+  end
+
+  # Sabotage: stale_pins/3's validated comprehension returning [] -> this case goes red.
+  test "a validated-not-declared pin the file does not describe names the file and the type" do
+    root =
+      update_in(
+        root_map(),
+        ["definitions", "core", "core.on_event", "properties", "config", "properties"],
+        &Map.delete(&1, "capture")
+      )
+
+    assert drift(root, Palette.core_types(), configs()) == [
+             "#{@schema_file}: core.on_event's definition does not describe config/capture, " <>
+               "which @validated_not_declared names"
+           ]
+  end
+
+  # Sabotage: undeclared_properties/4 checking only the config's own properties -> this case goes red.
+  test "a property the file describes on a value_path and no field declares names the file and the type" do
+    root =
+      put_in(
+        root_map(),
+        [
+          "definitions",
+          "core",
+          "core.branch",
+          "properties",
+          "config",
+          "properties",
+          "arms",
+          "items",
+          "properties",
+          "weight"
+        ],
+        %{"type" => "integer"}
+      )
+
+    assert drift(root, Palette.core_types(), configs()) == [
+             "#{@schema_file}: core.branch's definition describes config/arms/*/weight, " <>
+               "which no field config_schema/1 declares"
            ]
   end
 
