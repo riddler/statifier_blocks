@@ -10,32 +10,36 @@ defmodule StatifierBlocks.Describe do
       ...>     id: "root",
       ...>     slots: %{
       ...>       "body" => [
-      ...>         Block.new("core.wait", id: "wait", config: %{"duration" => "30s"}),
-      ...>         Block.new("core.send", id: "send", config: %{"event" => "order.paid"})
+      ...>         Block.new("core.wait", id: "wait", config: %{"duration" => "14d"}),
+      ...>         Block.new("core.send", id: "send", config: %{"event" => "loan.overdue"})
       ...>       ]
       ...>     }
       ...>   )
       iex> root |> Document.new() |> Describe.outline(Palette.core(), []) |> Describe.render([])
       [
         "Run its steps in order",
-        "Wait 30s",
-        "Send order.paid",
-        "Run its steps in order starts with Wait 30s",
-        "After Wait 30s (done), Send order.paid",
-        "Send order.paid (done) ends Run its steps in order"
+        "Wait 14d",
+        "Send loan.overdue",
+        "Run its steps in order starts with Wait 14d",
+        "After Wait 14d (done), Send loan.overdue",
+        "Send loan.overdue (done) ends Run its steps in order"
       ]
 
   ## Pure, and no model anywhere
 
   `outline/3` is a function of the document, the palette and its options,
   and `render/2` of the outline and its options. Neither compiles the
-  document, reads a clock or a random source, starts or messages a
-  process, reaches a network or asks a language model, and equal input
-  answers byte-identical output. The only code either runs that this
-  package does not own is the palette's block-type callbacks and the
-  host's phrasing module, each held to be a pure function of its arguments
-  by its own contract (`StatifierBlocks.BlockType`,
-  `StatifierBlocks.Describe.Phrasing`).
+  document, reads a clock or a random source, starts a process or sends a
+  message of its own, reaches a network or asks a language model, and
+  equal input answers byte-identical output. The one way either can reach
+  another process is not of its own making: a module is made sure of
+  (`Code.ensure_loaded?/1`) before it is asked - a palette's block-type
+  module by `StatifierBlocks.Palette.declares?/3`, the host's phrasing
+  module by `render/2` - and a module not yet loaded is loaded by the
+  runtime's code server. The only code either runs that this package does
+  not own is the palette's block-type callbacks and the host's phrasing
+  module, each held to be a pure function of its arguments by its own
+  contract (`StatifierBlocks.BlockType`, `StatifierBlocks.Describe.Phrasing`).
 
   ## Nodes
 
@@ -66,6 +70,16 @@ defmodule StatifierBlocks.Describe do
       `:exit` edge from its last child to the branch's exit, where the arms
       converge. `otherwise` always has its edge; `undecided` has one only
       when it holds a block.
+
+  A type is recognised here by the module the palette resolves the
+  block's type name to - `StatifierBlocks.Core.Sequence`,
+  `StatifierBlocks.Core.Group`, `StatifierBlocks.Core.ResumableGroup` or
+  `StatifierBlocks.Core.Branch` - not by the name itself; under
+  `StatifierBlocks.Palette.core/0` the two agree. A palette that registers
+  a host's own module under `core.sequence` gets that block described by
+  containment only, and one that registers `StatifierBlocks.Core.Sequence`
+  under a name of the host's own gets a sequence's edges. The timer edge
+  below recognises its sends, rules and awaits the same way.
 
   A child here is one `StatifierBlocks.ViewModel.flow_children/1` answers
   for the slot: a drafts shelf is a node and takes part in no edge.
@@ -179,6 +193,11 @@ defmodule StatifierBlocks.Describe do
   a usable answer replaces the line, and `:default` or a refused answer
   keeps it (`Phrasing` gives the refusal set). Without the option every
   line is the default.
+
+  The option's value is a module atom, and `phrasing: nil` is the same as
+  leaving it out. An atom that names no loadable module answers the
+  default lines; a value that is not an atom is outside this contract and
+  raises.
   """
   @spec render(t(), keyword()) :: [String.t()]
   def render(%__MODULE__{nodes: nodes, edges: edges}, opts) when is_list(opts) do

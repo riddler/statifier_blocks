@@ -217,7 +217,7 @@ defmodule StatifierBlocks.DescribeTest do
           slots: %{
             "body" => [
               Block.new("nobody.knows.this", id: "odd", config: %{"x" => 1}),
-              Block.new("core.send", id: "send", config: %{"event" => "order.paid"})
+              Block.new("core.send", id: "send", config: %{"event" => "loan.overdue"})
             ]
           }
         )
@@ -450,6 +450,50 @@ defmodule StatifierBlocks.DescribeTest do
     end
   end
 
+  describe "a container is recognised by the module its type resolves to" do
+    defp loan_steps(type) do
+      Block.new(type,
+        id: "root",
+        slots: %{
+          "body" => [Block.new("core.send", id: "send", config: %{"event" => "loan.overdue"})]
+        }
+      )
+      |> Document.new()
+    end
+
+    # Sabotage: in `Describe.edges/3`, dispatch on the block's type name
+    # (`module(Map.get(Palette.core_types(), block.type))`) instead of
+    # `module(ref)` -> the host-named sequence draws no edge, red.
+    test "the package's sequence under a host's name draws a sequence's edges" do
+      palette =
+        Palette.new(%{
+          "library.loan_steps" => StatifierBlocks.Core.Sequence,
+          "core.send" => StatifierBlocks.Core.Send
+        })
+
+      assert %Describe{edges: edges} =
+               Describe.outline(loan_steps("library.loan_steps"), palette, [])
+
+      assert edges == [
+               edge(:entry, "root", {:entry, "root"}, {:block, "send"}),
+               edge(:exit, "root", {:block, "send"}, {:exit, "root"}, outcomes: ["done"])
+             ]
+    end
+
+    # Sabotage: the mutation above -> `core.sequence` dispatches to the
+    # package's sequence whatever the palette holds, edges drawn, red.
+    test "a host's own module under core.sequence is described by containment only" do
+      palette =
+        Palette.new(%{
+          "core.sequence" => StatifierBlocks.BlockTypeFixtures.OutcomeParent,
+          "core.send" => StatifierBlocks.Core.Send
+        })
+
+      assert %Describe{edges: [], nodes: [%Node{id: "root"}, %Node{id: "send", depth: 1}]} =
+               Describe.outline(loan_steps("core.sequence"), palette, [])
+    end
+  end
+
   describe "the timer edge" do
     defp delayed(id, event, delay),
       do: Block.new("core.send", id: id, config: %{"event" => event, "delay" => delay})
@@ -665,7 +709,7 @@ defmodule StatifierBlocks.DescribeTest do
       @behaviour StatifierBlocks.Describe.Phrasing
 
       @impl true
-      def step(%Node{id: "send"}, _default), do: "Tell the shop the order is paid"
+      def step(%Node{id: "send"}, _default), do: "Tell the patron the loan is overdue"
       def step(%Node{id: "wait"}, _default), do: "   "
       def step(%Node{id: "root"}, default), do: default <> "\nsecond line"
 
@@ -704,11 +748,11 @@ defmodule StatifierBlocks.DescribeTest do
 
     @defaults [
       "Run its steps in order",
-      "Wait 30s",
-      "Send order.paid",
-      "Run its steps in order starts with Wait 30s",
-      "After Wait 30s (done), Send order.paid",
-      "Send order.paid (done) ends Run its steps in order"
+      "Wait 14d",
+      "Send loan.overdue",
+      "Run its steps in order starts with Wait 14d",
+      "After Wait 14d (done), Send loan.overdue",
+      "Send loan.overdue (done) ends Run its steps in order"
     ]
 
     defp described do
@@ -716,8 +760,8 @@ defmodule StatifierBlocks.DescribeTest do
         id: "root",
         slots: %{
           "body" => [
-            Block.new("core.wait", id: "wait", config: %{"duration" => "30s"}),
-            Block.new("core.send", id: "send", config: %{"event" => "order.paid"})
+            Block.new("core.wait", id: "wait", config: %{"duration" => "14d"}),
+            Block.new("core.send", id: "send", config: %{"event" => "loan.overdue"})
           ]
         }
       )
@@ -730,11 +774,11 @@ defmodule StatifierBlocks.DescribeTest do
     test "a host overrides one node and one edge; blank, newline, non-string and raise fall back" do
       assert Describe.render(described(), phrasing: Host) == [
                "Run its steps in order",
-               "Wait 30s",
-               "Tell the shop the order is paid",
+               "Wait 14d",
+               "Tell the patron the loan is overdue",
                "It begins with a pause.",
-               "After Wait 30s (done), Send order.paid",
-               "Send order.paid (done) ends Run its steps in order"
+               "After Wait 14d (done), Send loan.overdue",
+               "Send loan.overdue (done) ends Run its steps in order"
              ]
     end
 
@@ -812,44 +856,43 @@ defmodule StatifierBlocks.DescribeTest do
   describe "no network, clock, process, random source or model" do
     @modules [Describe, Edge, Node, StatifierBlocks.Describe.Phrasing]
 
-    @forbidden_modules [
-      :gen_tcp,
-      :gen_udp,
-      :httpc,
-      :inet,
-      :socket,
-      :ssl,
-      :os,
-      :calendar,
-      :timer,
-      :rand,
-      :random,
-      :crypto,
-      :global,
-      :ets,
-      :persistent_term,
-      System,
-      DateTime,
-      NaiveDateTime,
-      Date,
-      Time,
-      Process,
-      Task,
-      GenServer,
-      Agent,
-      Port,
-      Registry,
-      Supervisor,
-      StatifierBlocks.Compiler,
-      :"Elixir.Node"
+    # An allowlist, not a denylist: every module the compiled modules call
+    # into is named here, so a call into anything else - a bare `:erlang`
+    # process primitive included - fails the test until it is added here
+    # on purpose. The modules below reach no network, clock, process,
+    # random source or model of their own.
+    @allowed_modules [
+      ArgumentError,
+      Enum,
+      Exception,
+      Keyword,
+      List,
+      Map,
+      String,
+      String.Chars,
+      StatifierBlocks.BlockType,
+      StatifierBlocks.Core.Duration,
+      StatifierBlocks.Core.Send,
+      StatifierBlocks.Palette,
+      StatifierBlocks.Shelf,
+      StatifierBlocks.ViewModel,
+      :elixir_erl_pass,
+      :lists
     ]
 
-    @forbidden_erlang ~w(spawn spawn_link spawn_monitor spawn_opt send now monotonic_time
-                         system_time time date localtime universaltime timestamp
-                         unique_integer make_ref open_port whereis register self)a
+    # Modules that hold both pure functions and ones that reach a process,
+    # allowed one function at a time. `Code.ensure_loaded?/1` loads a host's
+    # phrasing module through the code server when it is not yet loaded,
+    # the one call the moduledoc names.
+    @allowed_functions %{
+      :erlang => ~w(++ =/= =:= error function_exported get_module_info tl)a,
+      Code => [:ensure_loaded?],
+      Kernel => [:inspect]
+    }
 
-    # Sabotage: add `System.os_time()` to `Describe.render/2` -> the import
-    # table names `System`, red.
+    # Sabotage: in `Describe.render/2`, read the option as
+    # `Keyword.get(opts, :phrasing, length(:erlang.processes()) && nil)` ->
+    # the import table names `{:erlang, :processes, 0}`, off the list, red.
     test "the compiled modules import nothing that reaches one" do
       for module <- @modules do
         # Read from the file on disk: under coverage the loaded module is
@@ -860,8 +903,8 @@ defmodule StatifierBlocks.DescribeTest do
           beam |> String.to_charlist() |> :beam_lib.chunks([:imports])
 
         offending =
-          Enum.filter(imports, fn {mod, fun, _arity} ->
-            mod in @forbidden_modules or (mod == :erlang and fun in @forbidden_erlang)
+          Enum.reject(imports, fn {mod, fun, _arity} ->
+            mod in @allowed_modules or fun in Map.get(@allowed_functions, mod, [])
           end)
 
         assert offending == [], "#{inspect(module)} imports #{inspect(offending)}"
