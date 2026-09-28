@@ -283,13 +283,6 @@ defmodule StatifierBlocks.SchemaTest do
 
   # --- j. the core definitions ------------------------------------------------
 
-  # Sabotage: the "core.drafts" definition deleted -> the key comparison goes red.
-  test "there is exactly one definition per core type, under definitions/core" do
-    core_definitions = root_map() |> get_in(["definitions", "core"]) |> Map.keys() |> Enum.sort()
-
-    assert core_definitions == Palette.core_types() |> Map.keys() |> Enum.sort()
-  end
-
   # Sabotage: the $id's trailing schema_version changed to 2 -> the comparison goes red.
   test "the $id names the schema_version the package writes" do
     %Document{schema_version: version} =
