@@ -14254,3 +14254,174 @@ it.
 
 This Note carries no `Status:` line, which is this file's convention for a
 Note. Filed with `sb-q9d7`; `sb-111v` builds the callback and the resolver.
+
+## Amendment (2026-09-28): decision 7, declared field types are binding for every block type
+
+**Status: proposed (2026-09-28).** Drafted for `sb-0zsz` under the operator's
+campaign consent, recording the operator's ruling of 2026-09-27: a block
+type's declared field types are binding for every block type, core and host
+alike, the package enforces them before `validate_config/1`, and a host gets a
+palette pre-flight and an upgrade note. It merges at proposed; flipping it to
+accepted is a separate request through the same `docs/adr/` gate, once the
+code that enforces it has shipped in a published version of this package.
+Additive: no text above this line is edited by this section, and decision 7's
+`value_path` amendment (2026-08-27), its `{:path, opts}` amendment at `:2761`,
+its `{:type_expr, opts}` amendment at `:4957` and its field-flags amendment at
+`:5644` stand as written. `ADR-0015`'s amendment of the same date to its
+decision 6 is this section's schema half.
+
+Code cites below were read at `a26bf9f` and carry their anchors; re-locate by
+anchor, not by number.
+
+### What this amends
+
+Decision 7 says the config schema "is not a validation language" (`:180-181`),
+that it "drives the editor's form and nothing else" (`:217`), and that
+"`validate_config/1` is the authority", the schema being "a rendering hint
+that happens to catch the easy cases early" (`:222-225`). The typespec
+appendix repeats the split in two `@doc` lines (`:471` and `:474`). From this
+date each of those reads with one exception carved out of it: a field's
+declared **type** binds. The field list is still not a validation language
+for anything past a field's type, and `validate_config/1` is still the
+authority on everything past it. The text above stays as written.
+
+Decision 7's reason for the split still holds, and it is why this section
+binds types and nothing more. A schema rich enough to state bounds and
+cross-field rules becomes a second validation implementation that drifts from
+the first. A field's type is not that: it is already stated once, in one
+mapping, which the editor draws from, the shipped schema's drift test holds
+the core definitions to, and a per-palette schema reads. Holding a config to
+it adds no second statement of anything.
+
+### Decision
+
+**T1. A declared field type is binding.** For every block type a palette
+resolves, a config is held to the field types that type's `config_schema/1`
+declares for that config. A value whose JSON type the declared field type
+does not admit is a finding naming the field's `key` and its declared type.
+No type opts in or out: the rule is the same for a core type, a host type and
+a host module mounted under a `core.` name.
+
+**T2. The enforcement point is before `validate_config/1`, at the three
+config seams.** The package asks a block type about a config in three places,
+and each already lists one package-owned check ahead of the type's own
+callback: the compiler's `:config` stage (`StatifierBlocks.Compiler`,
+`defp config_findings/2`, `lib/statifier_blocks/compiler.ex:1558`), the edit
+gate (`StatifierBlocks.Edit.check_config/3`'s `:update_config` clause,
+`lib/statifier_blocks/edit.ex:302`), and the view model's findings under a
+field (`StatifierBlocks.ViewModel`, `defp config_findings/3`,
+`lib/statifier_blocks/view_model.ex:1959`). That check is
+`StatifierBlocks.BlockType.type_expr_findings/2`
+(`lib/statifier_blocks/block_type.ex:1139`, `def type_expr_findings/2`). The
+binding check's findings sit beside it, ahead of `validate_config/1`'s, in all
+three, so the set an author is shown, the set a compile refuses on and the set
+the edit gate refuses on stay one set. "Before" orders findings; it is not a
+short circuit. `validate_config/1` still runs, and its findings still follow.
+
+**T3. Types are judged through the one field-type mapping.** The check reads
+`StatifierBlocks.Schema.FieldType.json_schema/1`
+(`lib/statifier_blocks/schema/field_type.ex:22-47`, `def json_schema/1`), the
+internal mapping from a field type to the JSON a document stores for it.
+There is no second table. A value the binding check admits and the mapping's
+fragment refuses, or the reverse, is a defect in one of them, except where
+T4 names the one place the two are read differently on purpose. The closed
+set is `t:StatifierBlocks.BlockType.field_type/0`
+(`lib/statifier_blocks/block_type.ex:195`, `@type field_type`). It has nine
+arms, and each reads through the mapping as follows:
+
+| Arm | What the stored value must be |
+|---|---|
+| `:string` | a string |
+| `:expression` | a string |
+| `:duration` | a string |
+| `{:path, opts}` | a string |
+| `:integer` | a JSON integer |
+| `:boolean` | `true` or `false` |
+| `{:select, choices}` | one of the choices' values, each a string |
+| `{:list, inner}` | an array whose every element `inner` admits |
+| `{:type_expr, opts}` | a string or an array (T4) |
+
+For the four string arms the type is all that binds. Whether an expression
+parses, whether a duration reads in the accepted grammar and what a path
+names stay where they are checked today. A float never reaches the
+`:integer` arm, because `Validation` refuses one anywhere in a config
+(ADR-0001 decision 6). A list's elements are judged as values by `inner`, so
+an element `inner` does not admit is refused even where T5 leaves the list's
+own absence alone.
+
+**T4. The `{:type_expr, opts}` arm is already bound, by the check that
+exists.** Since decision 7's amendment of 2026-09-06, `type_expr_findings/2`
+has held a `{:type_expr, opts}` field's value to the arms its declaration
+admits, at all three seams. It tells a name from an inline shape by JSON type
+alone (`defp stored_arm/2`, `lib/statifier_blocks/block_type.ex:1187`) and
+refuses bytes that are neither. That check **is** the binding check for this
+arm. A `{:type_expr, opts}` field draws no second finding from the binding
+check. What `type_expr_findings/2` leaves alone, the binding check leaves
+alone too. That includes a member's own shape, which that function's
+documentation places with `statifier_datamodel`. The mapping's fragment for
+this arm also says each member is an object (`field_type.ex:44`, the
+`{:type_expr, opts}` clause). That member constraint is not a type this
+section binds. `ADR-0015`'s amendment of this date reads it the same way for a
+generated definition.
+
+**T5. What the binding check does not judge.**
+
+- **An absent key and a `null` value.** Both are left to `validate_config/1`.
+  `required?` stays a rendering hint: whether a field must be present, and
+  whether a type's "none" may be spelled `null`, are the type's own. The
+  mapping's comment says the same of a stored `null`.
+- **A declaration the mapping cannot read.** This is a `{:select, choices}`
+  with no choices or with a choice whose value is not a string, or a
+  `{:list, inner}` whose `inner` is one of those. `json_schema/1` answers
+  `:error` for it, and the field is not judged. Refusing a value against a
+  declaration no reader can read would blame the author for the type's
+  defect. This section does not decide whether such a declaration is itself
+  refused. The compiler's declaration check (`defp declaration_finding/1`,
+  `lib/statifier_blocks/compiler.ex:1631`) refuses a field with no `default:`
+  and a `hidden?: true` field with an empty `default:`, and nothing about a
+  malformed select.
+- **Everything past the type.** Bounds, cross-field rules, identifier syntax,
+  choices that depend on an earlier field's value, and every grammar a string
+  field carries stay with `validate_config/1`, which is the authority on all
+  of them.
+
+**T6. The `value_path` rule.** A field is judged where its value lives. The
+place is found by `StatifierBlocks.BlockType.value_path/1`
+(`lib/statifier_blocks/block_type.ex:1108`) and read by
+`StatifierBlocks.BlockType.fetch_value/2` (`:1255`), the pair the editor
+already reads through. A field whose `value_path` segments are all
+string keys is judged at that path. A field whose `value_path` carries an
+integer segment, a position in a list as `core.branch`'s per-arm condition
+fields carry (the 2026-08-27 amendment above, `["arms", 2, "cond"]`), is left
+to `validate_config/1`. Which positions exist is a property of the config,
+and the generated schema names no positional path (`ADR-0015`'s amendment),
+so leaving it here keeps the two on one reading. A path that reaches no
+value, through a missing key or a step that is not an object, is T5's absent
+case.
+
+**T7. The one behaviour change.** From the release that ships this, a config
+whose value its own type's declared field type does not admit is refused at
+compile, at the edit gate and under the field in the view model. Before, only
+the type's `validate_config/1` could refuse it. A host type whose documents
+or fixtures disagree with its declarations will see findings it did not see
+before. An integer stored in a field declared `:string` is the plain case.
+The package gives a host a palette pre-flight that lists the types whose
+fixtures disagree with their declarations, and the changelog's upgrade note
+names it. Nothing else a function of this package answers changes for a host
+that calls none of the new surface.
+
+### What this section does not change
+
+- The closed field-type set and the reason decision 7 gives for closing it.
+- `value_path`'s meaning for the editor, and `key` as the field's identity
+  and the anchor of every finding.
+- `required?`, `hidden?`, `readonly?`, `sensitive?` and `datamodel_path?`:
+  none gains a binding meaning here.
+- `Decode` and `Validation`. A document is still admitted without resolving
+  a type (ADR-0001 decision 9), so the binding check runs where a type is
+  resolved and never at decode.
+- The code's own restatement of the split,
+  `@callback validate_config/1`'s documentation
+  (`lib/statifier_blocks/block_type.ex:472`), which still calls
+  `config_schema/1` "a rendering hint only". The code that builds this
+  section amends that text in the same request.
