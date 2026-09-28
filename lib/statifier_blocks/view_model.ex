@@ -1968,9 +1968,12 @@ defmodule StatifierBlocks.ViewModel do
     shared =
       BlockType.type_expr_findings(ref, config) ++ BlockType.field_type_findings(ref, config)
 
-    Enum.map(shared ++ own, fn {key, message} ->
-      Finding.new({:config, block_id, key}, :config, message)
-    end)
+    to_finding = fn {key, message} -> Finding.new({:config, block_id, key}, :config, message) end
+
+    # Each list is mapped on its own and only the results are joined: `own`
+    # is whatever the type answered, and appending onto an unchecked value
+    # would build an improper list from a type that answers a map.
+    Enum.map(shared, to_finding) ++ Enum.map(own, to_finding)
   end
 
   @spec resolution_message(
