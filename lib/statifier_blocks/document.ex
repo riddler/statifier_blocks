@@ -278,7 +278,10 @@ defmodule StatifierBlocks.Document do
   no insignificant whitespace, empty `slots`/`config`/`metadata`/`datamodel`/
   `accepts` omitted, no floats. An empty `accepts` is omitted for the reason
   an empty `datamodel` is: every document written before the key existed
-  keeps its bytes, and so its `content_hash/1` (ADR-0014 decision 2).
+  keeps its bytes, and so its `content_hash/1` (ADR-0014 decision 2). A
+  block's empty `note` is omitted for the same reason; a non-empty note is
+  in the bytes, so it changes `content_hash/1` while the compiled chart
+  stays the same (ADR-0001's Amendment of 2026-09-28, `2b` and `2f`).
 
   Runs `validate/1` first and raises `ArgumentError` carrying the validation
   reason when it fails, so an invalid document can never produce bytes that
@@ -316,6 +319,11 @@ defmodule StatifierBlocks.Document do
   `schema_version`, `metadata`, `datamodel`, `accepts` - decision 11 added
   `datamodel` and ADR-0014 decision 2 added `accepts`) is refused rather than silently dropped, the same discipline the
   block-level decode already applies to an unrecognized block key.
+
+  A block's optional `note` (ADR-0001's Amendment of 2026-09-28, `2b`)
+  decodes when it is a string, and an absent one decodes to `""`; any other
+  value, an explicit `null` included, is refused as
+  `{:malformed_block, id, {:note, :not_a_string}}`.
   """
   @spec from_json(binary()) :: {:ok, t()} | {:error, validation_error()}
   def from_json(binary) when is_binary(binary), do: Decode.decode(binary)

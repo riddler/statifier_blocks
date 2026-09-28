@@ -47,7 +47,7 @@ defmodule StatifierBlocks.Decode do
   alias StatifierBlocks.{Block, Document, Validation}
   alias StatifierBlocks.Document.DatamodelEntry
 
-  @block_keys ~w(id type type_version config slots)
+  @block_keys ~w(id type type_version config slots note)
   @envelope_keys ~w(id revision root schema_version metadata datamodel accepts)
   @entry_keys ~w(id expr description)
 
@@ -143,7 +143,8 @@ defmodule StatifierBlocks.Decode do
          type: Map.get(map, "type"),
          type_version: Map.get(map, "type_version"),
          config: Map.get(map, "config", %{}),
-         slots: slots
+         slots: slots,
+         note: Map.get(map, "note", "")
        }}
     end
   end

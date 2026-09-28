@@ -214,6 +214,16 @@ defmodule StatifierBlocks.SchemaTest do
     assert {:error, _errors} = validate(definition_schema("core.wait"), wait)
   end
 
+  # Sabotage: the block definition's "note" property deleted -> the schema verdict goes red.
+  test "a block carrying a note, empty or not, decodes and validates" do
+    for note <- ["Checks the patron's card before the loan.", ""] do
+      document = put_root(valid_document(), "note", note)
+
+      assert match?({:ok, %Document{}}, Document.from_json(JSON.encode!(document))), note
+      assert validate(root_schema(), document) == :ok, note
+    end
+  end
+
   # --- h. refusals the schema expresses ---------------------------------------
 
   @negatives [
@@ -271,6 +281,10 @@ defmodule StatifierBlocks.SchemaTest do
     {"a datamodel entry with no id", ["datamodel"], [%{"expr" => "1"}]},
     # Sabotage: block's "type": "object" deleted -> this case goes red.
     {"a string as the root block", ["root"], "blk_ROOT"},
+    # Sabotage: block note's "type": "string" deleted -> this case goes red.
+    {"a non-string block note", ["root", "note"], 5},
+    # Sabotage: block note's "type" widened to ["string", "null"] -> this case goes red.
+    {"an explicit null block note", ["root", "note"], nil},
     # Sabotage: the root's "type": "object" deleted -> this case goes red.
     {"a list as the whole document", [], []}
   ]
