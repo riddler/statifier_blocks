@@ -116,6 +116,10 @@
           "additionalProperties": {
             "$ref": "#/definitions/block_list"
           }
+        },
+        "note": {
+          "description": "An author-written note for a person reading the document, never compiled. Absent or empty means no note.",
+          "type": "string"
         }
       }
     },

@@ -3,7 +3,8 @@ defmodule StatifierBlocks.CanonicalJson do
 
   # ADR-0001 decision 8's deterministic encoder: sorted object keys, no
   # insignificant whitespace, empty `slots`/`config`/`metadata` omitted
-  # rather than encoded as `{}`/`[]`, and no floats. Two encodes of equal
+  # rather than encoded as `{}`/`[]` (and an empty block `note` omitted
+  # rather than encoded as `""`), and no floats. Two encodes of equal
   # documents are therefore byte-identical, which is what makes a SHA-256
   # over the result a usable document identity (`Document.content_hash/1`).
   #
@@ -61,6 +62,7 @@ defmodule StatifierBlocks.CanonicalJson do
     ]
 
     pairs = maybe_put(pairs, "config", block.config)
+    pairs = maybe_put_note(pairs, block.note)
     pairs = maybe_put_slots(pairs, block.slots)
 
     object(pairs)
@@ -130,6 +132,14 @@ defmodule StatifierBlocks.CanonicalJson do
   @spec maybe_put_scalar([{String.t(), term()}], String.t(), term()) :: [{String.t(), term()}]
   defp maybe_put_scalar(pairs, _key, nil), do: pairs
   defp maybe_put_scalar(pairs, key, value), do: [{key, value} | pairs]
+
+  # A block's empty `note` is omitted (ADR-0001's Amendment of 2026-09-28,
+  # `2b`): the empty string is the absent note, so the two are one spelling
+  # in the bytes, and no document written before the key existed changes a
+  # byte or a hash.
+  @spec maybe_put_note([{String.t(), term()}], String.t()) :: [{String.t(), term()}]
+  defp maybe_put_note(pairs, ""), do: pairs
+  defp maybe_put_note(pairs, note), do: [{"note", note} | pairs]
 
   @spec object([{String.t(), term()}]) :: iodata()
   defp object(pairs) do

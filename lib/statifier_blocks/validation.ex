@@ -39,8 +39,8 @@ defmodule StatifierBlocks.Validation do
   1. The envelope (`schema_version`, `id`, `revision`, `metadata`,
      `datamodel`, `accepts`, `root`).
   2. Every block, pre-order (`id`, `type`, `type_version`, `config`,
-     `slots`), slots visited in UTF-8-sorted name order - the same order
-     `Document.blocks/1` uses for a well-formed tree.
+     `note`, `slots`), slots visited in UTF-8-sorted name order - the same
+     order `Document.blocks/1` uses for a well-formed tree.
   3. Id uniqueness across the whole tree.
 
   Never consults a block-type registry and never looks at what a `config`
@@ -284,6 +284,7 @@ defmodule StatifierBlocks.Validation do
          :ok <- check_type(reported_id, block.type),
          :ok <- check_type_version(reported_id, block.type_version),
          :ok <- check_config(reported_id, block.config),
+         :ok <- check_note(reported_id, block.note),
          :ok <- check_slots_shape(reported_id, block.slots) do
       validate_slots(reported_id, block.slots, [block])
     end
@@ -321,6 +322,20 @@ defmodule StatifierBlocks.Validation do
     case canonical_json_object(config) do
       :ok -> :ok
       {:error, reason} -> {:error, {:malformed_block, reported_id, {:config, reason}}}
+    end
+  end
+
+  # A note is author prose (ADR-0001's Amendment of 2026-09-28, `2a` and
+  # `2b`): a UTF-8 string, the empty string being the absent note - Decode
+  # defaults an absent key to it, so a decoded JSON `null` arrives here as
+  # `nil` and is refused with every other non-string. A binary the encoder
+  # could not write as a JSON string is refused too.
+  @spec check_note(Block.id() | nil, term()) :: :ok | {:error, error()}
+  defp check_note(reported_id, note) do
+    if is_binary(note) and String.valid?(note) do
+      :ok
+    else
+      {:error, {:malformed_block, reported_id, {:note, :not_a_string}}}
     end
   end
 
