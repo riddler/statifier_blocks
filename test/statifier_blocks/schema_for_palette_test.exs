@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.SchemaForPaletteTest do
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Document, DocumentGenerator, Palette, Schema}
+  alias StatifierBlocks.{Block, BlockType, Document, DocumentGenerator, Palette, Schema}
 
   @fixtures_dir "test/fixtures/documents"
 
@@ -138,6 +138,39 @@ defmodule StatifierBlocks.SchemaForPaletteTest do
     def emit(_state, %Block{id: id}, _context), do: {:ok, {:emitted, id}}
   end
 
+  defmodule LaxRenewal do
+    @moduledoc false
+    # A library-loan host type whose validate_config/1 accepts every config,
+    # so what the package refuses of it is the binding check's alone: one
+    # field per arm of the closed field-type set, a field at a path of
+    # string keys, one at a list position, and a list of type expressions.
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def config_schema(_config) do
+      [
+        field("note", :string, ""),
+        field("renew_when", :expression, "true"),
+        field("grace", :duration, "P7D"),
+        field("patron_path", {:path, %{}}, "patron.email"),
+        field("renewals", :integer, 0),
+        field("auto", :boolean, false),
+        field("channel", {:select, [{"email", "Email"}, {"letter", "Letter"}]}, "email"),
+        field("branches", {:list, :string}, []),
+        field("record", {:type_expr, %{}}, ""),
+        field("records", {:list, {:type_expr, %{}}}, []),
+        Map.put(field("desk", :string, ""), :value_path, ["counter", "desk"]),
+        Map.put(field("first_title", :string, ""), :value_path, ["items", 0, "title"])
+      ]
+    end
+
+    defp field(key, type, default),
+      do: %{key: key, type: type, label: key, required?: false, default: default}
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+  end
+
   # --- helpers -----------------------------------------------------------------
 
   defp resolve(schema), do: ExJsonSchema.Schema.resolve(schema)
@@ -272,31 +305,163 @@ defmodule StatifierBlocks.SchemaForPaletteTest do
 
   # --- the invariant ----------------------------------------------------------
 
+  # The package's config check, as the invariant names it: the declared
+  # field types (the `{:type_expr, opts}` arm's check and the binding check
+  # for every other arm), then the type's own `validate_config/1`.
+  defp package_accepts?(ref, config) do
+    BlockType.type_expr_findings(ref, config) == [] and
+      BlockType.field_type_findings(ref, config) == [] and
+      Palette.call(ref, :validate_config, [config], :ok) == :ok
+  end
+
+  defp accepted_by(palette, document) do
+    document.root
+    |> all_blocks()
+    |> Enum.all?(fn block ->
+      case Map.fetch(palette.types, block.type) do
+        {:ok, ref} -> package_accepts?(ref, block.config)
+        :error -> true
+      end
+    end)
+  end
+
   # Sabotage: definition/2 answering Map.put(shipped, "required", ["config"])
   # -> a generated core block with no config goes red.
-  test "every generated document whose core blocks validate_config/1 accepts validates" do
-    core_types = Palette.core_types()
-    schema = Palette.core() |> Schema.for_palette() |> resolve()
+  test "every generated document whose core blocks the package accepts validates" do
+    palette = Palette.core()
+    schema = palette |> Schema.for_palette() |> resolve()
 
     accepted =
       0..(@corpus_size - 1)
       |> Enum.map(&{&1, DocumentGenerator.generate(@seed, &1)})
-      |> Enum.filter(fn {_index, document} ->
-        document.root
-        |> all_blocks()
-        |> Enum.all?(fn block ->
-          case Map.fetch(core_types, block.type) do
-            {:ok, module} -> module.validate_config(block.config) == :ok
-            :error -> true
-          end
-        end)
-      end)
+      |> Enum.filter(fn {_index, document} -> accepted_by(palette, document) end)
 
     assert length(accepted) >= 20
 
     for {index, document} <- accepted do
       json = Document.to_json(document)
       assert {:ok, _document} = Document.from_json(json), "index #{index}"
+      assert validate(schema, JSON.decode!(json)) == :ok, "index #{index}"
+    end
+  end
+
+  # A generated corpus of host blocks, from a fixed seed: each declared field
+  # absent, `null`, a value of its own declared type, or a value drawn from a
+  # pool of every JSON type, written where the field's value lives.
+  @host_values [
+    "",
+    "text",
+    "pigeon",
+    0,
+    3,
+    true,
+    false,
+    [],
+    ["branch", 2],
+    [nil],
+    %{},
+    %{"desk" => 4}
+  ]
+
+  @host_types %{
+    "library.overdue_notice" => OverdueNotice,
+    "library.lax_renewal" => LaxRenewal,
+    "parcel.route" => ParcelRoute
+  }
+
+  defp corpus_palette, do: Palette.new(Map.merge(Palette.core_types(), @host_types))
+
+  # A value its declared type admits.
+  defp own_value(type) when type in [:string, :expression, :duration], do: "text"
+  defp own_value({:path, _opts}), do: "patron.email"
+  defp own_value(:integer), do: :rand.uniform(9)
+  defp own_value(:boolean), do: :rand.uniform(2) == 1
+  defp own_value({:select, [{value, _label} | _rest]}) when is_binary(value), do: value
+  defp own_value({:select, _unreadable}), do: "slow"
+  defp own_value({:list, inner}), do: Enum.map(1..:rand.uniform(2), fn _n -> own_value(inner) end)
+  defp own_value({:type_expr, _opts}), do: Enum.random(["due", [%{"name" => "due"}]])
+
+  defp field_value(type) do
+    case :rand.uniform(10) do
+      1 -> :absent
+      2 -> nil
+      n when n <= 8 -> own_value(type)
+      _n -> Enum.random(@host_values)
+    end
+  end
+
+  # Writes `value` at `path`, building an object for a key and a one-element
+  # list for a position; a step that already holds something else is left
+  # alone, which is the absent case for the field beneath it.
+  defp put_path(_container, [], value), do: value
+
+  defp put_path(config, [key | rest], value) when is_map(config) and is_binary(key),
+    do: Map.put(config, key, put_path(Map.get(config, key, empty(rest)), rest, value))
+
+  defp put_path([element], [0 | rest], value), do: [put_path(element, rest, value)]
+  defp put_path(other, _path, _value), do: other
+
+  defp empty([index | _rest]) when is_integer(index), do: [%{}]
+  defp empty(_path), do: %{}
+
+  defp host_config(ref) do
+    ref
+    |> Palette.call(:config_schema, [%{}], [])
+    |> Enum.reduce(%{}, fn decl, config ->
+      case field_value(decl.type) do
+        :absent -> config
+        value -> put_path(config, BlockType.value_path(decl), value)
+      end
+    end)
+  end
+
+  defp host_document(index) do
+    :rand.seed(:exsss, {@seed, index, 7})
+
+    blocks =
+      for n <- 1..:rand.uniform(3) do
+        {type, ref} = Enum.random(@host_types)
+        %{"id" => "blk_#{n}", "type" => type, "type_version" => 1, "config" => host_config(ref)}
+      end
+
+    document(%{
+      "id" => "blk_ROOT",
+      "type" => "core.sequence",
+      "type_version" => 1,
+      "slots" => %{"body" => blocks}
+    })
+  end
+
+  # Sabotage: FieldType's json_type?("integer", _) answering `true` -> the
+  # binding check admits a string renewals the schema refuses, and this goes
+  # red.
+  test "every generated host document whose blocks the package accepts validates" do
+    palette = corpus_palette()
+    schema = palette |> Schema.for_palette() |> resolve()
+
+    {accepted, refused} =
+      0..(@corpus_size - 1)
+      |> Enum.map(fn index ->
+        json = JSON.encode!(host_document(index))
+        assert {:ok, document} = Document.from_json(json), "index #{index}"
+        {index, json, document}
+      end)
+      |> Enum.split_with(fn {_index, _json, document} -> accepted_by(palette, document) end)
+
+    assert length(accepted) >= 20
+
+    # The corpus reaches the binding check: some documents a lax
+    # validate_config/1 accepts are refused by the declared types alone.
+    assert Enum.any?(refused, fn {_index, _json, document} ->
+             document.root
+             |> all_blocks()
+             |> Enum.any?(fn block ->
+               block.type == "library.lax_renewal" and
+                 BlockType.field_type_findings(LaxRenewal, block.config) != []
+             end)
+           end)
+
+    for {index, json, _document} <- accepted do
       assert validate(schema, JSON.decode!(json)) == :ok, "index #{index}"
     end
   end
@@ -367,10 +532,37 @@ defmodule StatifierBlocks.SchemaForPaletteTest do
 
     assert {:ok, _document} = Document.from_json(JSON.encode!(doc))
     assert {:error, [_ | _]} = OverdueNotice.validate_config(config)
+    refute package_accepts?(OverdueNotice, config)
     assert {:error, [_ | _]} = validate(host_palette() |> Schema.for_palette() |> resolve(), doc)
   end
 
-  # Sabotage: loosen/2's {:list, inner} clause answering "items" => %{} ->
+  # Sabotage: the `false <- FieldType.admits?/2` step of BlockType's
+  # field_type_finding/2 answering `true` -> nothing is judged, the package
+  # admits the integer note and the refute goes red.
+  test "an integer in the declared string field is refused by the package even where validate_config/1 accepts it" do
+    config = %{"note" => 42}
+
+    doc =
+      document(%{
+        "id" => "renewal",
+        "type" => "library.lax_renewal",
+        "type_version" => 1,
+        "config" => config
+      })
+
+    assert {:ok, _document} = Document.from_json(JSON.encode!(doc))
+    assert LaxRenewal.validate_config(config) == :ok
+
+    assert [{"note", "the note field is declared a string, and holds an integer"}] =
+             BlockType.field_type_findings(LaxRenewal, config)
+
+    refute package_accepts?(LaxRenewal, config)
+
+    assert {:error, [_ | _]} =
+             validate(corpus_palette() |> Schema.for_palette() |> resolve(), doc)
+  end
+
+  # Sabotage: FieldType's loosen/2 {:list, inner} clause answering "items" => %{} ->
   # the integer copy is admitted and this goes red.
   test "each declared field type refuses a value of the wrong JSON type" do
     schema = host_palette() |> Schema.for_palette() |> resolve()
@@ -407,7 +599,7 @@ defmodule StatifierBlocks.SchemaForPaletteTest do
              validate(schema, parcel.(%{"route" => %{"origin" => %{"depot" => 9}}}))
   end
 
-  # Sabotage: loosen/2's {:type_expr, _} clause answering the fragment as is
+  # Sabotage: FieldType's loosen/2 {:type_expr, _} clause answering the fragment as is
   # -> the manifest keeps the member constraint and the comparison goes red.
   test "a type_expr field carries no member constraint, and an unreadable declaration no type" do
     config =

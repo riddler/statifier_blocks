@@ -119,24 +119,14 @@ defmodule StatifierBlocks.Schema.HostDefinition do
   defp field_property(field) do
     base = %{"title" => field.label, "default" => field.default}
 
-    case FieldType.json_schema(field.type) do
-      {:ok, fragment} ->
-        Map.put(base, "anyOf", [%{"type" => "null"}, loosen(field.type, fragment)])
-
-      :error ->
-        base
+    # The fragment the package's binding check holds the value to, so the
+    # definition is never stricter than the package: a `{:type_expr, opts}`
+    # value is judged by its JSON type alone, here and inside a list's items.
+    case FieldType.binding_schema(field.type) do
+      {:ok, fragment} -> Map.put(base, "anyOf", [%{"type" => "null"}, fragment])
+      :error -> base
     end
   end
-
-  # A `{:type_expr, opts}` value is judged by its JSON type alone; a
-  # member's own shape is not the package's to type, so the mapping's
-  # member constraint is dropped here, and inside a list's items.
-  defp loosen({:type_expr, _opts}, fragment), do: Map.delete(fragment, "items")
-
-  defp loosen({:list, inner}, %{"items" => items} = fragment),
-    do: Map.put(fragment, "items", loosen(inner, items))
-
-  defp loosen(_type, fragment), do: fragment
 
   # Names a field at its path as nested `properties`, giving the objects on
   # the way no type. A path named twice keeps the first declaration's

@@ -242,14 +242,17 @@ defmodule StatifierBlocks.Edit do
   stage and the editor's view model ask, against the **candidate** config
   the command carries (not the block's current config - that one already
   validated, or the block would not exist in a valid document): the type's
-  own `validate_config/1`, and
+  own `validate_config/1`,
   `StatifierBlocks.BlockType.type_expr_findings/2`, the one implementation
   of what a `{:type_expr, opts}` field's value may be (ADR-0002 decision 7,
-  amended 2026-09-06). A value that is no arm the field admits is refused
-  here, at the edit gate, rather than passing the edit algebra and being
-  refused first at compile. The findings of both are reported together on
-  one `{:invalid_config, id, findings}`, `type_expr_findings/2`'s first, in
-  the order the compiler and the view model already use.
+  amended 2026-09-06), and the package's check of every other field against
+  its declared field type (decision 7, amended 2026-09-28). A value that is
+  no arm the field admits, or that its declared field type does not admit,
+  is refused here, at the edit gate, rather than passing the edit algebra
+  and being refused first at compile. The findings are reported together on
+  one `{:invalid_config, id, findings}`, the two type checks' first and
+  `validate_config/1`'s after them, in the order the compiler and the view
+  model already use.
 
   Also `:ok` when the block does not resolve through `palette` at all -
   unknown type, too-new version, or a failed migration. There is no
@@ -311,12 +314,12 @@ defmodule StatifierBlocks.Edit do
     end
   end
 
-  # The two questions a block type answers about a candidate config, in the
+  # The questions a block type answers about a candidate config, in the
   # order `Compiler.config_findings/2` and `ViewModel.config_findings/3`
   # already put them: the shared `{:type_expr, opts}` check first, then the
-  # type's own callback. One order in three places means the set an author
-  # is shown, the set a compile refuses on and the set this gate refuses on
-  # cannot drift apart.
+  # declared field types, then the type's own callback, which runs either
+  # way. One order in three places means the set an author is shown, the set
+  # a compile refuses on and the set this gate refuses on cannot drift apart.
   @spec config_findings(Palette.type_ref(), Block.config()) :: [BlockType.finding()]
   defp config_findings(ref, config) do
     own =
@@ -325,7 +328,9 @@ defmodule StatifierBlocks.Edit do
         {:error, findings} -> findings
       end
 
-    BlockType.type_expr_findings(ref, config) ++ own
+    BlockType.type_expr_findings(ref, config) ++
+      BlockType.field_type_findings(ref, config) ++
+      own
   end
 
   @spec check_leaf(Palette.t(), t(), {:ok, Document.t()}) ::
