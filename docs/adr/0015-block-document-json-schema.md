@@ -307,10 +307,14 @@ anchor, not by number.
 
 ### What this amends
 
-Four sentences above rest on a premise `ADR-0002`'s amendment removes: that
+Five sentences above rest on a premise `ADR-0002`'s amendment removes: that
 the package never holds a config to `config_schema/1`. From this date each is
 superseded as this section says, and each stays as written.
 
+- Decision 6's heading says `for_palette/1` "never refuses a document the
+  package admits and every block's `validate_config/1` accepts"
+  (`:193-194`). Its premise is superseded by `D4` below, which restates it
+  on the binding check followed by `validate_config/1`.
 - Decision 6's host-entry bullet says a generated definition "constrains
   nothing the generic block shape does not", because `config_schema/1` is a
   rendering hint "that the package never holds to `validate_config/1`, so a
@@ -373,8 +377,8 @@ definition carries the looser reading. There are two such places:
   `statifier_datamodel` (`T4`). The shipped file's hand-written core
   definitions already leave both core `{:type_expr, opts}` fields
   unconstrained: `core.map`'s `collect_type` and `core.on_event`'s `payload`
-  in `priv/schemas/block-document.schema.json`. So a host type gets here
-  what a core type already gets.
+  in `priv/schemas/block-document.schema.json`. So a host type, like a core
+  type, carries no member constraint for this arm.
 
 **D4. The invariant, restated.** For `Palette.core()` and for a palette
 carrying test-only host types, every document the package admits, in which

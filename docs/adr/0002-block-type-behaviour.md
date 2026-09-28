@@ -14288,10 +14288,11 @@ authority on everything past it. The text above stays as written.
 Decision 7's reason for the split still holds, and it is why this section
 binds types and nothing more. A schema rich enough to state bounds and
 cross-field rules becomes a second validation implementation that drifts from
-the first. A field's type is not that: it is already stated once, in one
-mapping, which the editor draws from, the shipped schema's drift test holds
-the core definitions to, and a per-palette schema reads. Holding a config to
-it adds no second statement of anything.
+the first. A field's type is not that. The editor renders from the field
+type `config_schema/1` declares, and that type is mapped to JSON once, in one
+mapping, which the shipped schema's drift test holds the core definitions to
+and a per-palette schema reads. Holding a config to it adds no second
+statement of anything.
 
 ### Decision
 
