@@ -47,8 +47,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     describe "the two rail vocabularies (10g, 10h)" do
       # Sabotage: dropping the `:failure` arm from `Slot`'s class list - the
       # failure rail falls back to the placement class alone and renders in
-      # the interrupt's dashed warning edge, which is the reading campaign
-      # 013's screens recorded as wrong.
+      # the interrupt's dashed warning edge, which is the reading earlier
+      # screens recorded as wrong.
       test "a :failure slot carries its own class, not the interrupt's", %{conn: conn} do
         {:ok, view, _html} = mount_checkout(conn)
 
