@@ -39,10 +39,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     in `data-editable`; the list's event names in `data-select-event` and
     `data-insert-event`; the element to scroll into view after an insert
     armed from the map in `data-insert-reveal`, when the host names one; and
-    the description region's id and its store's in `data-info-region` and
-    `data-info-store`, when the host names the region, which is what gives
-    the map its hover. The drawing goes into a child marked
-    `data-map-canvas`, which LiveView leaves alone (`phx-update="ignore"`).
+    the description region's id, its hover layer's and its store's in
+    `data-info-region`, `data-info-hover` and `data-info-store`, when the
+    host names the region, which is what gives the map its hover. The
+    drawing goes into a child marked `data-map-canvas`, which LiveView
+    leaves alone (`phx-update="ignore"`).
 
     ## The description region
 
@@ -59,6 +60,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     element's map id, holding the same markup the region shows for it. The
     store's id is the region's with `-store` after it, which is the id
     `map_region/1` stamps when it is handed the region's.
+
+    ## Selection speaks, hover is silent
+
+    What the region announces changes on a selection and never on a hover.
+    The server writes the region, and only on a render: a row selected in
+    the list, or a block selected on the map, which arrives as the list's
+    own event. A hover is drawn in the hover layer instead, an element
+    beside the region and outside it, with the region's id and `-hover`
+    after it: `aria-hidden="true"`, `hidden` until the hook fills it, and
+    left alone by LiveView (`phx-update="ignore"`). The two sit in one
+    frame, `sb-map__description-frame`, and while the layer is shown the
+    stylesheet stacks it over the region and makes the region transparent,
+    so the visible text is the hovered element's while the region's own
+    content, and its `aria-live`, stay as the server wrote them.
     """
 
     use Phoenix.Component
@@ -126,6 +141,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           data-insert-event={@insert_event}
           data-insert-reveal={@insert_reveal}
           data-info-region={@description}
+          data-info-hover={@description && hover_id(@description)}
           data-info-store={@description && store_id(@description)}
         >
           <div id={"#{@id}-canvas"} data-map-canvas phx-update="ignore"></div>
@@ -151,7 +167,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     attr(:class, :string, default: nil, doc: "a class of the host's, added to the region's own")
 
-    @doc "The Map's description region and its hidden store; see the moduledoc."
+    @doc "The Map's description region, its hover layer and its hidden store; see the moduledoc."
     @spec description_region(map()) :: Phoenix.LiveView.Rendered.t()
     def description_region(assigns) do
       %{document: document, view_model: view_model, palette: palette} = assigns
@@ -169,15 +185,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> assign(:current, current(elements, assigns.selected, idle))
 
       ~H"""
-      <section
-        id={@id}
-        class={["sb-map__description", @class]}
-        aria-live="polite"
-        aria-label="Description"
-        data-map-description={@current.kind}
-      >
-        <.description description={@current} />
-      </section>
+      <div class="sb-map__description-frame">
+        <div
+          id={hover_id(@id)}
+          class="sb-map__description-hover"
+          aria-hidden="true"
+          hidden
+          phx-update="ignore"
+          data-map-description-hover="true"
+        >
+        </div>
+        <section
+          id={@id}
+          class={["sb-map__description", @class]}
+          aria-live="polite"
+          aria-label="Description"
+          data-map-description={@current.kind}
+        >
+          <.description description={@current} />
+        </section>
+      </div>
       <div id={store_id(@id)} hidden data-map-descriptions="true">
         <div
           :for={description <- @elements}
@@ -236,6 +263,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @spec store_id(String.t()) :: String.t()
     defp store_id(region_id), do: region_id <> "-store"
+
+    @spec hover_id(String.t()) :: String.t()
+    defp hover_id(region_id), do: region_id <> "-hover"
 
     @spec graph_opts(String.t() | nil, term()) :: keyword()
     defp graph_opts(selected, phrase), do: [selected: selected] ++ phrase_opts(phrase)

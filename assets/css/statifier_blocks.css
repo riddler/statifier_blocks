@@ -4987,13 +4987,35 @@ button.sb-inspector__group-row:hover {
 }
 
 /* The description region: words, never controls. The note an author wrote
-   for a block leads it, above the built-in text. */
-.sb-map__description {
+   for a block leads it, above the built-in text. The hover layer beside it
+   wears the same box, since it is drawn in the region's place. */
+.sb-map__description,
+.sb-map__description-hover {
   margin-bottom: var(--sb-space);
   padding-bottom: var(--sb-space);
   border-bottom: 1px solid var(--sb-border);
   font-size: var(--sb-text-sm);
   color: var(--sb-fg);
+}
+
+/* Selection speaks, hover is silent: the region and its hover layer share
+   one grid cell, and while the hook shows the layer the region goes
+   transparent under it. The region stays in place and in the
+   accessibility tree, so its content and its aria-live never change on a
+   hover; the layer is aria-hidden and outside the region. The layer
+   carries no display of its own, so its hidden attribute keeps it out. */
+.sb-map__description-frame {
+  display: grid;
+}
+
+.sb-map__description-frame > .sb-map__description,
+.sb-map__description-frame > .sb-map__description-hover {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.sb-map__description-hover:not([hidden]) + .sb-map__description {
+  opacity: 0;
 }
 
 .sb-map__description-note {

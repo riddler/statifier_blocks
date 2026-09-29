@@ -18,9 +18,9 @@
 // map's element (`data-select-event`, `data-insert-event`), with the payload
 // the list sends for the same gesture. A host that stamps no name gets a
 // drawing that sends nothing. test/statifier_blocks/assets_test.exs holds
-// this file to that. Hover pushes nothing at all: it swaps the description
-// region's text in the page, from descriptions the server already rendered
-// (see "Hover" below).
+// this file to that. Hover pushes nothing at all: it shows, beside the
+// description region, a description the server already rendered into the
+// page, and never writes the region itself (see "Hover" below).
 //
 // Its own entry point, `statifier_blocks/map`, and not the default export of
 // `statifier_blocks`: the import below pulls in the whole of the vendored
@@ -606,19 +606,27 @@ export function markSelected(target, id) {
 // ------------------------------------------------------------------ hover
 //
 // The description region, on hover: pointing at anything the map draws
-// shows that element's description in the region, and pointing away puts
-// back what the region said before - the selected block's description, or
-// the document's when nothing is selected.
+// shows that element's description where the region is read, and pointing
+// away shows the region again - the selected block's description, or the
+// document's when nothing is selected.
+//
+// Selection speaks, hover is silent. The region is the page's
+// `aria-live="polite"` node, and only the server writes it, on a
+// selection. A hover never touches it: the hovered description goes into
+// the hover layer, a sibling of the region outside it, hidden from
+// assistive technology, which the stylesheet stacks over the region while
+// it is shown. So what is announced changes on a selection and never on a
+// hover, and `aria-live` is never toggled.
 //
 // Every description was computed by the server (`StatifierBlocks.Map.Info`)
 // and rendered into the page's hidden store, one entry per map id under
 // `data-describes`, in the same markup the region draws. The hook finds the
-// region and the store by the ids the host stamps on its element,
-// `data-info-region` and `data-info-store`; a host that stamps neither gets
-// no hover. This code only copies an entry into the region and back: it
-// pushes nothing to the server, adds no command, and never changes what is
-// selected. It listens on the document, so the map may be redrawn under it
-// at any time.
+// hover layer and the store by the ids the host stamps on its element,
+// `data-info-hover` and `data-info-store`; a host that stamps neither gets
+// no hover. This code only copies an entry into the layer and hides the
+// layer again: it pushes nothing to the server, adds no command, and never
+// changes what is selected. It listens on the document, so the map may be
+// redrawn under it at any time.
 //
 // The region stays the list's: the map is `aria-hidden`, and a keyboard or
 // a screen reader reaches every description by selecting a row, which the
@@ -652,39 +660,33 @@ export function entryFor(store, id) {
   return null
 }
 
-// The swap and the restore, over a region and a store. `region()` and
+// The show and the hide, over the hover layer and the store. `layer()` and
 // `store()` are asked afresh on every call, since a patch may replace
-// either.
+// either. Neither touches the region.
 //
-// `show(id)` puts the entry for `id` into the region and marks the region
-// with `data-map-hover`; the first swap keeps what the region said, so
-// `restore()` can put it back. An id with no entry restores instead.
-//
-// A patch that reaches the region while it shows a hovered entry redraws
-// the server's own content there and drops the mark; the kept content is
-// then stale, so it is discarded rather than put back.
-export function hover(region, store) {
-  let resting = null
-
+// `show(id)` puts the entry for `id` into the layer, marks the layer with
+// `data-map-hover` and unhides it. `restore()` hides the layer, empties it
+// and drops the mark, whatever it showed; the region under it has kept
+// whatever the server last wrote there, a selection made mid-hover
+// included. An id with no entry restores instead.
+export function hover(layer, store) {
   function restore() {
-    const el = region()
-    if (el && resting !== null && el.dataset.mapHover !== undefined) {
-      el.innerHTML = resting
-      delete el.dataset.mapHover
-    }
-    resting = null
+    const el = layer()
+    if (!el) return
+    el.hidden = true
+    el.innerHTML = ""
+    delete el.dataset.mapHover
   }
 
   function show(id) {
-    const el = region()
+    const el = layer()
     const entry = id === null ? null : entryFor(store(), id)
     if (!el || !entry) return restore()
-
-    if (el.dataset.mapHover === undefined) resting = el.innerHTML
-    if (el.dataset.mapHover === id) return
+    if (el.dataset.mapHover === id && !el.hidden) return
 
     el.innerHTML = entry.innerHTML
     el.dataset.mapHover = id
+    el.hidden = false
   }
 
   return {show, restore}
@@ -715,15 +717,15 @@ function named(doc, id) {
 // assistive technology; the list and the panel are the keyboard path to
 // every one of these gestures but the insert into an empty slot.
 //
-// A pointer arriving over any element the map draws swaps the description
-// region to that element's description; one arriving over nothing the map
-// draws, or leaving the window, puts the region back (see "Hover" above).
+// A pointer arriving over any element the map draws shows that element's
+// description in the hover layer; one arriving over nothing the map draws,
+// or leaving the window, hides the layer again (see "Hover" above).
 export const StatifierBlocksMap = {
   mounted() {
     const doc = this.el.ownerDocument
     if (doc) {
       this.hover = hover(
-        () => named(doc, this.el.dataset.infoRegion),
+        () => named(doc, this.el.dataset.infoHover),
         () => named(doc, this.el.dataset.infoStore),
       )
       this.onOver = (event) => this.hover.show(describedId(event.target))

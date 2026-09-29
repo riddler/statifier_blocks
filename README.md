@@ -1764,7 +1764,8 @@ bundler can shake out.
 
 Both regions read the `--sb-*` palette from the page, since neither sits
 inside the editor: set the palette on an ancestor of the regions, or on
-`.sb-map__region` and `.sb-map__description` themselves. The map's drawing
+`.sb-map__region` and `.sb-map__description-frame` themselves (the frame
+holds the description region and its hover layer). The map's drawing
 reads the `--sb-map-*` tokens, declared on `.sb-map__region` and mapped onto
 the palette, so a page that themes the palette dresses the map too; set one
 of them to disagree with that mapping. Set it on `.sb-map__region` itself,
