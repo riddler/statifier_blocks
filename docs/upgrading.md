@@ -1,7 +1,7 @@
-# Upgrading a host from 0.31 to 0.34, and from 0.39 to 0.40
+# Upgrading a host from 0.31 to 0.34, and from 0.39 to 0.41
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.34.0, one minor at a time, and from 0.39.0 to 0.40.0. It does not cover
+0.34.0, one minor at a time, and from 0.39.0 to 0.41.0. It does not cover
 0.34 to 0.39; the CHANGELOG's sections for those releases say what each one
 changed. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
@@ -11,7 +11,7 @@ about it, and says **NONE** where the answer is nothing.
 
 Take the minors in order, and move the pin with each one, as the README
 recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`, then
-`"~> 0.34.0"`; from 0.39, to `"~> 0.40.0"`.
+`"~> 0.34.0"`; from 0.39, to `"~> 0.40.0"`, then `"~> 0.41.0"`.
 
 What an **author** changes in a document is a separate page:
 [Migrating a document from 0.27 to 0.34](guides/migrating-documents-0.27-to-0.34.md).
@@ -124,3 +124,44 @@ what they are.
   pass `nil` or a function of one argument. Any other value now raises an
   `ArgumentError` naming the attr, where it raised a `FunctionClauseError`;
   `nil` and a one-argument function render as before.
+
+## 0.40 to 0.41
+
+- **If you match the edge lines `StatifierBlocks.Describe.render/2`
+  answers**, or pin them in a test, read the new words. An edge line
+  names a container by a noun where it named it by its sentence: its
+  title where it has one; else a short noun for its type, `the steps`
+  for a sequence, `the group` for a group or a resumable group, `the
+  branch`, `the lanes` for a parallel and `the loop` for a for-each;
+  else `the` and its palette label in lower case. A noun that opens a
+  line with a lower-case `the` takes a capital there, and `the steps`
+  and `the lanes` take `start` where the others take `starts`: the line
+  that read `Run its steps in order starts with Wait 14d` now reads
+  `The steps start with Wait 14d`, and `Send loan.overdue (done) ends
+  Run its steps in order` reads `Send loan.overdue (done) ends the
+  steps`. Wherever an edge line embeds a delayed send's sentence it is
+  set in double quotation marks, so its own comma does not read as the
+  line's: `After "In 7 days, send loan.overdue" (done), Wait 14d`. Node
+  lines, and a step named in an edge line, keep their sentence. To keep
+  other words, give the container a title, or reword the line through
+  `StatifierBlocks.Describe.Phrasing`, whose callback receives the new
+  default.
+- **If you build `StatifierBlocks.Describe.Node` structs yourself**, it
+  gains a `noun` field, `nil` by default. `outline/3` fills it; a node
+  built by hand with no noun is named by its sentence in an edge line,
+  as before. A host that only reads `outline/3`'s nodes changes nothing.
+- **If you match the idle description's how-to-read text**, the
+  `explanation` of `StatifierBlocks.Map.Info.idle/4`, read the new
+  paragraph: it names every mark the Map draws, the clock on a timed
+  wait among them.
+- **If you attach the `StatifierBlocksMap` hook to your own element**
+  rather than mounting `map_region/1`, give that element a child marked
+  `data-map-canvas` for the hook to draw into. Without one the hook
+  still draws into the element itself, which LiveView patches, and now
+  warns once per mount in the browser console that this is not
+  supported. `map_region/1` renders the child.
+
+The Map's other changes need nothing from a host: it draws the happy
+path straight through a group whose body holds a container, the hook
+laying such a document out twice, and it draws the clock mark on a
+timed wait (`core.wait`), which still takes no part in a timer edge.
