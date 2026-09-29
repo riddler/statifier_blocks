@@ -11,6 +11,52 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.39.0] 2026-09-28
+
+0.39.0 ships the Map, a second view of a block document drawn beside the
+host's own list. `StatifierBlocks.Map` is a pure reader of the view model,
+and nothing about the map is stored in the document. A draw-only hook,
+`StatifierBlocksMap`, lays that graph out and draws it from its own entry
+point, `statifier_blocks/map`, with elkjs 0.9.3 vendored (about 1.6 MB,
+loaded only by a host that imports that entry point; the default export is
+unchanged). `StatifierBlocks.Map.Info` answers the description region's
+data, and `StatifierBlocks.Editor.MapRegions` gives a host the map region
+and the description region to mount beside its list. The one change to an
+existing answer is under Changed: Decode admits an optional `note` string on
+a block, a key it refused before, and refuses a note that is not a string
+with the new reason `{:malformed_block, id, {:note, :not_a_string}}`. Under
+Fixed, a card whose control strip wraps now holds that wrapped height at
+rest. The vendored elkjs file is the package's one file under the Eclipse
+Public License 2.0, so the package metadata lists `EPL-2.0` beside `MIT`.
+0.39.0 is a minor, because it adds to the public surface and changes no
+existing signature. The package gains no Hex dependency.
+
+### Added
+
+- `StatifierBlocks.Map.Info` answers the description region's data: `elements/6` describes every element `StatifierBlocks.Map.graph/2` draws, keyed by the id the map draws it under - a block or a rule with its title, sentence, type's explanation, settings, place, outcomes, interrupt rules, timer edges and findings, a slot, an arm, an empty marker, the start and end marks, a connector, an interrupt edge and a timer edge - and `idle/4` describes the document for when nothing is selected. A block's author-written `note` is its description's `note`, shown above the built-in text; the host's `:phrase` reads event names as words, as the Map's does.
+- The `StatifierBlocksMap` hook swaps the description region, in the browser, to the description of the element under the pointer and puts the region back when the pointer leaves, reading the region and a hidden store of rendered descriptions by the ids the host stamps on the map's element (`data-info-region`, `data-info-store`). Hover pushes nothing and changes no selection; a host that stamps neither id gets no hover.
+
+- `StatifierBlocks.Map.graph/2` builds the graph a layout hook draws the block document from, as boxes in boxes read off the view model: the start dot, an end mark per way the document finishes, a branch's arms under one band, a group's rules in a side column, a marker per empty slot, every edge the outline describes including the dotted timer edge, the host's selection marked and the host's words for its event names read into the sentences; with `nodes/1`, `interrupts/1`, `timers/1`, `caption/1`, `empty_text/0` and `start_text/0` beside it.
+
+- `StatifierBlocksMap`, a draw-only LiveView hook at its own entry point `statifier_blocks/map` (`assets/js/statifier_blocks_map.js`), lays out the graph `StatifierBlocks.Map.graph/2` answers with elkjs and draws it as plain SVG: model order kept, the happy path straight through a group's fixed ports, an error pane in place of a map that could not be laid out, a moved selection re-marked without a second layout, and a click on a box, a gap or an empty slot's marker sent as the host list's own select or insert event, under the names the host stamps on the element (`data-select-event`, `data-insert-event`). It is not in the default export, so a host that never mounts the Map never bundles the layout library.
+- elkjs 0.9.3 ships vendored and unmodified as `assets/vendor/elk.bundled.js` (1,606,238 bytes, 466,990 gzipped at the highest level, loaded whole by any bundle that imports the Map hook), with its Eclipse Public License 2.0 text beside it as `assets/vendor/elkjs-LICENSE.md`.
+
+- `StatifierBlocks.Editor.MapRegions`, the two function components a host mounts to show the Map beside its own list. `map_region/1` renders the element the `StatifierBlocksMap` hook draws into, stamped with the graph `StatifierBlocks.Map.graph/2` answers for the host's view model and selection, the host list's own select and insert event names, whether the page can edit, and the description region's ids for hover; the region is `aria-hidden` and its scroll box `tabindex="-1"`, so the list stays the keyboard and screen-reader path. `description_region/1` renders the `aria-live="polite"` region the list's rows name with `aria-describedby`, with the selected block's `StatifierBlocks.Map.Info` description (its note first) or the document's idle one rendered on the server, and beside it the hidden store of every element's description the hook's hover reads.
+- The package stylesheet styles both regions under `sb-map__` classes and declares the nine `--sb-map-*` tokens the Map hook's drawing reads (`--sb-map-block-fill`, `--sb-map-block-stroke`, `--sb-map-slot-fill`, `--sb-map-slot-stroke`, `--sb-map-empty-fill`, `--sb-map-empty-stroke`, `--sb-map-edge`, `--sb-map-mark`, `--sb-map-band-fill`) on `.sb-map__region`, mapped onto the `--sb-*` palette.
+
+### Changed
+
+- Decode admits an optional `note` string on a block, a key it refused
+  before: `StatifierBlocks.Block` gains a `note` field (default `""`, the
+  absent note) that `Block.new/2` takes as `:note`, canonical form omits an
+  empty note, the shipped schema describes it, and a non-string note is
+  refused as `{:malformed_block, id, {:note, :not_a_string}}`. A note
+  changes the document hash, not the compiled chart.
+
+### Fixed
+
+- A card whose text is shorter than its wrapped control strip no longer grows taller on hover, selection or keyboard focus: the strip wraps its controls at rest too, so the card holds that height in every state.
+
 ## [0.38.0] 2026-09-28
 
 Upgrading a host: a block type's declared field types now bind, so a host
@@ -3631,6 +3677,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.39.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.39.0
 [0.38.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.38.0
 [0.37.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.37.0
 [0.36.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.36.1
