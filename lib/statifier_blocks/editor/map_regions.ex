@@ -121,7 +121,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     attr(:phrase, :any,
       default: nil,
-      doc: "the host's words for event names, as `StatifierBlocks.Map.graph/2` takes them"
+      doc:
+        "the host's words for event names, as `StatifierBlocks.Map.graph/2` takes them: " <>
+          "`nil` or a function of one argument; any other value raises `ArgumentError`"
     )
 
     attr(:description, :string,
@@ -177,7 +179,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     attr(:phrase, :any,
       default: nil,
-      doc: "the host's words for event names, the function `map_region/1` takes"
+      doc:
+        "the host's words for event names, the function `map_region/1` takes: " <>
+          "`nil` or a function of one argument; any other value raises `ArgumentError`"
     )
 
     attr(:map, :boolean,
@@ -303,8 +307,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec graph_opts(String.t() | nil, term()) :: keyword()
     defp graph_opts(selected, phrase), do: [selected: selected] ++ phrase_opts(phrase)
 
+    # The attr stays typed `:any`: LiveView checks a literal against a
+    # function type at compile time and warns on a literal `nil`, which a
+    # host may pass today. Any other value is refused here, naming the attr.
     @spec phrase_opts(term()) :: keyword()
     defp phrase_opts(nil), do: []
     defp phrase_opts(phrase) when is_function(phrase, 1), do: [phrase: phrase]
+
+    defp phrase_opts(phrase) do
+      raise ArgumentError,
+            "the phrase attr takes nil or a function of one argument, got: " <>
+              inspect(phrase)
+    end
   end
 end
