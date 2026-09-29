@@ -537,6 +537,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the phrase attr" do
+      # A host passes nil or a function of one argument, which the tests
+      # above render; anything else is refused under the attr's name.
+      # Sabotage: dropped the refusing clause of `phrase_opts/1`; this went
+      # red on a FunctionClauseError where ArgumentError was asserted.
+      # Sabotage: dropped "the phrase attr" from the message; this went red
+      # on the message.
+      test "a value that is not nil or a one-argument function is refused by name" do
+        document = MapFixtures.document!("library_loan")
+        view_model = MapFixtures.view_model!("library_loan")
+
+        for phrase <- ["loan words", :phrase, fn a, b -> {a, b} end] do
+          assert_raise ArgumentError,
+                       ~r/^the phrase attr takes nil or a function of one argument, got: /,
+                       fn ->
+                         region_html(document, %{phrase: phrase})
+                       end
+
+          assert_raise ArgumentError,
+                       ~r/^the phrase attr takes nil or a function of one argument, got: /,
+                       fn ->
+                         render_component(&MapRegions.map_region/1, %{
+                           id: "map",
+                           view_model: view_model,
+                           selected: nil,
+                           phrase: phrase
+                         })
+                       end
+        end
+      end
+    end
+
     defp count_of(html, selector),
       do: html |> LazyHTML.from_fragment() |> LazyHTML.query(selector) |> Enum.count()
 
