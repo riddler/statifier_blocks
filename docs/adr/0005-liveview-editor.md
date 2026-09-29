@@ -13751,7 +13751,7 @@ Filed with `sb-ok65`.
 
 ## Amendment (2026-09-29): decision 2's closed set gains `{:update_note, id, note}`, and the inspector's Config tab edits a block's note
 
-**Status: proposed (2026-09-29, bead `sb-q91j`, ruled by the operator,
+**Status: accepted (2026-09-29, bead `sb-q91j`, ruled by the operator,
 2026-09-29).** A decision record merges at proposed and is flipped to
 accepted by a separate request once the code below has shipped in a
 published version of this package. Additive: decision 2, every amendment
@@ -13866,7 +13866,7 @@ gen_update_note/1`).
 
 ## Amendment (2026-09-29): the shell arrangement, one description region under the canvas
 
-**Status: proposed (2026-09-29, bead `sb-k8qj`, ruled by the operator,
+**Status: accepted (2026-09-29, bead `sb-k8qj`, ruled by the operator,
 2026-09-29).** A decision record merges at proposed and is flipped to
 accepted by a separate request once the code below has shipped in a
 published version of this package. Additive: the Amendment of 2026-08-29,
@@ -13974,3 +13974,83 @@ something else: the region is left out and the editor survives" (at
   at this section.
 - **Nothing else in the shell arrangement changes.** No pane, tab, drawer
   tab, breakpoint or profile key is added or moved.
+
+## Note (2026-09-29): the two Amendments of 2026-09-29, on decision 2's note command and the shell's description region, are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it
+are the two Amendments' status lines (`:13754`, `:13869`), each by one word,
+`proposed` to `accepted`. Everything else is this Note, at the foot of the
+file, so no line another record cites moves.
+
+The code the two Amendments record shipped in statifier_blocks 0.40.0,
+published on Hex from the `v0.40.0` tag at `8c4d61b`, whose `CHANGELOG.md`
+section names the command `{:update_note, id, note}` and the inspector's Note
+field under Added, and the editor's description region under its canvas with
+`description_region/1`'s `map` attr under Added. Every claim the two
+Amendments make was checked against `main` at `8c4d61b`. The two Amendments
+read their code cites at `a6b96dd`, `be60d52` and `40d18cf`, commits of
+their own requests that are not on `main`; every `lib/`, `assets/` and
+`test/` cite below was re-located by its anchor at `8c4d61b` and is written
+anchor first, line second. A cite whose line moved is re-labelled here, by
+addition; the Amendments' own text is not edited.
+
+### Clause 2s: decision 2's closed set gains `{:update_note, id, note}`
+
+| Claim | Read at `8c4d61b` |
+|---|---|
+| The union member | the `{:update_note, Block.id(), String.t()}` member of `Edit.t()` (`lib/statifier_blocks/edit.ex:179`), at the line printed |
+| The `apply/2` clause, and its inverse | `def apply(%Document{} = document, {:update_note, id, note})` (`edit.ex:254`), at the line printed; it answers `{:update_note, id, block.note}`, the note the block held before |
+| The empty string is the absent note | `defp maybe_put_note/2`'s `""` clause, printed at `lib/statifier_blocks/canonical_json.ex:141`, reads at `:143`, two lines down, moved by a two-line comment at its call site, where a stored block term with no `:note` key now reads as the absent note. The clause is unchanged. `apply/2` stores the note as given, with no trim |
+| The grammar is `Validation`'s | `apply/2` calls `StatifierBlocks.Validation.note/2` (`lib/statifier_blocks/validation.ex:339`, at the line printed), whose refusal is `{:malformed_block, id, {:note, :not_a_string}}`; a missing block is `{:no_such_block, id}` from `defp find_block/2` (`edit.ex:481`) |
+| `check_config/3` asks no block type | the `{:update_note, _id, _note}` clause answering `:ok` (`edit.ex:347`), at the line printed |
+| A recipe's reach | `defp reach({:update_note, id, _note}, ...)` (`lib/statifier_blocks/recipe.ex:168`), at the line printed, admits an `id` in the minted set and halts as `:out_of_reach` otherwise |
+| A compound may carry it | `defp check_compound/1` (`edit.ex:409`), at the line printed, refuses a nested list; its sibling clauses refuse an empty list (`:407`) and a value that is not a list (`:417`) |
+| The counts | `Edit.t()` (`edit.ex:172-180`) has eight constructors, the seven leaf edits the clause names and `:compound` |
+| The inspector's field | `defp note_section/1` (`lib/statifier_blocks/editor/inspector.ex:478`) and its call (`:398`), at the lines printed; the call is gated on the Config tab and a selected node, and on nothing about the block's type |
+| The event | `def handle_event("note-change", ...)`, printed at `lib/statifier_blocks/editor.ex:1810`, reads at `:1843`; a note equal to the block's current one answers the socket unchanged, and any other is one `commit/3` of `{:update_note, id, note}` |
+| A read-only mount refuses it | `note-change` is on `@read_only_refused`, printed at `editor.ex:758`, which reads at `:776`; the refusal is the `handle_event/3` clause matching `profile: %{read_only?: true}` (`editor.ex:1296`) |
+| A read-only mount draws a reading | `defp note_section/1`'s `read_only: true` clause (`inspector.ex:469`), at the line printed, draws the note as text and nothing when it is empty |
+| The tests | `test/statifier_blocks/edit/note_test.exs`, with describes "Edit.apply/2" (`:24`), "Edit.History" (`:115`), "Edit.check_config/3" (`:157`) and "Recipe.within_reach?/2" (`:189`); `test/statifier_blocks/editor/note_field_test.exs`, describes "the note textarea" (`:44`) and "a read-only mount" (`:114`); `defp gen_update_note/1` (`test/support/document_generator.ex:136`) |
+
+### The shell arrangement: one description region under the canvas
+
+| Claim | Read at `8c4d61b` |
+|---|---|
+| Where it sits | the `<MapRegions.description_region` call inside the `sb-editor__description` wrapper (`editor.ex:1207`), at the line printed, is the last child of `<div class="sb-editor__main">`, after the run pane and the "Save as a step" tray |
+| It scrolls in its own box | the `.sb-editor__description` rule (`assets/css/statifier_blocks.css:3147`), at the line printed: `flex: none`, a `max-height` and `overflow: auto` |
+| What it shows | `def description_region`, printed at `lib/statifier_blocks/editor/map_regions.ex:192`, reads at `:205`; the editor passes its own document, view model, palette and selected id |
+| The `map` attr | `attr(:map, :boolean`, printed at `map_regions.ex:181`, reads at `:187`; the editor passes `map={false}` |
+| No hover layer and no store | their `:if={@map}`, printed at `map_regions.ex:210` and `:229`, read at `:223` and `:242` |
+| No how-to-read paragraph when idle | `explanation={@map or @current.kind != :idle}`, printed at `map_regions.ex:226`, reads at `:239` |
+| What is announced | the region keeps `aria-live="polite"` (`map_regions.ex:235`); `ADR-0018`'s Note of 2026-09-29, "selection speaks, hover is silent", is on `main` |
+| The exception | `defp describable?/2` (`editor.ex:3923`), at the line printed, calls `Describe.outline/3` and rescues any exception into `false`; `Composite.expand/2` (`lib/statifier_blocks/composite.ex:626`) rescues any error into `{:error, reason}` |
+| The tests | `test/statifier_blocks/editor/description_region_test.exs`, describes "under the canvas" (`:55`) and "no Map in the editor" (`:148`); `test/statifier_blocks/editor/map_regions_test.exs`, describe "the map attr" (`:456`); `test/statifier_blocks/editor/composite_expand_test.exs`, "the canvas is drawn and the description region is left out" (`:468`) and "a subtree/1 that raises something else: the region is left out and the editor survives" (`:486`) |
+| `ADR-0018`'s "a request of its own" | its Note of 2026-09-29, "the editor's own description region is decided in ADR-0005", sits below its selection Note |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- Each status line says "proposed (2026-09-29 ..."; each is flipped by one
+  word above.
+- Each Amendment says that a decision record "merges at proposed and is
+  flipped to accepted by a separate request once the code below has shipped
+  in a published version of this package". This is that request, and 0.40.0
+  is that version.
+- Each Amendment's Consequences say the next release's changelog says so,
+  naming its fragment (`changelog.d/sb-q91j.md`, `changelog.d/sb-k8qj.md`).
+  That release is 0.40.0, and each fragment is an Added entry of its
+  `CHANGELOG.md` section, read above.
+- Each Amendment says the head `Status:` line at `:3` is not extended, and
+  this Note does not extend it either.
+
+### Sentences that no longer hold as written
+
+None. Each clause holds at `8c4d61b` as written. The same release also gives
+`description_region/1` a `label` attr, the live region's accessible name,
+defaulting to `"Description"` (`map_regions.ex:194`); the shell Amendment's
+Consequence that `description_region/1` "gains an attr whose default changes
+nothing" is about the `map` attr, and it holds.
+
+Filed with `sb-u2cm`.
