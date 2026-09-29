@@ -651,6 +651,169 @@ defmodule StatifierBlocks.DescribeTest do
     end
   end
 
+  describe "an embedded delayed send's sentence is set in double quotation marks" do
+    defp overdue(id),
+      do: Block.new("core.send", id: id, config: %{"event" => "loan.overdue", "delay" => "7d"})
+
+    defp lines(root), do: root |> Document.new() |> outline() |> Describe.render([])
+
+    # A node written by hand, for the two templates whose embedded step
+    # the package's own edges never make a send.
+    defp hand_node(id, type, sentence),
+      do: %Node{id: id, type: type, depth: 1, kind: :step, sentence: sentence}
+
+    defp by_hand(nodes, edges),
+      do: %Describe{id: "bdoc_loan", revision: 0, nodes: nodes, edges: edges}
+
+    # Sabotage: in `Describe.embedded_name/1`, answer `name(node)` for a
+    # delayed send -> the entry line reads `The steps start with In 7 days,
+    # send loan.overdue`, red.
+    test "the :entry line" do
+      root =
+        Block.new("core.sequence", id: "root", slots: %{"body" => [overdue("overdue")]})
+
+      assert "The steps start with \"In 7 days, send loan.overdue\"" in lines(root)
+    end
+
+    # Sabotage: in `Describe.embedded_name/1`, answer `name(node)` for a
+    # delayed send -> the sequence lines lose their marks, red.
+    test "the :sequence line, from either end" do
+      wait = Block.new("core.wait", id: "wait", config: %{"duration" => "14d"})
+
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{"body" => [overdue("overdue"), wait, overdue("again")]}
+        )
+
+      rendered = lines(root)
+
+      assert "After \"In 7 days, send loan.overdue\" (done), Wait 14d" in rendered
+      assert "After Wait 14d (done), \"In 7 days, send loan.overdue\"" in rendered
+    end
+
+    # Sabotage: in `Describe.embedded_name/1`, answer `name(node)` for a
+    # delayed send -> the exit line reads `In 7 days, send loan.overdue
+    # (done) ends the steps`, red.
+    test "the :exit line" do
+      root =
+        Block.new("core.sequence", id: "root", slots: %{"body" => [overdue("overdue")]})
+
+      assert "\"In 7 days, send loan.overdue\" (done) ends the steps" in lines(root)
+    end
+
+    # Sabotage: in `Describe.embedded_name/1`, answer `name(node)` for a
+    # delayed send -> the branch line reads `The branch: when
+    # patron.fines_owed > 0, In 7 days, send loan.overdue`, red.
+    test "the :branch line" do
+      root =
+        Block.new("core.branch",
+          id: "fines",
+          config: %{"arms" => [%{"slot" => "arm_owes", "cond" => "patron.fines_owed > 0"}]},
+          slots: %{"arm_owes" => [overdue("overdue")], "otherwise" => [], "undecided" => []}
+        )
+
+      assert "The branch: when patron.fines_owed > 0, \"In 7 days, send loan.overdue\"" in lines(
+               root
+             )
+    end
+
+    # Sabotage: in `Describe.embedded_name/1`, answer `name(node)` for a
+    # delayed send -> the interrupt line reads `On loan.reported_lost, In 7
+    # days, send loan.overdue abandons the group`, red.
+    test "the :interrupt line" do
+      described =
+        by_hand(
+          [
+            hand_node("lending", "core.group", "Run its steps as a group")
+            |> Map.put(:noun, "the group"),
+            hand_node("overdue", "core.send", "In 7 days, send loan.overdue")
+          ],
+          [
+            edge(:interrupt, "lending", {:block, "overdue"}, {:exit, "lending"},
+              event: "loan.reported_lost"
+            )
+          ]
+        )
+
+      assert Describe.render(described, []) |> List.last() ==
+               "On loan.reported_lost, \"In 7 days, send loan.overdue\" abandons the group"
+    end
+
+    # Sabotage: in `Describe.embedded_name/1`, answer `name(node)` for a
+    # delayed send -> the timer line reads `In 2 days, loan.due reaches In 7
+    # days, send loan.overdue`, red.
+    test "the :timer line" do
+      described =
+        by_hand(
+          [
+            hand_node("due", "core.send", "In 2 days, send loan.due"),
+            hand_node("overdue", "core.send", "In 7 days, send loan.overdue")
+          ],
+          [
+            edge(:timer, "root", {:block, "due"}, {:block, "overdue"},
+              event: "loan.due",
+              delay: "2d"
+            )
+          ]
+        )
+
+      assert Describe.render(described, []) |> List.last() ==
+               "In 2 days, loan.due reaches \"In 7 days, send loan.overdue\""
+    end
+
+    # Sabotage: in `Describe.container_name/1`, fall back to `name/1` for a
+    # node with no noun -> the line reads `On loan.due, When loan.due,
+    # abandon abandons In 7 days, send loan.overdue`, red.
+    test "a delayed send named by its sentence where a container carries no noun" do
+      described =
+        by_hand(
+          [
+            hand_node("overdue", "core.send", "In 7 days, send loan.overdue"),
+            hand_node("rule", "core.on_event", "When loan.due, abandon")
+          ],
+          [edge(:interrupt, "overdue", {:block, "rule"}, {:exit, "overdue"}, event: "loan.due")]
+        )
+
+      assert Describe.render(described, []) |> List.last() ==
+               "On loan.due, When loan.due, abandon abandons \"In 7 days, send loan.overdue\""
+    end
+
+    # Sabotage: in `Describe.render/2`, quote the node line of a delayed
+    # send too (`embedded_name/1` in place of `node_line/1`'s `name/1`) ->
+    # the node line carries the marks, red.
+    # Sabotage: in `Describe.embedded_name/1`, drop the `core.send` type
+    # match -> the host's step carries the marks, red.
+    test "a delayed send's node line, an undelayed send and any other step are written as before" do
+      reminder =
+        hand_node("remind", "loan.remind", "In 7 days, send a reminder")
+
+      described =
+        by_hand(
+          [
+            hand_node("root", "core.sequence", "Run its steps in order")
+            |> Map.put(:noun, "the steps"),
+            hand_node("overdue", "core.send", "In 7 days, send loan.overdue"),
+            hand_node("closed", "core.send", "Send loan.closed"),
+            reminder
+          ],
+          [
+            edge(:entry, "root", {:entry, "root"}, {:block, "closed"}),
+            edge(:sequence, "root", {:block, "closed"}, {:block, "remind"}, outcomes: ["done"])
+          ]
+        )
+
+      assert Describe.render(described, []) == [
+               "Run its steps in order",
+               "In 7 days, send loan.overdue",
+               "Send loan.closed",
+               "In 7 days, send a reminder",
+               "The steps start with Send loan.closed",
+               "After Send loan.closed (done), In 7 days, send a reminder"
+             ]
+    end
+  end
+
   describe "the timer edge" do
     defp delayed(id, event, delay),
       do: Block.new("core.send", id: id, config: %{"event" => event, "delay" => delay})
