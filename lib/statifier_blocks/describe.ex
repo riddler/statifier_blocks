@@ -142,6 +142,16 @@ defmodule StatifierBlocks.Describe do
   `The steps start with Wait 14d` and `Send loan.overdue (done) ends the
   steps`. A node that carries no noun is named by its sentence.
 
+  A step keeps its sentence in an edge line, first letter and all, and a
+  delayed send's sentence, `In 7 days, send loan.overdue`, is set there in
+  double quotation marks, because its comma would otherwise read as the
+  line's own: `The steps start with "In 7 days, send loan.overdue"`,
+  `After "In 7 days, send loan.overdue" (done), Wait 14d`. A delayed send
+  is read from its node alone - the type name `core.send` and the
+  sentence `core.send` writes for a delay - because `render/2` holds no
+  palette. Its own node line, and every other embedded sentence, is
+  written without the marks.
+
   Every line is non-blank English with no newline, carriage return or tab,
   and uncapped: a newline, carriage return or tab inside an author's text
   is written as one space. A block's id never appears in a default line.
@@ -244,7 +254,7 @@ defmodule StatifierBlocks.Describe do
   @spec render(t(), keyword()) :: [String.t()]
   def render(%__MODULE__{nodes: nodes, edges: edges}, opts) when is_list(opts) do
     phrasing = Keyword.get(opts, :phrasing)
-    names = Map.new(nodes, &{&1.id, {name(&1), container_name(&1)}})
+    names = Map.new(nodes, &{&1.id, {embedded_name(&1), container_name(&1)}})
 
     node_lines = Enum.map(nodes, &phrase(phrasing, &1.kind, &1, node_line(&1)))
     edge_lines = Enum.map(edges, &phrase(phrasing, &1.kind, &1, edge_line(&1, names)))
@@ -673,8 +683,27 @@ defmodule StatifierBlocks.Describe do
   # none (one built by hand, say).
   @spec container_name(Node.t()) :: String.t()
   defp container_name(%Node{noun: noun} = node) do
-    if is_binary(noun) and String.trim(noun) != "", do: flat(noun), else: name(node)
+    if is_binary(noun) and String.trim(noun) != "", do: flat(noun), else: embedded_name(node)
   end
+
+  # A node's sentence as an edge line embeds it: a delayed send's sentence
+  # in double quotation marks, because its own comma would otherwise read
+  # as a template's comma (ADR-0016's amendment of 2026-09-29, item 7);
+  # every other sentence as it stands. `render/2` holds no palette and no
+  # config, so a delayed send is read from the node alone: the type name
+  # `core.send` and the sentence `core.send` writes for a delay,
+  # `In <delay>, send <event>`.
+  @spec embedded_name(Node.t()) :: String.t()
+  defp embedded_name(%Node{type: "core.send"} = node) do
+    name = name(node)
+    if delayed_send?(name), do: ~s("#{name}"), else: name
+  end
+
+  defp embedded_name(%Node{} = node), do: name(node)
+
+  @spec delayed_send?(String.t()) :: boolean()
+  defp delayed_send?(sentence),
+    do: String.starts_with?(sentence, "In ") and String.contains?(sentence, ", send ")
 
   # A node's sentence as one non-blank line, falling back to its type.
   @spec name(Node.t()) :: String.t()
