@@ -13748,3 +13748,118 @@ They are met here, not edited.
 None. Each clause holds at `362a0e9` as written.
 
 Filed with `sb-ok65`.
+
+## Amendment (2026-09-29): decision 2's closed set gains `{:update_note, id, note}`, and the inspector's Config tab edits a block's note
+
+**Status: proposed (2026-09-29, bead `sb-q91j`, ruled by the operator,
+2026-09-29).** A decision record merges at proposed and is flipped to
+accepted by a separate request once the code below has shipped in a
+published version of this package. Additive: decision 2, every amendment
+to it above, and every clause above this line stand as printed. **No text
+above this line is edited by this section**, no line above it is removed,
+and the head `Status:` line at `:3` is not extended. It adds clause `2s`.
+
+**Why this is an Amendment and not a Note.** It grows decision 2's closed
+command set, as the Amendment of 2026-09-22 did for `{:set_accepts, names}`
+(`2o`), and by this directory's README a note decides nothing.
+
+Code cites below were read at `a6b96dd` and carry their anchors; re-locate
+by anchor, not by number.
+
+### Context
+
+`ADR-0001`'s Amendment of 2026-09-28 gave a block an optional author-written
+`note`: a string, the empty string being the absent note, left out of the
+canonical bytes when empty and never read by the compiler. Its section "What
+this amendment does not decide" left the editor's field for writing a note
+to a later record: until then a note reached a document only through the
+document's own bytes or a host's code. Decision 2 is a closed set, so an
+editor field that writes the document needs a member of it or a reason it
+does not; the operator ruled for a member, 2026-09-29.
+
+### 2s. Decision 2's closed set gains `{:update_note, Block.id(), String.t()}`
+
+The command replaces the `note` of the block `id` names, and its inverse is
+`{:update_note, id, previous_note}`, the note that block held before. It is
+a command like every other write to the document, so it goes through
+`Edit.apply/2` and `Edit.History`, one undo entry per commit; nothing writes
+a note around the algebra. In the code: the `Edit.t()` union
+(`lib/statifier_blocks/edit.ex:179`, the `{:update_note, Block.id(),
+String.t()}` member) and the `apply/2` clause (`edit.ex:254`, `def
+apply(%Document{} = document, {:update_note, id, note})`).
+
+- **The empty string is the absent note.** A note of `""` removes the note,
+  and canonical form omits it (`lib/statifier_blocks/canonical_json.ex:141`,
+  `defp maybe_put_note/2`'s `""` clause), so a note written and then emptied
+  leaves the bytes of a document that never had one. Nothing is trimmed: a
+  note is stored as the author wrote it.
+- **The command is where the grammar is enforced**, on 2h's terms. `apply/2`
+  refuses a note that is not a UTF-8 string with the term
+  `Document.validate/1` answers for one, `{:malformed_block, id, {:note,
+  :not_a_string}}`, by calling `StatifierBlocks.Validation.note/2`
+  (`lib/statifier_blocks/validation.ex:339`) rather than restating the
+  grammar. A block `id` the document does not hold is refused as
+  `{:no_such_block, id}`.
+- **`check_config/3` asks no block type** (`edit.ex:347`, the
+  `{:update_note, _id, _note}` clause, which answers `:ok`). A note is not
+  config and no block type reads one; the clause answers `:ok` even on a
+  block whose stored config its type refuses.
+- **A recipe may write a note only on a block its own compound inserted.**
+  The note is written on a block rather than on the document, so 3C bounds
+  it the way it bounds `:update_config`: the private `reach/3` clause for it
+  (`lib/statifier_blocks/recipe.ex:168`, `defp reach({:update_note, id,
+  _note}, ...)`) admits it when `id` is in the compound's minted set and
+  halts as out of reach otherwise.
+- **A compound may carry it as a leaf**, as it may any edit; 2n's rules are
+  untouched (`edit.ex:409`, `defp check_compound/1` refuses only an empty or
+  nested list).
+
+The counts. With this clause the leaf edits are `:insert`, `:remove`,
+`:move`, `:update_config`, `:set_datamodel`, `:set_accepts` and
+`:update_note`, seven, and `:compound` sits above them as the one
+constructor that is not an edit: `Edit.t()` has eight constructors. 2n's
+sentence that every edit a document can undergo is one of the set holds with
+the set read as these seven.
+
+**The editor's field.** The inspector's Config tab opens, with a block
+selected, on a Note textarea above its Block and Configuration sections
+(`lib/statifier_blocks/editor/inspector.ex`, `defp note_section/1` at `:478`
+and its call at `:398`). It is its own form posting its own event,
+`note-change`, which the editor turns into one `{:update_note, id, note}`
+through the same funnel as every other command
+(`lib/statifier_blocks/editor.ex:1810`, `def handle_event("note-change",
+...)`); a posted note equal to the block's current one commits nothing. A
+separate form keeps the note out of the config form's decode, where a
+block type's config field named `note` would collide with it. The field is
+on the Config tab, not a new tab: under 3A a note is about the selected
+block, and the tab strip is unchanged. It draws for a block whose type does
+not resolve too, because a note is not config and decision 12's reason for
+withholding a config form does not reach it.
+
+**A read-only mount refuses it.** `note-change` is on
+`@read_only_refused` (`editor.ex:758`), so the 2026-09-07 profile
+Amendment's `read_only?` clause 6 holds for it: the event answers with the
+socket it was given and `on_change` never fires. Under that Amendment's
+clause 3 the field draws as a reading: the note as text, and nothing when
+there is no note (`inspector.ex:469`, `defp note_section/1`'s `read_only:
+true` clause).
+
+**The tests.** `test/statifier_blocks/edit/note_test.exs` (at `a6b96dd`)
+pins the inverse, the empty note, the refusals, the history round trip,
+the `check_config/3` clause and the recipe's reach;
+`test/statifier_blocks/editor/note_field_test.exs` edits, undoes and redoes
+a note through the textarea and holds the read-only refusal. The generated
+command sequences of `test/statifier_blocks/edit_property_test.exs` draw
+`{:update_note, _, _}` too (`test/support/document_generator.ex`, `defp
+gen_update_note/1`).
+
+### Consequences
+
+- **A host that matches `Edit.t()` exhaustively sees one more member.**
+  The next release's changelog says so (`changelog.d/sb-q91j.md`).
+- **`ADR-0001`'s undecided editor field is answered here**, with no edit to
+  that record: its Amendment's "What this amendment does not decide" bullet
+  on the editor's field reads as closed by this clause.
+- **Nothing else in decisions 2, 3, 9 or 12 changes.** No structural rule,
+  no inverse of an existing command, no config gate and no unresolvable-block
+  rule is touched.
