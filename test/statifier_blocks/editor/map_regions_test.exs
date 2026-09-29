@@ -505,6 +505,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the label attr" do
+      # A host's page passes no `label`, and its region keeps the accessible
+      # name it had.
+      # Sabotage: made the attr default to `"Map description"`; this went
+      # red on the region's aria-label.
+      test "its default is Description, which leaves a host's region unchanged" do
+        document = MapFixtures.document!("library_loan")
+
+        default = region_html(document, %{})
+
+        assert LazyHTML.attribute(one(default, "#map-description"), "aria-label") == [
+                 "Description"
+               ]
+
+        assert default == region_html(document, %{label: "Description"})
+      end
+
+      # Sabotage: rendered `aria-label="Description"` whatever the attr
+      # held; this went red on the host's label.
+      test "a host's label names the live region, and nothing else changes" do
+        document = MapFixtures.document!("library_loan")
+
+        labelled = region_html(document, %{label: "Loan plan"})
+        region = one(labelled, "#map-description")
+        assert LazyHTML.attribute(region, "aria-label") == ["Loan plan"]
+        assert LazyHTML.attribute(region, "aria-live") == ["polite"]
+
+        assert String.replace(labelled, ~s(aria-label="Loan plan"), ~s(aria-label="Description")) ==
+                 region_html(document, %{})
+      end
+    end
+
     defp count_of(html, selector),
       do: html |> LazyHTML.from_fragment() |> LazyHTML.query(selector) |> Enum.count()
 
