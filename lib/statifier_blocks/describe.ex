@@ -20,9 +20,9 @@ defmodule StatifierBlocks.Describe do
         "Run its steps in order",
         "Wait 14d",
         "Send loan.overdue",
-        "Run its steps in order starts with Wait 14d",
+        "The steps start with Wait 14d",
         "After Wait 14d (done), Send loan.overdue",
-        "Send loan.overdue (done) ends Run its steps in order"
+        "Send loan.overdue (done) ends the steps"
       ]
 
   ## Pure, and no model anywhere
@@ -128,6 +128,20 @@ defmodule StatifierBlocks.Describe do
   and a timer edge's line is `In <delay>, <event> reaches <target>`, the
   delay written in the words `core.send`'s own sentence uses (`24h` reads
   as `24 hours`).
+
+  An edge line names a step by its sentence and a container - the block
+  whose structure drew the edge, and that block's entry, exit or body -
+  by the container's node's `noun` (ADR-0016's amendment of 2026-09-29):
+  its title where it has one; else the noun its module is known by, `the
+  steps` for a sequence, `the group` for a group or a resumable group,
+  `the branch`, `the lanes` for a parallel and `the loop` for a for-each;
+  else `the` and its palette label in lower case. A noun that opens a
+  line with a lower-case `the`, a title included, is written with a
+  capital there, and a noun whose text is `the steps` or `the lanes`,
+  a title included, takes `start` where the others take `starts`, as in
+  `The steps start with Wait 14d` and `Send loan.overdue (done) ends the
+  steps`. A node that carries no noun is named by its sentence.
+
   Every line is non-blank English with no newline, carriage return or tab,
   and uncapped: a newline, carriage return or tab inside an author's text
   is written as one space. A block's id never appears in a default line.
@@ -139,8 +153,10 @@ defmodule StatifierBlocks.Describe do
     Await,
     Branch,
     Duration,
+    Foreach,
     Group,
     OnEvent,
+    Parallel,
     ResumableGroup,
     Send,
     Sequence
@@ -161,6 +177,24 @@ defmodule StatifierBlocks.Describe do
   # The outcome a type declaring no `outcomes/1` has (ADR-0002 amendment
   # A1), which is all a placeholder can be said to declare.
   @placeholder_outcomes ["done"]
+
+  # What an edge line calls a container it names as a whole, where the
+  # block has no title of its own (ADR-0016's amendment of 2026-09-29):
+  # keyed by the module the palette resolves the type to, as the edges
+  # are. A container of any other module falls back to "the" and its
+  # palette label in lower case.
+  @nouns %{
+    Sequence => "the steps",
+    Group => "the group",
+    ResumableGroup => "the group",
+    Branch => "the branch",
+    Parallel => "the lanes",
+    Foreach => "the loop"
+  }
+
+  # The noun texts that take a plural verb, read from the text alone: a
+  # title with one of these texts takes it too.
+  @plural_nouns ["the steps", "the lanes"]
 
   @typep resolution :: {:ok, Palette.type_ref(), Block.t()} | {:unresolvable, Block.t()}
   @typep lookup :: %{optional(Block.id()) => {Block.id() | nil, resolution()}}
@@ -210,10 +244,10 @@ defmodule StatifierBlocks.Describe do
   @spec render(t(), keyword()) :: [String.t()]
   def render(%__MODULE__{nodes: nodes, edges: edges}, opts) when is_list(opts) do
     phrasing = Keyword.get(opts, :phrasing)
-    sentences = Map.new(nodes, &{&1.id, name(&1)})
+    names = Map.new(nodes, &{&1.id, {name(&1), container_name(&1)}})
 
     node_lines = Enum.map(nodes, &phrase(phrasing, &1.kind, &1, node_line(&1)))
-    edge_lines = Enum.map(edges, &phrase(phrasing, &1.kind, &1, edge_line(&1, sentences)))
+    edge_lines = Enum.map(edges, &phrase(phrasing, &1.kind, &1, edge_line(&1, names)))
 
     node_lines ++ edge_lines
   end
@@ -233,8 +267,34 @@ defmodule StatifierBlocks.Describe do
       sentence: ViewModel.sentence(vm_node),
       outcomes: outcomes(resolution),
       summary: vm_node.summary,
-      fan_label: ViewModel.fan_label(vm_node)
+      fan_label: ViewModel.fan_label(vm_node),
+      noun: node_noun(vm_node, resolution)
     }
+  end
+
+  # A block with slots is named by its title, else by its module's noun,
+  # else by "the" and its palette label in lower case. A block with no
+  # slots is never an edge's container, and a block the palette cannot
+  # resolve draws no edge inside itself: neither carries a noun.
+  @spec node_noun(ViewModel.Node.t(), resolution() | :unresolvable) :: String.t() | nil
+  defp node_noun(%ViewModel.Node{slots: []}, _resolution), do: nil
+
+  defp node_noun(%ViewModel.Node{title: title}, {:ok, _ref, _block}) when is_binary(title),
+    do: flat(title)
+
+  defp node_noun(%ViewModel.Node{} = vm_node, {:ok, ref, _block}),
+    do: Map.get(@nouns, module(ref)) || "the " <> String.downcase(label(vm_node))
+
+  defp node_noun(%ViewModel.Node{}, _unresolvable), do: nil
+
+  # The palette label, falling back to the type name as the view model's
+  # own title does.
+  @spec label(ViewModel.Node.t()) :: String.t()
+  defp label(%ViewModel.Node{entry: entry, type: type}) do
+    case Map.get(entry, :label) do
+      label when is_binary(label) -> if String.trim(label) == "", do: type, else: flat(label)
+      _undeclared -> type
+    end
   end
 
   @spec walk(Block.t(), Block.id() | nil) :: [{Block.t(), Block.id() | nil}]
@@ -537,25 +597,29 @@ defmodule StatifierBlocks.Describe do
   defp node_line(%Node{fan_label: nil} = node), do: name(node)
   defp node_line(%Node{fan_label: label} = node), do: "#{name(node)} (#{flat(label)})"
 
-  @spec edge_line(Edge.t(), %{optional(Block.id()) => String.t()}) :: String.t()
-  defp edge_line(%Edge{kind: :entry} = edge, s),
-    do: "#{sentence(s, edge.container)} starts with #{target(s, edge.to)}"
+  @spec edge_line(Edge.t(), names()) :: String.t()
+  defp edge_line(%Edge{kind: :entry} = edge, s) do
+    container = noun(s, edge.container)
+    starts = if container in @plural_nouns, do: "start", else: "starts"
+
+    "#{opening(container)} #{starts} with #{target(s, edge.to)}"
+  end
 
   defp edge_line(%Edge{kind: :sequence} = edge, s),
     do: "After #{target(s, edge.from)}#{carried(edge)}, #{target(s, edge.to)}"
 
   defp edge_line(%Edge{kind: :exit} = edge, s),
-    do: "#{target(s, edge.from)}#{carried(edge)} ends #{sentence(s, edge.container)}"
+    do: "#{target(s, edge.from)}#{carried(edge)} ends #{noun(s, edge.container)}"
 
   defp edge_line(%Edge{kind: :branch} = edge, s),
-    do: "#{sentence(s, edge.container)}: #{arm(edge.condition)}, #{target(s, edge.to)}"
+    do: "#{opening(noun(s, edge.container))}: #{arm(edge.condition)}, #{target(s, edge.to)}"
 
   defp edge_line(%Edge{kind: :interrupt} = edge, s) do
     on = if edge.event, do: "On #{flat(edge.event)}", else: "On its event"
     does = if match?({:body, _id}, edge.to), do: "resumes", else: "abandons"
     at = if edge.history, do: " at #{edge.history} history", else: ""
 
-    "#{on}, #{target(s, edge.from)} #{does} #{sentence(s, edge.container)}#{at}"
+    "#{on}, #{target(s, edge.from)} #{does} #{noun(s, edge.container)}#{at}"
   end
 
   defp edge_line(%Edge{kind: :timer} = edge, s) do
@@ -577,12 +641,40 @@ defmodule StatifierBlocks.Describe do
   defp carried(%Edge{outcomes: outcomes}),
     do: " (#{Enum.map_join(outcomes, ", ", &flat/1)})"
 
-  @spec target(%{optional(Block.id()) => String.t()}, Edge.endpoint()) :: String.t()
-  defp target(s, {:exit, id}), do: "the end of #{sentence(s, id)}"
-  defp target(s, {_block_entry_or_body, id}), do: sentence(s, id)
+  # A step is named by its sentence; a container's entry, exit or body by
+  # the container's noun.
+  @spec target(names(), Edge.endpoint()) :: String.t()
+  defp target(s, {:block, id}), do: sentence(s, id)
+  defp target(s, {:exit, id}), do: "the end of #{noun(s, id)}"
+  defp target(s, {_entry_or_body, id}), do: noun(s, id)
 
-  @spec sentence(%{optional(Block.id()) => String.t()}, Block.id()) :: String.t()
-  defp sentence(s, id), do: Map.get(s, id, "a block")
+  @typep names :: %{optional(Block.id()) => {String.t(), String.t()}}
+
+  @spec sentence(names(), Block.id()) :: String.t()
+  defp sentence(s, id) do
+    {sentence, _noun} = Map.get(s, id, {"a block", "a block"})
+    sentence
+  end
+
+  @spec noun(names(), Block.id()) :: String.t()
+  defp noun(s, id) do
+    {_sentence, noun} = Map.get(s, id, {"a block", "a block"})
+    noun
+  end
+
+  # A noun that opens a line with a lower-case "the" takes a capital
+  # there, read from the text alone: a title beginning "the " is
+  # capitalised the same way as a type's noun.
+  @spec opening(String.t()) :: String.t()
+  defp opening("the " <> rest), do: "The " <> rest
+  defp opening(name), do: name
+
+  # A node's noun, falling back to its sentence for a node that carries
+  # none (one built by hand, say).
+  @spec container_name(Node.t()) :: String.t()
+  defp container_name(%Node{noun: noun} = node) do
+    if is_binary(noun) and String.trim(noun) != "", do: flat(noun), else: name(node)
+  end
 
   # A node's sentence as one non-blank line, falling back to its type.
   @spec name(Node.t()) :: String.t()
