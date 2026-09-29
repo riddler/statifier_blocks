@@ -13417,7 +13417,7 @@ Filed with `sb-f7y4`.
 
 ## Amendment (2026-09-28): decision 7, one hook pushes commands; any number of hooks may only measure or draw
 
-**Status: proposed (2026-09-28, bead `sb-7v78`, ruled by the operator,
+**Status: accepted (2026-09-28, bead `sb-7v78`, ruled by the operator,
 2026-09-28).** A decision record merges at proposed and is flipped to
 accepted by a separate request once the code below has shipped in a
 published version of this package. Additive: decision 7, the Amendment of
@@ -13509,7 +13509,7 @@ reason.
 
 ## Amendment (2026-09-28): decision 1, the repository's tests run Node for the Map hook; the package still bundles nothing and a host needs no Node
 
-**Status: proposed (2026-09-28, bead `sb-7v78`, ruled by the operator,
+**Status: accepted (2026-09-28, bead `sb-7v78`, ruled by the operator,
 2026-09-28).** A decision record merges
 at proposed and is flipped to accepted by a separate request once the code
 below has shipped in a published version of this package. Additive:
@@ -13568,7 +13568,7 @@ exactly as decision 7 records it.
 
 ## Amendment (2026-09-28): item 4's control strip wraps its members at rest, so a card is the same height at rest and on hover
 
-**Status: proposed (2026-09-28, bead `sb-sk59`, ruled by the operator,
+**Status: accepted (2026-09-28, bead `sb-sk59`, ruled by the operator,
 2026-09-28).** A decision record merges at proposed and is flipped to
 accepted by a separate request once the code below has shipped in a
 published version of this package. Additive: the Amendment of 2026-09-25 on
@@ -13680,3 +13680,71 @@ line above it and moves no status line.
   than its wrapped strip is the same height at rest and on hover".
 
 Filed with `sb-sk59`.
+
+## Note (2026-09-28): the three Amendments of 2026-09-28, on decision 7, decision 1 and item 4's strip, are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it
+are the three Amendments' status lines (`:13420`, `:13512`, `:13571`), each
+by one word, `proposed` to `accepted`. Everything else is this Note, at the
+foot of the file, so no line another record cites moves.
+
+The code the three Amendments record shipped in statifier_blocks 0.39.0,
+published on Hex from the `v0.39.0` tag at `362a0e9`, whose `CHANGELOG.md`
+section names the draw-only `StatifierBlocksMap` hook at its own entry point
+under Added and the strip that holds its wrapped height at rest under Fixed.
+Every claim the three Amendments make was checked against `main` at
+`362a0e9`. Every `lib/`, `assets/`, `test/` and CI cite below was read there
+and is written anchor first, line second. Every cite the three Amendments
+give into this file reads at the line they print.
+
+### Decision 7: one hook pushes commands; any number may only measure or draw
+
+| Clause | Read at `362a0e9` |
+|---|---|
+| `7e`, one hook pushes commands | `test/statifier_blocks/assets_test.exs`, describe "one hook pushes commands; the others only measure or draw (decision 7, 7e)" (`:44`): the test "exactly one hook pushes commands, and it is the drag hook" (`:48`) fails on a second command set, and "every other hook only measures or draws" (`:69`) holds the rest to measuring or drawing |
+| `7f`, draws what the server computed | `StatifierBlocksMap`'s `draw()` writes the drawing into the child marked `data-map-canvas` (`assets/js/statifier_blocks_map.js:721`, `export const StatifierBlocksMap`), which `StatifierBlocks.Editor.MapRegions.map_region/1` renders with `phx-update="ignore"` (`editor/map_regions.ex:131`); `markSelected` marks the named block's box; `hover` swaps and restores the description region's text from the store the server rendered |
+| `7f`, pushes no command and no event of its own | the hook's one `this.pushEvent` (`statifier_blocks_map.js:741`) sends what `mapGesture` (`:557`) answers, under the name `listEvents` reads from the element's `data-select-event` and `data-insert-event`; a gesture the host named no event for sends nothing; the test "the map hook pushes only the names the host stamped on its element" (`assets_test.exs:102`) |
+| `7f`, holds no behaviour | what the hook keeps is the drawn graph's source string, to skip a layout it has drawn, a counter, to drop one a newer graph overtook, and a flag, to scroll the insert into view on the next patch; the test "ten selections cause zero layouts, and a new graph causes one" (`test/statifier_blocks/map_layout_test.exs:1003`) |
+| `7g`, the Map hook is the first draw-only hook | the file, the export `StatifierBlocksMap` and its hook name, with the `StatifierBlocks` prefix, ship as source under `assets/`; the hook has its own entry point, `"./map"` in `assets/package.json`'s `exports`, and is not in the default export (`assets/js/statifier_blocks.js:269`, `export default`), which the test "the map hook is its own entry point, with its own default export" (`assets_test.exs:344`) holds. Nothing in the Amendment puts it in the default export |
+
+### Decision 1: the repository's tests run Node; the package bundles nothing
+
+| Clause | Read at `362a0e9` |
+|---|---|
+| `1a`, the package still bundles nothing | `assets/package.json` names no dependency and the repository tracks no `package-lock`; the Map hook imports the vendored file by relative path (`import ELK from "../vendor/elk.bundled.js"`, `statifier_blocks_map.js:34`) |
+| `1b`, the test suite runs Node | `map_layout_test.exs` and `map_hover_test.exs` run the hook with `node` from the path and fail without it; CI's `actions/setup-node@v4` step (`.github/workflows/ci.yml:51`) installs the version `mise.toml` pins, and no workflow step installs from a registry |
+| `1c`, the no-imports carve-out does not reach the Map hook | the hook has one import, the vendored elkjs file; the test "its one import is the vendored layout library" (`assets_test.exs:372`) |
+| Consequences, a contributor needs Node | `README.md`, section "Working on the Map in this repository" (`:1773`) |
+| Consequences, a host's side is unchanged | a host still takes a `file:` dependency and imports in `app.js`; the Map's import is one more line from the same dependency (`README.md`, section "The hook, and what it costs", `:1739`) |
+
+### Item 4: the control strip wraps its members at rest
+
+| Clause | Read at `362a0e9` |
+|---|---|
+| At rest the strip wraps | the `.sb-node__chrome > .sb-node__strip` rule (`assets/css/statifier_blocks.css:1130`) declares `flex-wrap: wrap` and keeps `overflow: hidden` |
+| The reclaim rule gives up the clip and nothing else | the rule headed `.sb-node__chrome:hover > .sb-node__strip` (`statifier_blocks.css:1163-1166`), with its four selectors, declares `overflow: visible` alone |
+| The yield stands | the `.sb-node__chrome` rule declares `grid-template-columns: auto minmax(calc(var(--sb-text-md) * 6.5), 1fr) auto auto` (`statifier_blocks.css:1109`) |
+| The reservation stands | `<div class="sb-node__strip">` (`lib/statifier_blocks/editor/block_node.ex:455`) and `class="sb-node__strip-reserve"` (`block_node.ex:472`), at the lines the Amendment prints |
+| The tests | `test/statifier_blocks/editor/presentation_test.exs`, describe "the title keeps a minimum and the strip yields to it at rest (ADR-0005's Amendment of 2026-09-25 on item 4)" (`:1715`), with the three tests the Amendment names (`:1756`, `:1773`, `:1802`) |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- Each status line says "proposed (2026-09-28 ..."; each is flipped by one
+  word above.
+- Each Amendment says that a decision record "merges at proposed and is
+  flipped to accepted by a separate request once the code below has shipped
+  in a published version of this package". This is that request, and 0.39.0
+  is that version.
+- Item 4's Consequences say "The change is in the next release's changelog
+  (`changelog.d/sb-sk59.md`)". That release is 0.39.0, and the fragment is
+  its `CHANGELOG.md` section's Fixed entry, read above.
+- This file's head `Status:` line (`:3`) is not extended.
+
+### Sentences that no longer hold as written
+
+None. Each clause holds at `362a0e9` as written.
+
+Filed with `sb-ok65`.

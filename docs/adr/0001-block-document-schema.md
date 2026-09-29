@@ -1188,7 +1188,7 @@ Filed with `sb-910d`.
 
 ## Amendment (2026-09-28): decision 2, a block carries an optional author-written note
 
-**Status: proposed (2026-09-28, ruled by the operator, 2026-09-28: a note key on the block).**
+**Status: accepted (2026-09-28, ruled by the operator, 2026-09-28: a note key on the block).**
 Drafted for `sb-l45c`. Additive: no text above this line is edited, every
 decision above stands as written except where a clause below says how one
 reads, and the header line's status history is not extended here. It adds
@@ -1359,3 +1359,57 @@ the renderer's; that the note leads is this clause's.
   note, with no change to the chart the document compiles to.
 - A reader of this record alone learns that a block has five fields and why
   the fifth took no bump.
+
+## Note (2026-09-28): the Amendment of 2026-09-28 on decision 2, the block's note, is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+that Amendment's status line (`:1191`), by one word, `proposed` to
+`accepted`. Everything else is this Note, at the foot of the file, so no line
+another record cites moves.
+
+The code that builds the Amendment shipped in statifier_blocks 0.39.0,
+published on Hex from the `v0.39.0` tag at `362a0e9`, whose `CHANGELOG.md`
+section names the change under Changed: Decode admits an optional `note`
+string on a block. Every claim the Amendment makes was checked against
+`main` at `362a0e9`. Every `lib/`, `priv/` and `test/` cite below was read
+there and is written anchor first, line second.
+
+### Each clause, and where it reads today
+
+| Clause | Read at `362a0e9` |
+|---|---|
+| `2a`, a block is `{type, id, config, slots, note}` | `defstruct` (`block.ex:51`) carries `note: ""` beside the other five fields, and `@type t` (`block.ex:42`) types it `String.t()`; `Block.new/2` (`block.ex:61`) takes `:note` |
+| `2b`, an empty note is left out of the canonical bytes | `defp value/1`'s `%Block{}` clause (`canonical_json.ex:57`) hands the note to `defp maybe_put_note/2`, whose `""` clause (`canonical_json.ex:141`) writes no key; `defp object/1` (`canonical_json.ex:145`) sorts keys, so a note sits between `id` and `slots`. `defp build_block/1` in `StatifierBlocks.Decode` defaults an absent key to `""` (`decode.ex:147`) |
+| `2b`, a non-string note is a typed refusal at decode | `decode/1` (`decode.ex:55`) runs `Validation.validate/1` (`decode.ex:76`), whose `defp check_note/2` (`validation.ex:334`) refuses anything but a valid UTF-8 string with `{:malformed_block, id, {:note, :not_a_string}}` |
+| `2c`, `schema_version` stays at 1 | the `%Document{}` `defstruct` still defaults `schema_version: 1` (`document.ex:73`); a block without a note encodes as it did, by `2b`'s row |
+| `2d`, Decode and the shipped schema admit the note together | `@block_keys` (`decode.ex:50`) holds `note` beside the other five keys; `definitions.block` (`priv/schemas/block-document.schema.json:83`) describes `note` as a string (`:120`) under the same `"additionalProperties": false` |
+| `2e`, the note travels with its block | `Edit.apply/2`'s `:move` clause (`edit.ex:189`) detaches the block and inserts the same struct; `test/statifier_blocks/block_note_test.exs`, describe "copy and move" |
+| `2f`, the compiler and the provenance map never read the note | nothing under `lib/statifier_blocks/compiler.ex`, `lib/statifier_blocks/compiler/` or `provenance.ex` reads a block's `note`; `Document.content_hash/1` (`document.ex:305`) hashes the canonical bytes; the test "compiles to the same SCXML and provenance map as without the note" and the test "changes the document hash, and the compile record's document hash with it", in `block_note_test.exs` |
+| `2g`, the description region shows the note above the built-in text | `StatifierBlocks.Editor.MapRegions`'s `defp description/1` (`editor/map_regions.ex:196`) draws the note first; `StatifierBlocks.Map.Info` reads it off the block (`defp notes/1`, `map/info.ex:270`) |
+| What it does not decide | `StatifierBlocks.Describe` and `StatifierBlocks.ViewModel` read no block's `note`; the package editor has no note field |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The status line says "proposed (2026-09-28 ..."; it is flipped by one word
+  above.
+- "The code that builds it follows in its own request" described the day it
+  was written; that request is in 0.39.0, read above.
+- "the header line's status history is not extended here" still holds: this
+  file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written
+
+- The paragraphs that open "Today" in `2b` and `2c`, and the last paragraph
+  of `2d`, describe the code before the field existed, as the Amendment says
+  of its cites; the rows above are where that code reads now.
+- Cites that have moved since `ff04855`, each anchor still naming the thing
+  the Amendment says: the `defstruct` is at `block.ex:51` and `@type t` at
+  `:42`, `defp value/1`'s `%Block{}` clause at `canonical_json.ex:57`, the
+  `:move` clause at `edit.ex:189`, `Document.content_hash/1` at
+  `document.ex:305`, and the compiler's paragraph that opens "The guarantee
+  is **not** reversible" at `compiler.ex:298`.
+
+Filed with `sb-ok65`.
