@@ -256,7 +256,7 @@ defmodule StatifierBlocks.ThemeAuditTest do
 
     # The one family declared outside the editor's root. The map region is
     # not inside `.sb-editor`, so its tokens sit on its own root, where a
-    # host setting them on `.sb-map__region` or above reaches them, and
+    # host setting them on `.sb-map__region` reaches them, and
     # nothing else is declared there.
     # Sabotage: declared `--sb-accent` in the `.sb-map__region` block; this
     # went red.

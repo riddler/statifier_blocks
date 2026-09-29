@@ -1767,8 +1767,11 @@ inside the editor: set the palette on an ancestor of the regions, or on
 `.sb-map__region` and `.sb-map__description` themselves. The map's drawing
 reads the `--sb-map-*` tokens, declared on `.sb-map__region` and mapped onto
 the palette, so a page that themes the palette dresses the map too; set one
-of them to disagree with that mapping. The drawing carries a fallback for
-each, which is what the map looks like on a page that sets none.
+of them to disagree with that mapping. Set it on `.sb-map__region` itself,
+or on a selector that reaches that element: the region declares every
+`--sb-map-*` token on itself, so a value set on an ancestor loses to that
+declaration. The drawing carries a fallback for each, which is what the map
+looks like on a page that sets none.
 
 ### Working on the Map in this repository
 
