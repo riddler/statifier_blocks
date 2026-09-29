@@ -2,7 +2,7 @@
   "name": "statifier_blocks",
   "version": "0.1.0",
   "description": "The statifier_blocks editor's two LiveView hooks and the Map's draw-only hook, shipped as source (ADR-0005 decisions 7 and 14, the 2026-08-29 amendment admitting the measurement hook, and the 2026-09-28 amendment admitting draw-only hooks), with the Map's vendored elkjs build (ADR-0018).",
-  "license": "MIT",
+  "license": "(MIT AND EPL-2.0)",
   "type": "module",
   "main": "js/statifier_blocks.js",
   "exports": {
