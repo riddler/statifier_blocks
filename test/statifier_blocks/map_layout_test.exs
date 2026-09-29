@@ -531,12 +531,17 @@ defmodule StatifierBlocks.MapLayoutTest do
     # read off it here rather than off the map's code - is a dot inside a
     # ring, joined to the last step by an edge that leaves the step's
     # bottom, enters the ring's top, and carries its outcome as a caption
-    # drawn beside it, between the two.
+    # drawn beside it, between the two: beside the run that enters the
+    # ring, since two ends leaving one group by its one bottom port part
+    # on the way down.
     #
     # Sabotage: made drawNode draw the end mark's ring only; this went red.
     # Made drawEdge draw no caption for an end edge; this went red. Made
     # end_edge/4 hand the layout no label; the caption went missing and
     # this went red. Each reverted from a copy.
+    # Sabotage: made edgesOf shift every edge label 20px right; the caption
+    # stood off the edge into its mark and this went red. Reverted from a
+    # copy.
     test "every flow-graph end of both library fixtures draws a final mark, its outcome on the edge",
          %{tmp_dir: dir} do
       for {key, root, last, expected} <- @ends do
@@ -596,7 +601,7 @@ defmodule StatifierBlocks.MapLayoutTest do
           assert_in_delta x, label["x"], 0.5, edge_id
           assert label["width"] >= text_width([outcome])
 
-          line = edge["start"]["x"]
+          line = edge["end"]["x"]
           right = x + label["width"]
 
           assert (line >= right and line - right <= 4) or (line <= x and x - line <= 4),
@@ -785,24 +790,30 @@ defmodule StatifierBlocks.MapLayoutTest do
   end
 
   describe "the happy path, as drawn" do
-    # Each library group, the steps of its body, and the steps of the
-    # document's own flow after it.
-    # The registration's group is the root's last step - its age branch and
-    # welcome sit inside the body, so the deadline rule ends the document -
-    # and only its ends follow it; a body holding a branch carries no
-    # ports, so those are not held to the line.
+    # Each library fixture, the layouts its drawing takes, its group, the
+    # start dot before the group, the steps of its body, and the steps of
+    # the document's own flow after it. The loan's group holds one leaf, so
+    # the server gives it its ports and the hook lays the loan out once, as
+    # it always has. The registration's group is the root's last step and
+    # its body holds the age branch, whose width only the layout finds, so
+    # the hook lays it out twice and puts the ports on the second; its
+    # done end follows it on the line.
     @happy [
-      {"library_loan", "blk_ll_on_loan", ["blk_ll_loan_period"],
+      {"library_loan", 1, "blk_ll_on_loan", "blk_ll_root/start", ["blk_ll_loan_period"],
        ["blk_ll_due", "blk_ll_root/end/done"]},
-      {"patron_registration", "blk_pr_verify", ["blk_pr_deadline", "blk_pr_email"], []}
+      {"patron_registration", 2, "blk_pr_verify", "blk_pr_root/start",
+       ["blk_pr_deadline", "blk_pr_email", "blk_pr_age", "blk_pr_welcome"],
+       ["blk_pr_root/end/done"]}
     ]
 
     # How far off one line a step's centre may sit, in pixels.
     @straight 1.0
 
-    # The body's steps and the steps after the group are centred on one
-    # vertical line, and the edge out of the group runs down it: it leaves
-    # the group's bottom and enters the next step's top on the line.
+    # The start dot, the body's steps and the steps after the group are
+    # centred on one vertical line, and the edge out of the group runs down
+    # it: it leaves the group's bottom and enters the next step's top on
+    # the line. The loan takes one layout, so the second pass leaves its
+    # drawing as the one pass drew it; the registration takes two.
     #
     # Sabotage: made put_ports/2 answer its node unchanged; the edge left
     # the middle of the group and the body's steps stood left of the line,
@@ -811,15 +822,24 @@ defmodule StatifierBlocks.MapLayoutTest do
     # went red. Made offPorts give no edge back its ends; the edge out of
     # the group came back from its port and this went red. Each reverted
     # from a copy.
+    # Sabotage: made portsFrom answer null; the registration was drawn in
+    # one layout, its group's edges at the middle of the group, and this
+    # went red. Made portsFrom leave out the pane's offset; the ports moved
+    # 12px and the start dot stood off the line, and this went red. Made
+    # layout run the second pass on every graph; the loan took two layouts
+    # and this went red. Each reverted from a copy.
     test "both library fixtures run their body's steps and what follows down one line",
          %{tmp_dir: dir} do
-      for {key, group, steps, after_group} <- @happy do
-        %{"drawn" => "map", "boxes" => boxes, "edges" => edges} =
+      for {key, passes, group, start, steps, after_group} <- @happy do
+        %{"drawn" => "map", "boxes" => boxes, "edges" => edges, "layouts" => layouts} =
           run(dir, key, library_graph(key))
 
-        [line | _rest] = centres = Enum.map(steps ++ after_group, &centre(boxes[&1]))
+        assert layouts == passes, "#{key}: drawn in #{layouts} layouts, not #{passes}"
 
-        for {id, x} <- Enum.zip(steps ++ after_group, centres) do
+        on_line = [start | steps] ++ after_group
+        line = centre(boxes[hd(steps)])
+
+        for id <- on_line, x = centre(boxes[id]) do
           assert_in_delta x, line, @straight, "#{key}: #{id} is off the line at #{x}, not #{line}"
         end
 
@@ -845,7 +865,7 @@ defmodule StatifierBlocks.MapLayoutTest do
     # Reverted from a copy.
     test "both library fixtures draw their rules and abandon ends beside the happy path",
          %{tmp_dir: dir} do
-      for {key, group, steps, _after_group} <- @happy do
+      for {key, _passes, group, _start, steps, _after_group} <- @happy do
         graph = library_graph(key)
 
         %{"drawn" => "map", "boxes" => boxes, "interrupts" => drawn} =
@@ -992,18 +1012,23 @@ defmodule StatifierBlocks.MapLayoutTest do
   describe "the hook, on a patch and on a click" do
     # The graph `StatifierBlocks.Map.graph/2` answers for a moved selection
     # differs from the last one only by the `selected` mark, so the hook
-    # re-marks the drawing it has and lays nothing out: ten selections, one
-    # layout in all, the one the mount ran. A graph that really changed is
-    # laid out again, so the count is a count and not a hook that never
-    # draws twice.
+    # re-marks the drawing it has and lays nothing out. The registration's
+    # group body holds a branch, so its drawing takes two layouts (see
+    # "the happy path, as drawn"): the mount runs those two, and ten
+    # selections after it run none, the count staying at two. A graph that
+    # really changed is laid out again - the loan, in one layout - so the
+    # count is a count and not a hook that never draws twice.
     #
     # Sabotage: made the hook compare the graph with its `selected` mark
     # left on; every selection laid the graph out again and this went red on
     # the count. Made the hook skip markSelected on an unchanged graph; the
     # mark stayed where the mount left it and this went red. Each reverted
     # from a copy.
+    # Sabotage: removed the hook's early return on an unchanged graph, so a
+    # selection-only patch drew the graph again; the first selection took
+    # the count past two and this went red. Reverted from a copy.
     test "ten selections cause zero layouts, and a new graph causes one", %{tmp_dir: dir} do
-      graph = library_graph("library_loan")
+      graph = library_graph("patron_registration")
       blocks = BlockMap.nodes(graph)
       picks = blocks |> Stream.cycle() |> Enum.take(10)
 
@@ -1012,21 +1037,21 @@ defmodule StatifierBlocks.MapLayoutTest do
           "element" => %{"editable" => "true"},
           "steps" =>
             Enum.map(picks, &%{"select" => &1}) ++
-              [%{"graph" => library_graph("patron_registration")}]
+              [%{"graph" => library_graph("library_loan")}]
         })
 
-      assert %{"layouts" => 1, "drawn" => "map", "marked" => []} = mounted
+      assert %{"layouts" => 2, "drawn" => "map", "marked" => []} = mounted
       {selections, [changed]} = Enum.split(steps, 10)
 
       for {%{"layouts" => count, "marked" => marked, "drawn" => drawn}, id} <-
             Enum.zip(selections, picks) do
-        assert count == 1, "selecting #{id} laid the graph out again (#{count} layouts)"
+        assert count == 2, "selecting #{id} laid the graph out again (#{count} layouts)"
         assert marked == [id]
         assert drawn == "map"
       end
 
-      assert %{"layouts" => 2, "drawn" => "map"} = changed
-      assert layouts == 2
+      assert %{"layouts" => 3, "drawn" => "map"} = changed
+      assert layouts == 3
     end
 
     # A click is sent under the name the host stamped on the element, never

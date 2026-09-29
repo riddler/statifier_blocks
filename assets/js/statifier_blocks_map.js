@@ -58,7 +58,20 @@ export function escapeText(value) {
 // Lays `graph` out. Resolves to the laid-out graph, or rejects with the
 // reason ELK gave - including a result with nothing in it, which is a
 // failure rather than a picture.
+//
+// A graph whose groups all carry their ports is laid out once. A group
+// whose body holds a container carries none, because the server cannot
+// know how wide ELK will draw that container; so that graph is laid out
+// twice: once to read where the body's steps stand, and again with the
+// group's ports put there (`portsFrom`). See `StatifierBlocks.Map`'s
+// moduledoc, "The happy path runs straight".
 export async function layout(graph, elk = elkInstance()) {
+  const first = await layoutOnce(graph, elk)
+  const ported = portsFrom(graph, first)
+  return ported === null ? first : layoutOnce(ported, elk)
+}
+
+async function layoutOnce(graph, elk) {
   const {graph: attached, owners} = onPorts(graph)
   const laid = await elk.layout(attached)
 
@@ -71,13 +84,62 @@ export async function layout(graph, elk = elkInstance()) {
 }
 
 const PORT_SIDE = "org.eclipse.elk.port.side"
+const PORT_CONSTRAINTS = "org.eclipse.elk.portConstraints"
+
+// A group's node: a block whose first child is its body's pane.
+function bodyPane(node) {
+  const [first] = node.children || []
+  return node.kind === "block" && first && first.kind === "slot" && first.style === "body" ? first : null
+}
+
+// A copy of `graph` with ports on every group the server left without
+// them - a group whose body holds a container - placed where `laid`, the
+// same graph laid out once, drew that body's steps: the pane's offset in
+// the group plus the centre of its widest step, the rule the server
+// applies to a body of leaves at its estimate. The ports are the server's
+// shape, `<id>#in` on the top side and `<id>#out` on the bottom, at a
+// fixed x. Answers null when every group already has its ports, so a
+// graph that needs no second layout gets none.
+function portsFrom(graph, laid) {
+  const placed = new Map()
+  const read = (node) => {
+    const pane = bodyPane(node)
+    const steps = pane ? pane.children || [] : []
+    if (steps.length > 0) {
+      const widest = steps.reduce((a, b) => (b.width > a.width ? b : a))
+      placed.set(node.id, pane.x + widest.x + widest.width / 2)
+    }
+    for (const child of node.children || []) read(child)
+  }
+  read(laid)
+
+  const copy = structuredClone(graph)
+  let added = false
+  const put = (node) => {
+    if (bodyPane(node) && !(node.ports || []).length && placed.has(node.id)) {
+      const x = placed.get(node.id)
+      node.layoutOptions = {...(node.layoutOptions || {}), [PORT_CONSTRAINTS]: "FIXED_POS"}
+      node.ports = [port(`${node.id}#in`, x, "NORTH"), port(`${node.id}#out`, x, "SOUTH")]
+      added = true
+    }
+    for (const child of node.children || []) put(child)
+  }
+  put(copy)
+
+  return added ? copy : null
+}
+
+function port(id, x, side) {
+  return {id, x, y: 0, width: 0, height: 0, layoutOptions: {[PORT_SIDE]: side}}
+}
 
 // A copy of `graph` with every edge into or out of a node that carries
 // ports moved onto them: an edge out of the node leaves by its bottom
-// port, an edge into it arrives by its top one. The server places a
-// group's ports where its body's steps stand, so the happy path runs
-// straight through the group (`StatifierBlocks.Map`'s moduledoc, "The
-// happy path runs straight"). Answers the copy and each port's owner.
+// port, an edge into it arrives by its top one. A group's ports stand
+// where its body's steps do - put there by the server, or by `portsFrom`
+// for a body holding a container - so the happy path runs straight
+// through the group (`StatifierBlocks.Map`'s moduledoc, "The happy path
+// runs straight"). Answers the copy and each port's owner.
 export function onPorts(graph) {
   const copy = structuredClone(graph)
   const sides = new Map()

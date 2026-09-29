@@ -259,8 +259,13 @@ defmodule StatifierBlocks.Map do
 
   The line is placed by estimate, from the widths this module gives its
   leaves, so a group puts out its ports only when every step in its body
-  is a leaf or an empty marker. A body that holds a container, whose width
-  is ELK's to find, keeps its edges at the middle of the group, as before.
+  is a leaf or an empty marker. A body that holds a container has a width
+  only ELK can find, so this module gives that group no ports and places
+  nothing: the hook lays such a graph out twice. The first layout says
+  where the body's steps stand; the hook then puts the group's two ports
+  at the centre of the widest of them, in the same shape as the ones
+  above, and lays the graph out again. A graph whose every group carries
+  its ports is laid out once.
 
   ## Order is semantic, so it is forced
 
