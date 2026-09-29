@@ -476,6 +476,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute has_element?(view, "#editor-description")
       end
 
+      # `Composite.expand/2` refuses whatever `subtree/1` raises, not only
+      # the `ArgumentError`s this module's own checks raise: here `subtree/1`
+      # has no clause for the param, a `FunctionClauseError`. The editor
+      # mounts the document, leaves the region out, and the gesture refuses.
+      # Sabotage: narrowed `describable?/2`'s `rescue` to `ArgumentError`;
+      # the FunctionClauseError took the mount down, red before the
+      # assertion.
+      test "a subtree/1 that raises something else: the region is left out and the editor survives",
+           %{conn: conn} do
+        document = broken_subtree_document("no_clause")
+
+        {:ok, view, _html} = mount_editor(conn, document: document, palette: palette())
+
+        assert has_element?(view, ~s(#sb-block-blk_BS))
+        refute has_element?(view, "#editor-description")
+
+        assert_refused(conn, document, "blk_BS")
+      end
+
       # The reason the gesture refuses with is `{:composite_expansion_failed,
       # id, why}` - the compiler's own vocabulary for this case - and `why` is
       # `Exception.message/1` of the raise. So what the author is told is

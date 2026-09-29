@@ -3911,12 +3911,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # expand gesture refuses it (`expanded_members/2`), so the region is left
     # out for it rather than taking the editor down: a document the editor
     # can draw is never refused for what its description would say.
+    #
+    # The `rescue` is as wide as `Composite.expand/2`'s own: any exception,
+    # not `catch`. A `subtree/1` is package-author code and may raise
+    # anything, and `expand/2` refuses every such raise; a narrower rescue
+    # here would crash the editor on a declaration the gesture refuses as
+    # data. Asking `expand/2` of each composite block instead would miss a
+    # composite nested inside another's expansion, which the outline also
+    # expands.
     @spec describable?(Document.t(), Palette.t()) :: boolean()
     defp describable?(%Document{} = document, %Palette{} = palette) do
       _outline = Describe.outline(document, palette, [])
       true
     rescue
-      ArgumentError -> false
+      _error -> false
     end
 
     # The selected block's note, read off the document: the view model's node
