@@ -597,3 +597,72 @@ How two sentences elsewhere now read:
   anchors.
 
 Filed with `sb-r2kc`.
+
+## Note (2026-09-29): the chart-view paragraph's "reads the view model alone", and cites that have moved
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. The sentences it reads stay as written, and so do the cites it
+re-locates.
+
+### The chart-view paragraph
+
+Decision (d)'s paragraph "**The chart view is out.**" ends: "the Map,
+which reads the view model alone, reads no chart either". The two Notes of
+2026-09-28 above, on the Map's captions and on the description region's
+data, read decisions (a) and (d)'s "and from nothing else" and "It reads no
+document or palette of its own" with one exception each, but do not name
+this sentence. Its "alone" is read with the same two exceptions:
+
+- `StatifierBlocks.Map.graph/2`'s captions read the core palette's type
+  explanations, through `StatifierBlocks.Map.caption/1`, as the Note on
+  captions says;
+- `StatifierBlocks.Map.Info.elements/6` and `idle/4` take the document the
+  view model was built from, and read a block's note and the document's id,
+  name, description and `accepts`, as the Note on the description region's
+  data says.
+
+Neither exception is a chart. At `9adc029`, neither
+`lib/statifier_blocks/map.ex` nor `lib/statifier_blocks/map/info.ex` names
+a compiler module or a compiled chart: `StatifierBlocks.Map`'s aliases
+(`map.ex:305-312`) and `StatifierBlocks.Map.Info`'s (`map/info.ex:98-106`)
+name the view model with its node and slot, the palette, the block type
+and helpers for phrasing, durations and the shelf, and, in `Map.Info`
+alone, the describe and the document. The sentence's point, that the Map reads no
+chart, holds as written; only its "alone" is read with the two exceptions.
+
+### Cites that have moved
+
+Each cite below was read at `9adc029` and is written anchor first, line
+second. The cites above stand as written, at the commits they name; each
+anchor still names the thing the record says.
+
+- Decision (a)'s cite of `lib/statifier_blocks/map.ex:375`, and the flip
+  Note's row for (a): `def graph` is at `map.ex:384`.
+- The Note on captions: `defp put_band/2` is at `map.ex:565` (cited
+  `:556`), `defp put_caption/3` at `map.ex:1019` (cited `:1009`), and
+  `def caption` at `map.ex:447` (cited `map.ex:438`).
+  `StatifierBlocks.Palette.core/0` is still at
+  `lib/statifier_blocks/palette.ex:206`.
+- The flip Note's row for (c): `export const StatifierBlocksMap` is at
+  `assets/js/statifier_blocks_map.js:786` (cited `:721`), and its one
+  `this.pushEvent` at `statifier_blocks_map.js:806` (cited `:741`), still
+  the only `pushEvent` in the file. The import of the vendored file is
+  still at `statifier_blocks_map.js:34`.
+- The flip Note's row for (d): `defp timer_parties` is at `map.ex:834`
+  (cited `:824`); `defp findings` is at `map/info.ex:436` (cited `:433`).
+- The flip Note's row for the description region, and the Note on the
+  description region's data: `def elements` is at `map/info.ex:187` (cited
+  `:184`), `def idle` at `map/info.ex:209` (cited `:206`), `defp notes` at
+  `map/info.ex:273` (cited `:270`) and `defp starts` at `map/info.ex:231`
+  (cited `:228`); `def map_region` is at `editor/map_regions.ex:143` (cited
+  `:111`) and `def description_region` at `editor/map_regions.ex:205`
+  (cited `:156`). The guard is still the file's first line.
+- The Note on the clock mark: `@timer_targets` is at `map.ex:325` (cited
+  `:316`, read at `a2e008c`).
+- The flip Note's list of moved cites: `package()`'s `files:` is at
+  `mix.exs:127` (cited `:128`); `licenses:` is still at `mix.exs:115`.
+
+The cites that have not moved since the commits they name are left
+unlisted.
+
+Filed with `sb-24rp`.
