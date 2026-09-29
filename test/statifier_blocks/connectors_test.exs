@@ -4,8 +4,8 @@ defmodule StatifierBlocks.ConnectorsTest do
 
   ADR-0005 decision 7's 2026-08-29 amendment, clause 7b.2: *the connector
   geometry itself is computed on the server, as pure functions from measured
-  rectangles to path data*. This file is what that clause buys. The campaign
-  012/013 spike kept the same split and asserted the same arithmetic in
+  rectangles to path data*. This file is what that clause buys. An earlier
+  spike kept the same split and asserted the same arithmetic in
   `spike/dev/selftest.html`, which could only ever run inside Chrome; the
   geometry assertions below are those assertions, re-expressed against the
   shipped functions, and they run in the gate.
