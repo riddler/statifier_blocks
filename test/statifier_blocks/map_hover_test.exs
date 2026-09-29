@@ -116,7 +116,8 @@ defmodule StatifierBlocks.MapHoverTest do
       {_graph, descriptions, _idle} = described("library_loan")
       selected = descriptions |> Enum.find(&(&1.id == "blk_ll_loan_period")) |> entry_html()
 
-      assert selected =~ "Wait"
+      # Sabotage: looked up blk_ll_late_return (titled "Wait for event") instead; red.
+      assert selected =~ ~s(<p class="title">Wait</p>)
       refute selected == idle["region"]
 
       result = run(dir, "selected", Map.put(idle, "patched", selected))
