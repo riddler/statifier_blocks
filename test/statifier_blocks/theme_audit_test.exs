@@ -39,6 +39,11 @@ defmodule StatifierBlocks.ThemeAuditTest do
   @stylesheet "assets/css/statifier_blocks.css"
   @theming_doc "docs/theming.md"
 
+  # The Map hook paints its SVG in `--sb-map-*` tokens through inline styles
+  # rather than through a rule in the stylesheet, so its source is where
+  # those tokens are read and is scanned with the stylesheet for coverage.
+  @map_hook "assets/js/statifier_blocks_map.js"
+
   # The four surfaces a foreground token can land on, and the roles that land
   # on them. Every colour token the stylesheet declares is accounted for by one
   # of these lists or by `@no_ratio` below, and a test asserts that - a new
@@ -84,7 +89,11 @@ defmodule StatifierBlocks.ThemeAuditTest do
       raw: raw,
       source: source,
       declared: ThemeAudit.declared_tokens(source),
-      referenced: ThemeAudit.referenced_tokens(source),
+      referenced:
+        MapSet.union(
+          ThemeAudit.referenced_tokens(source),
+          ThemeAudit.referenced_tokens(File.read!(@map_hook))
+        ),
       values: ThemeAudit.token_values(source),
       example: example,
       # What a host actually renders under: the package's defaults with the
@@ -212,6 +221,7 @@ defmodule StatifierBlocks.ThemeAuditTest do
     test "every token is declared on the editor root", %{source: source} do
       root_block = source |> String.split("\n.sb-editor {", parts: 2) |> List.last()
       {tokens, rest} = String.split(root_block, "\n}\n", parts: 2) |> List.to_tuple()
+      {_map_tokens, rest} = map_root(rest)
 
       stray =
         ~r/(--sb-[a-z0-9-]+)\s*:/
@@ -242,6 +252,35 @@ defmodule StatifierBlocks.ThemeAuditTest do
 
       assert stray == [],
              "decision 14: the property namespace is `--sb-*`. Found: #{inspect(stray)}"
+    end
+
+    # The one family declared outside the editor's root. The map region is
+    # not inside `.sb-editor`, so its tokens sit on its own root, where a
+    # host setting them on `.sb-map__region` or above reaches them, and
+    # nothing else is declared there.
+    # Sabotage: declared `--sb-accent` in the `.sb-map__region` block; this
+    # went red.
+    # Sabotage: dropped `--sb-map-edge` from the `.sb-map__region` block;
+    # this went red, on the hook reading a token nothing declares.
+    test "the map's tokens are declared on the map region's root, and only there", context do
+      root_block = context.source |> String.split("\n.sb-editor {", parts: 2) |> List.last()
+      {_tokens, rest} = String.split(root_block, "\n}\n", parts: 2) |> List.to_tuple()
+      {map_tokens, _rest} = map_root(rest)
+
+      declared_there =
+        ~r/(--sb-[a-z0-9-]+)\s*:/
+        |> Regex.scan(map_tokens)
+        |> MapSet.new(fn [_all, name] -> name end)
+
+      read_by_hook = ThemeAudit.referenced_tokens(File.read!(@map_hook))
+
+      assert Enum.all?(declared_there, &String.starts_with?(&1, "--sb-map-")),
+             "only --sb-map-* tokens belong on .sb-map__region; found #{inspect(MapSet.to_list(declared_there))}"
+
+      assert declared_there == read_by_hook,
+             "the .sb-map__region block declares exactly the tokens the Map hook reads"
+
+      assert MapSet.member?(declared_there, "--sb-map-edge"), "the split found the map's block"
     end
   end
 
@@ -843,6 +882,19 @@ defmodule StatifierBlocks.ThemeAuditTest do
   # The tier of every token, read from the stylesheet's header comment. Read
   # from the RAW source on purpose: this is the one check whose subject is the
   # comment rather than what the browser sees.
+  # The `.sb-map__region` token block out of the stylesheet after the
+  # editor's root, and what is left once it is taken out.
+  defp map_root(css) do
+    case String.split(css, "\n.sb-map__region {", parts: 2) do
+      [before, after_root] ->
+        {block, tail} = after_root |> String.split("\n}\n", parts: 2) |> List.to_tuple()
+        {block, before <> "\n" <> tail}
+
+      [_none] ->
+        {"", css}
+    end
+  end
+
   defp tiers(raw) do
     ~r/^\s*\*\s+([123])\s+(--sb-[a-z0-9-]+)\s*$/m
     |> Regex.scan(raw)

@@ -1654,6 +1654,130 @@ where its revisions are stored, and what publishing means. The editor is also a
 single-session component: it surfaces the `revision` it loaded so you can do
 optimistic concurrency on save, and it does not merge or resolve anything.
 
+## Mounting the Map
+
+The Map draws a block document as boxes in boxes: every step, what holds
+it, the arrows between them, where the document starts and where it
+finishes. It is a reader of the same view model the editor renders, and a
+page mounts it beside a list of the document's steps. It is not a mode of
+the editor, and the editor draws no map (ADR-0018).
+
+Three pieces make it. `StatifierBlocks.Map.graph/2` builds the graph from
+the view model, `StatifierBlocks.Map.Info` describes every element the map
+draws in words, and two function components in
+`StatifierBlocks.Editor.MapRegions` render them into the page:
+`map_region/1`, where the `StatifierBlocksMap` hook lays the graph out and
+draws it, and `description_region/1`, which says what the selected block is,
+or what the document is when nothing is selected. Pointing at anything the
+map draws shows its description in that region, in the browser, and pointing
+away puts back what it said.
+
+### What the host brings
+
+The components keep no state. A host brings four things, and each stays its
+own:
+
+1. **The view model.** `StatifierBlocks.ViewModel.build/3` of the document.
+   Both regions read it; the description region also takes the document and
+   the palette it was built from.
+2. **The selection.** The block id the host's list has selected, or `nil`.
+   The map marks that block's box and the description region describes it.
+   Selecting a block is the host's to do, in its own event handler.
+3. **The list's event names.** The names the host's list already sends to
+   select a block and to open an insert. A click on a box, on the gap after
+   a block or on an empty slot's marker is sent under those names with the
+   payload the list sends for the same gesture (`"block-id"`, and `"slot"`
+   for an empty slot), so the server cannot tell a gesture on the map from
+   the same gesture on the list. The map has no event of its own.
+4. **The list.** The map region is hidden from assistive technology
+   (`aria-hidden="true"`) and nothing in it takes focus, so the list is the
+   keyboard and screen-reader path to every step. Its rows point at the
+   description region with `aria-describedby`, and the region is
+   `aria-live="polite"`, so a selection made in the list is read out.
+
+```heex
+<StatifierBlocks.Editor.MapRegions.map_region
+  id="plan-map"
+  view_model={@view_model}
+  selected={@selected_id}
+  select_event="select-row"
+  insert_event="insert-open"
+  editable={true}
+  description="plan-description"
+/>
+
+<StatifierBlocks.Editor.MapRegions.description_region
+  id="plan-description"
+  document={@document}
+  view_model={@view_model}
+  palette={@palette}
+  selected={@selected_id}
+/>
+
+<ol>
+  <li :for={{node, _depth, _kind} <- ViewModel.outline(@view_model)}>
+    <button
+      type="button"
+      phx-click="select-row"
+      phx-value-block-id={node.block_id}
+      aria-describedby="plan-description"
+    >
+      {ViewModel.sentence(node)}
+    </button>
+  </li>
+</ol>
+```
+
+`description` on the map region names the description region's id, which
+is what gives the map its hover; a map without it draws and selects, and
+shows no description under the pointer. Both components take `phrase`, the
+host's words for its event names, as `StatifierBlocks.Map.graph/2` takes
+it; pass the same function to both so the region says what the box says.
+`insert_reveal` takes a selector for the element to scroll into view after
+an insert armed from the map, since what the list opens may sit below it.
+
+### The hook, and what it costs
+
+The Map hook is not in the package's default export. It has its own entry
+point, `statifier_blocks/map`, because it imports the vendored elkjs build
+that lays the graph out, and a host that never mounts the Map should never
+bundle it. Register it beside the editor's hooks:
+
+```javascript
+import StatifierBlocks from "statifier_blocks";
+import { StatifierBlocksMap } from "statifier_blocks/map";
+
+let liveSocket = new LiveSocket("/live", Socket, {
+  hooks: { ...StatifierBlocks, StatifierBlocksMap },
+});
+```
+
+On the `NODE_PATH` route the specifier is
+`statifier_blocks/assets/js/statifier_blocks_map.js`.
+
+That import pulls in `assets/vendor/elk.bundled.js`, elkjs 0.9.3 under the
+Eclipse Public License 2.0 (its licence ships beside it), and pulls it in
+whole: 1,606,238 bytes as shipped and 466,990 bytes gzipped, none of which a
+bundler can shake out.
+
+### Theming the Map
+
+Both regions read the `--sb-*` palette from the page, since neither sits
+inside the editor: set the palette on an ancestor of the regions, or on
+`.sb-map__region` and `.sb-map__description` themselves. The map's drawing
+reads the `--sb-map-*` tokens, declared on `.sb-map__region` and mapped onto
+the palette, so a page that themes the palette dresses the map too; set one
+of them to disagree with that mapping. The drawing carries a fallback for
+each, which is what the map looks like on a page that sets none.
+
+### Working on the Map in this repository
+
+The package bundles nothing, and a host needs no Node for the Map. This
+repository's own tests do: the Map hook's layout tests run the hook through
+the vendored elkjs outside the browser, so a contributor needs `node` on the
+path to run the full `mix quality` gate (`mise.toml` pins the version CI
+uses).
+
 ## Design records
 
 The contracts this package is built out of are written down as ADRs in

@@ -36,7 +36,8 @@ defmodule StatifierBlocks.HeadlessTest do
     StatifierBlocks.Editor.Findings,
     StatifierBlocks.Editor.Toolbar,
     StatifierBlocks.Editor.Inspector,
-    StatifierBlocks.Editor.Drawer
+    StatifierBlocks.Editor.Drawer,
+    StatifierBlocks.Editor.MapRegions
   ]
 
   @pure [
