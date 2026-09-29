@@ -62,21 +62,21 @@ defmodule StatifierBlocks.AssetsTest do
     # pushes: the measurement and nothing else (7a), or only names the host
     # handed it (7f) - never a literal. A hook that is neither fails here
     # even when it pushes nothing the test above counts.
-    # Sabotage: having the map hook read its name from a local
-    # `const name = "select-row"` instead of the element - no push takes a
-    # literal, so the test above stays green, and this goes red naming the
-    # literal.
+    # Sabotage: adding `this.pushEventTo(this.el, "measure", {})` to the map
+    # hook - the measurement is not a name of its own, so the test above
+    # stays green, but a hook that both measures and draws is neither kind -
+    # and this goes red naming the pushes.
     test "every other hook only measures or draws" do
       for {hook, source} <- hook_sources(), hook != @command_hook do
-        case kind(source) do
+        text = File.read!(source)
+
+        case kind(text) do
           :measure ->
             :ok
 
           :draw ->
-            text = File.read!(source)
-
             for name <- @command_names ++ @list_event_names ++ [@measurement] do
-              refute text =~ ~s("#{name}"), """
+              refute text =~ ~r/["'`]#{Regex.escape(name)}["'`]/, """
               7f: a draw-only hook pushes no event name of its own, so its
               source names none. `#{hook}` (#{source}) spells `#{name}`.
               """
@@ -102,11 +102,67 @@ defmodule StatifierBlocks.AssetsTest do
     test "the map hook pushes only the names the host stamped on its element" do
       source = File.read!(@map_source)
 
-      assert kind(@map_source) == :draw
+      assert kind(source) == :draw
       assert source =~ "select: el.dataset.selectEvent"
       assert source =~ "insert: el.dataset.insertEvent"
       assert [_one] = Regex.scan(~r/\bpushEvent(?:To)?\s*\(/, source)
       assert source =~ "this.pushEvent(gesture.event, gesture.payload)"
+    end
+
+    # The classifier the tests above rest on, held against probe sources
+    # rather than the shipped hooks: a name the hook spells itself is its
+    # own however it is spelled - double quotes, single quotes, a template,
+    # or a `const`, `let` or `var` bound to one of them - and `pushEventTo`'s
+    # target is never read as the name.
+    # Sabotage: narrowing the name match in `push_names/1` back to double
+    # quotes alone - the single-quoted, template and binding-held probes
+    # read as expressions, so a hook pushing them would pass as draw-only -
+    # and this goes red.
+    test "a name the hook spells is a literal however it is spelled" do
+      for probe <- [
+            ~S|this.pushEvent("select-row", {})|,
+            ~S|this.pushEvent('select-row', {})|,
+            ~S|this.pushEvent(`select-row`, {})|,
+            ~S|const name = 'select-row'; this.pushEvent(name, {})|,
+            ~S|let name = `select-row`; this.pushEvent(name, {})|,
+            ~S|this.pushEventTo(this.el, 'select-row', {})|,
+            ~S|this.pushEventTo('#list', `select-row`, {})|
+          ] do
+        assert push_names(probe) == [{:literal, "select-row"}], probe
+        assert pushes_own_name?(probe), probe
+        refute kind(probe) == :draw, probe
+      end
+    end
+
+    # The other direction: a name read from the host's stamped attributes
+    # stays an expression, even when a binding holds it on the way.
+    # Sabotage: resolving a bare identifier through any `const` binding, not
+    # only one bound to a quoted name - the stamped name held in
+    # `const name = this.el.dataset.selectEvent` reads as a literal - and
+    # this goes red.
+    test "a name the host stamped stays the host's, and the hook stays draw-only" do
+      for probe <- [
+            ~S|const events = {select: this.el.dataset.selectEvent}; this.pushEvent(events.select, {})|,
+            ~S|const name = this.el.dataset.selectEvent; this.pushEvent(name, {})|,
+            ~S|this.pushEventTo(this.el, this.el.dataset.insertEvent, {})|
+          ] do
+        assert match?([{:expression, _text}], push_names(probe)), probe
+        refute pushes_own_name?(probe), probe
+        assert kind(probe) == :draw, probe
+      end
+    end
+
+    # 7f's rule is that a draw-only hook's pushes come from the names the
+    # host stamped, so a hook whose pushes are all expressions but that
+    # reads no stamped event name is not draw-only.
+    # Sabotage: dropping the stamped-name condition from `kind/1`'s draw
+    # clause - a hook pushing a name it computed passes as draw-only - and
+    # this goes red.
+    test "a hook whose pushes read no stamped name is not draw-only" do
+      probe = ~S|const name = pick(); this.pushEvent(name, {})|
+
+      assert [{:expression, "name"}] = push_names(probe)
+      assert kind(probe) == {:unstamped, [{:expression, "name"}]}
     end
 
     # A hook the checks above classify per file must be alone in its file.
@@ -903,37 +959,75 @@ defmodule StatifierBlocks.AssetsTest do
     |> Enum.map(fn [_all, name] -> name end)
   end
 
-  # The event name each push in `source` sends: `{:literal, name}` for a
-  # string it spells, `{:expression, text}` for one it reads from elsewhere.
-  defp push_names(source) do
-    ~r/\bpushEvent(?:To)?\s*\(\s*(?:this\.el\s*,\s*)?("([^"]*)"|[^,)]+)/
-    |> Regex.scan(File.read!(source))
-    |> Enum.map(fn
-      [_all, _quoted, name] -> {:literal, name}
-      [_all, expression] -> {:expression, String.trim(expression)}
-    end)
+  # A quoted name in any of the three JavaScript spellings.
+  @quoted ~S/"[^"]*"|'[^']*'|`[^`]*`/
+
+  # The event name each push in the JavaScript `text` sends: `{:literal,
+  # name}` for a name it spells - in double quotes, single quotes or a
+  # template, or through a `const`, `let` or `var` bound to one of those -
+  # and `{:expression, text}` for one it reads from elsewhere.
+  # `pushEventTo`'s first argument is the target and is skipped.
+  defp push_names(text) do
+    ~r/\b(?:pushEvent\s*\(|pushEventTo\s*\(\s*(?:#{@quoted}|[^,"'`]+?)\s*,)\s*(#{@quoted}|[^,)]+)/
+    |> Regex.scan(text)
+    |> Enum.map(fn [_all, argument] -> push_name(String.trim(argument), text) end)
   end
 
-  # The hooks that push an event name of their own: a literal other than the
-  # measurement.
+  defp push_name(argument, text) do
+    cond do
+      argument =~ ~r/\A(?:#{@quoted})\z/ -> {:literal, unquote_name(argument)}
+      held = held_name(argument, text) -> {:literal, held}
+      true -> {:expression, argument}
+    end
+  end
+
+  # The name a bare identifier holds when `text` binds it to a quoted name.
+  defp held_name(argument, text) do
+    with true <- argument =~ ~r/\A[A-Za-z_$][\w$]*\z/,
+         [_all, quoted] <-
+           Regex.run(
+             ~r/\b(?:const|let|var)\s+#{Regex.escape(argument)}\s*=\s*(#{@quoted})/,
+             text
+           ) do
+      unquote_name(quoted)
+    else
+      _no -> nil
+    end
+  end
+
+  defp unquote_name(quoted), do: String.slice(quoted, 1..-2//1)
+
+  # Whether `text` pushes an event name of its own: a literal other than
+  # the measurement.
+  defp pushes_own_name?(text) do
+    Enum.any?(push_names(text), &match?({:literal, name} when name != @measurement, &1))
+  end
+
+  # The hooks that push an event name of their own.
   defp command_pushers do
-    for {hook, source} <- hook_sources(),
-        Enum.any?(push_names(source), &match?({:literal, name} when name != @measurement, &1)),
-        do: hook
+    for {hook, source} <- hook_sources(), pushes_own_name?(File.read!(source)), do: hook
   end
 
-  # What kind of hook `source` holds, by what it pushes: only the
-  # measurement is `:measure`; only names it did not spell is `:draw`;
-  # anything else is answered as the pushes themselves.
-  defp kind(source) do
-    names = push_names(source)
+  # What kind of hook the JavaScript `text` holds, by what it pushes: only
+  # the measurement is `:measure`; nothing, or only names read from the
+  # host's stamped `data-*-event` attributes, is `:draw` (7f); pushes that
+  # are all expressions with no stamped name read are `{:unstamped,
+  # names}`; anything else is answered as the pushes themselves.
+  defp kind(text) do
+    names = push_names(text)
 
     cond do
       names != [] and Enum.all?(names, &(&1 == {:literal, @measurement})) -> :measure
-      Enum.all?(names, &match?({:expression, _text}, &1)) -> :draw
-      true -> names
+      names == [] -> :draw
+      not Enum.all?(names, &match?({:expression, _text}, &1)) -> names
+      stamped_names?(text) -> :draw
+      true -> {:unstamped, names}
     end
   end
+
+  # Whether `text` reads an event name the host stamped on the hook's
+  # element: `el.dataset.<something>Event`.
+  defp stamped_names?(text), do: text =~ ~r/\bel\.dataset\.[a-z]\w*Event\b/
 
   # The names in a file's `export default { ... }`, sorted. This is the object
   # a host spreads into `hooks:`, so it is the list that decides what actually
