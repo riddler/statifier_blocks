@@ -338,6 +338,45 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
+    # The band is never drawn narrower than the branch's `caption_width`,
+    # the room its fork mark and caption need. Both library branches' arms
+    # already span wider than that room; a graph whose branch asks for more
+    # room than its arms span draws the band that wide, from the leftmost
+    # arm, and still inside the branch's box.
+    #
+    # Sabotage: made bandOf's width `right - left` without the
+    # caption_width floor; the widened branch's band came back as wide as
+    # its arms and this went red. Reverted from a copy.
+    test "a branch's band is never narrower than its caption_width", %{tmp_dir: dir} do
+      for {key, branch, _next, _header} <- @branches do
+        graph = library_graph(key)
+        %{"drawn" => "map", "bands" => bands} = run(dir, key, graph)
+        [band] = bands[branch]
+
+        assert band["width"] >= find(graph, branch)["caption_width"], key
+
+        room = band["width"] + 120
+        widened = widen_caption(graph, branch, room)
+
+        %{"drawn" => "map", "boxes" => boxes, "bands" => widened_bands} =
+          run(dir, "#{key}-widened", widened)
+
+        [widened_band] = widened_bands[branch]
+
+        arms =
+          for %{"kind" => "slot", "style" => "arm", "id" => id} <-
+                find(widened, branch)["children"],
+              do: boxes[id]
+
+        assert widened_band["width"] == room, key
+        assert_in_delta widened_band["x"], arms |> Enum.map(& &1["x"]) |> Enum.min(), 0.5, key
+
+        assert widened_band["x"] + widened_band["width"] <=
+                 boxes[branch]["x"] + boxes[branch]["width"],
+               key
+      end
+    end
+
     # The branch's rejoin is the edge out of it: drawn from the branch's
     # bottom edge, with its join dot there, into the top of the next node.
     #
@@ -1125,6 +1164,23 @@ defmodule StatifierBlocks.MapLayoutTest do
     do: BlockMap.graph(MapFixtures.view_model!(key), phrase: &MapFixtures.phrase/1)
 
   defp find(graph, id), do: Enum.find(walk(graph), &(&1["id"] == id))
+
+  # `graph` with the branch `id` asking for `room` as its caption_width,
+  # and held that wide plus its padding, as the server holds a branch at
+  # least as wide as its own caption_width.
+  defp widen_caption(%{"id" => id} = node, id, room) do
+    node
+    |> Map.put("caption_width", room)
+    |> update_in(["layoutOptions", "org.eclipse.elk.nodeSize.minimum"], fn minimum ->
+      [height, _width] = Regex.run(~r/^\((\d+),(\d+)\)$/, minimum, capture: :all_but_first)
+      "(#{height},#{room + 24})"
+    end)
+  end
+
+  defp widen_caption(%{"children" => children} = node, id, room),
+    do: %{node | "children" => Enum.map(children, &widen_caption(&1, id, room))}
+
+  defp widen_caption(node, _id, _room), do: node
 
   defp run(dir, name, graph, mode \\ nil) do
     node = System.find_executable("node") || flunk("the map's layout tests need Node on the PATH")
