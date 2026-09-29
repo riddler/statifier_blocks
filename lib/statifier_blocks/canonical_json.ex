@@ -62,7 +62,9 @@ defmodule StatifierBlocks.CanonicalJson do
     ]
 
     pairs = maybe_put(pairs, "config", block.config)
-    pairs = maybe_put_note(pairs, block.note)
+    # A `%Block{}` built before the field existed and kept outside JSON
+    # (a stored Erlang term) has no `:note` key; it reads as the absent note.
+    pairs = maybe_put_note(pairs, Map.get(block, :note, ""))
     pairs = maybe_put_slots(pairs, block.slots)
 
     object(pairs)

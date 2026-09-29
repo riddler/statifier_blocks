@@ -284,7 +284,7 @@ defmodule StatifierBlocks.Validation do
          :ok <- check_type(reported_id, block.type),
          :ok <- check_type_version(reported_id, block.type_version),
          :ok <- check_config(reported_id, block.config),
-         :ok <- check_note(reported_id, block.note),
+         :ok <- check_note(reported_id, stored_note(block)),
          :ok <- check_slots_shape(reported_id, block.slots) do
       validate_slots(reported_id, block.slots, [block])
     end
@@ -337,6 +337,12 @@ defmodule StatifierBlocks.Validation do
   # calls this rather than restating the grammar.
   @spec note(Block.id(), term()) :: :ok | {:error, error()}
   def note(id, note), do: check_note(id, note)
+
+  # A `%Block{}` built before the field existed and kept outside JSON (a
+  # stored Erlang term) has no `:note` key: it reads as the absent note
+  # rather than raising. A present key, whatever its value, is checked as is.
+  @spec stored_note(map()) :: term()
+  defp stored_note(block), do: Map.get(block, :note, "")
 
   @spec check_note(Block.id() | nil, term()) :: :ok | {:error, error()}
   defp check_note(reported_id, note) do

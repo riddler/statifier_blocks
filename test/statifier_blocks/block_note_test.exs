@@ -162,6 +162,45 @@ defmodule StatifierBlocks.BlockNoteTest do
     end
   end
 
+  describe "a block term stored before the note field existed" do
+    # The patron registration document as a host could have kept it outside
+    # JSON before blocks had a note: every `%Block{}` in it lacks the
+    # `:note` key, and it comes back through `:erlang.binary_to_term/1`.
+    defp old_shape(%Document{root: root} = document) do
+      %{document | root: strip_note(root)}
+      |> :erlang.term_to_binary()
+      |> :erlang.binary_to_term()
+    end
+
+    defp strip_note(%Block{slots: slots} = block) do
+      block
+      |> Map.delete(:note)
+      |> Map.put(
+        :slots,
+        Map.new(slots, fn {name, children} -> {name, Enum.map(children, &strip_note/1)} end)
+      )
+    end
+
+    # Sabotage: `CanonicalJson`'s `%Block{}` clause defaulting a missing
+    # note to "x" rather than "" -> the old term gains a note -> red.
+    test "encodes to the same bytes as the note-free document" do
+      document = DocumentFixtures.patron_registration()
+      old = old_shape(document)
+
+      refute Map.has_key?(old.root, :note)
+      assert Document.to_json(old) == Document.to_json(document)
+    end
+
+    # Sabotage: `Validation`'s `stored_note/1` defaulting a missing note to
+    # `nil` rather than "" -> the old term is refused -> red.
+    test "validates as the note-free document" do
+      old = old_shape(DocumentFixtures.patron_registration())
+
+      refute Map.has_key?(find(old, "blk_PDLN"), :note)
+      assert Document.validate(old) == :ok
+    end
+  end
+
   describe "copy and move" do
     # Sabotage: `Block.new/2` building the struct with `note: ""` whatever
     # the options -> the note is lost -> red.
