@@ -13942,10 +13942,13 @@ edits.
 - **One exception, a document the region cannot describe.** The region
   reads `StatifierBlocks.Describe.outline/3`, which expands every composite
   to learn its outcomes and raises for a composite whose declaration cannot
-  expand. The editor draws the canvas for such a document and its expand
-  gesture refuses it; so the editor asks first and leaves the region out
-  for that document rather than failing (`editor.ex:3915`, `defp
-  describable?/2`).
+  expand. `StatifierBlocks.Composite.expand/2` refuses every such
+  declaration, whatever its `subtree/1` raises, by rescuing any exception
+  into `{:error, reason}`; the editor draws the canvas for such a document
+  and its expand gesture refuses it. So the editor asks first, with a rescue
+  exactly as wide as `expand/2`'s, any exception, and leaves the region out
+  for any document whose outline raises rather than failing
+  (`editor.ex:3923`, `defp describable?/2`, read at `40d18cf`).
 
 The tests. `test/statifier_blocks/editor/description_region_test.exs`
 (at `be60d52`) holds the region's place under the canvas, the idle and
@@ -13956,7 +13959,10 @@ control. `test/statifier_blocks/editor/map_regions_test.exs`, describe
 "the map attr", pins that the default leaves a host's region unchanged and
 that `map={false}` drops exactly the paragraph, the layer and the store.
 `test/statifier_blocks/editor/composite_expand_test.exs`, "the canvas is
-drawn and the description region is left out", holds the exception.
+drawn and the description region is left out", holds the exception for a
+declaration this package's own checks refuse, and "a subtree/1 that raises
+something else: the region is left out and the editor survives" (at
+`40d18cf`) holds it for a `subtree/1` that has no clause for its param.
 
 ### Consequences
 
