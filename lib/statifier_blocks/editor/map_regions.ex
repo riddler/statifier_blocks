@@ -8,9 +8,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     They live in the `StatifierBlocks.Editor.*` namespace because they name
     Phoenix, and that namespace is where ADR-0005 decision 1's compile guard
-    lives. They are not part of the editor: neither reads or renders
-    anything `StatifierBlocks.Editor` holds, and the editor draws no map
-    (ADR-0018).
+    lives. The editor draws no map and never mounts `map_region/1`
+    (ADR-0018). It does mount `description_region/1`, under its canvas,
+    from its own document, view model, palette and selection (ADR-0005's
+    Amendment of 2026-09-29 on the shell arrangement); see "In the editor"
+    below.
 
     ## What the host brings
 
@@ -74,6 +76,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     stylesheet stacks it over the region and makes the region transparent,
     so the visible text is the hovered element's while the region's own
     content, and its `aria-live`, stay as the server wrote them.
+
+    ## In the editor
+
+    `StatifierBlocks.Editor` renders `description_region/1` under its
+    canvas with `map={false}`, which says no map is mounted beside the
+    region. The region then renders without its hover layer and without
+    its store, which only the Map's hook reads, and the document's idle
+    description leaves out its explanation, the paragraph on how to read
+    the map; the name, the description, what starts it and the counts
+    stay. A selected block's description is unchanged. The default,
+    `map={true}`, renders the region exactly as a host's page has it.
     """
 
     use Phoenix.Component
@@ -165,6 +178,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       doc: "the host's words for event names, the function `map_region/1` takes"
     )
 
+    attr(:map, :boolean,
+      default: true,
+      doc:
+        "whether a map is mounted beside the region; `false` renders no hover layer, " <>
+          "no store and no how-to-read paragraph in the idle description"
+    )
+
     attr(:class, :string, default: nil, doc: "a class of the host's, added to the region's own")
 
     @doc "The Map's description region, its hover layer and its hidden store; see the moduledoc."
@@ -187,6 +207,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ~H"""
       <div class="sb-map__description-frame">
         <div
+          :if={@map}
           id={hover_id(@id)}
           class="sb-map__description-hover"
           aria-hidden="true"
@@ -202,10 +223,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           aria-label="Description"
           data-map-description={@current.kind}
         >
-          <.description description={@current} />
+          <.description description={@current} explanation={@map or @current.kind != :idle} />
         </section>
       </div>
-      <div id={store_id(@id)} hidden data-map-descriptions="true">
+      <div :if={@map} id={store_id(@id)} hidden data-map-descriptions="true">
         <div
           :for={description <- @elements}
           data-describes={description.id}
@@ -218,9 +239,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     attr(:description, Info, required: true)
+    attr(:explanation, :boolean, default: true)
 
     # One description, in words: the region draws the current one and the
-    # store draws every one. The note leads; values, never controls.
+    # store draws every one. The note leads; values, never controls. The
+    # idle explanation is how to read the map, so a region with no map
+    # beside it draws the idle description without it.
     defp description(assigns) do
       ~H"""
       <p :if={@description.note} class="sb-map__description-note">{@description.note}</p>
@@ -228,7 +252,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       <p :if={@description.sentence} class="sb-map__description-sentence">
         {@description.sentence}
       </p>
-      <p class="sb-map__description-text">{@description.explanation}</p>
+      <p :if={@explanation} class="sb-map__description-text">{@description.explanation}</p>
       <.facts :if={@description.settings != []} heading="Settings" facts={@description.settings} />
       <.facts :if={@description.facts != []} facts={@description.facts} />
       """

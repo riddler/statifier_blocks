@@ -428,6 +428,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # half-written declaration killed the author's session rather than
       # telling them what was wrong with it.
       #
+      # Sabotage: dropped the `rescue` from the editor' `describable?/2` - red
+      # at every case below, because the description region under the canvas
+      # then raises the same ArgumentError out of the render.
+      #
       # `last_error` is asserted through the gesture's observable half - the
       # document does not move, the composite stays, and undo stays empty -
       # because the editor renders no surface from `last_error` today; the
@@ -452,6 +456,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         test "#{what}: nothing is written and the editor survives", %{conn: conn} do
           assert_refused(conn, broken_mapping_document(unquote(break)), "blk_BM")
         end
+      end
+
+      # The description region under the canvas reads an outline that
+      # expands every composite, so it cannot describe this document; the
+      # editor draws the canvas and leaves the region out.
+      # Sabotage: dropped the `rescue` from `describable?/2`; the outline's
+      # raise took the mount down, red before the assertion.
+      # Sabotage: made `describable?/2` answer `false` for every document;
+      # `StatifierBlocks.Editor.DescriptionRegionTest` went red instead.
+      test "the canvas is drawn and the description region is left out", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn,
+            document: broken_subtree_document("duplicate"),
+            palette: palette()
+          )
+
+        assert has_element?(view, ~s(#sb-block-blk_BS))
+        refute has_element?(view, "#editor-description")
       end
 
       # The reason the gesture refuses with is `{:composite_expansion_failed,

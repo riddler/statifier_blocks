@@ -1660,7 +1660,11 @@ The Map draws a block document as boxes in boxes: every step, what holds
 it, the arrows between them, where the document starts and where it
 finishes. It is a reader of the same view model the editor renders, and a
 page mounts it beside a list of the document's steps. It is not a mode of
-the editor, and the editor draws no map (ADR-0018).
+the editor, and the editor draws no map (ADR-0018). The editor does draw
+the description region described below, under its canvas, from its own
+document and selection: the selected block's description, its note first,
+or the document's when nothing is selected, with no paragraph on how to
+read a map, since there is none beside it.
 
 Three pieces make it. `StatifierBlocks.Map.graph/2` builds the graph from
 the view model, `StatifierBlocks.Map.Info` describes every element the map
@@ -1735,6 +1739,10 @@ host's words for its event names, as `StatifierBlocks.Map.graph/2` takes
 it; pass the same function to both so the region says what the box says.
 `insert_reveal` takes a selector for the element to scroll into view after
 an insert armed from the map, since what the list opens may sit below it.
+`map` on the description region says whether a map is mounted beside it,
+and a host with a map leaves it at its default, `true`; `false` is how the
+editor draws the region under its canvas: no hover layer, no store, and no
+paragraph on how to read the map in the document's description.
 
 ### The hook, and what it costs
 
@@ -1762,8 +1770,10 @@ bundler can shake out.
 
 ### Theming the Map
 
-Both regions read the `--sb-*` palette from the page, since neither sits
-inside the editor: set the palette on an ancestor of the regions, or on
+On a page of the host's, both regions read the `--sb-*` palette from the
+page, since neither sits inside the editor (the description region the
+editor draws under its canvas reads the editor's own tokens instead): set
+the palette on an ancestor of the regions, or on
 `.sb-map__region` and `.sb-map__description-frame` themselves (the frame
 holds the description region and its hover layer). The map's drawing
 reads the `--sb-map-*` tokens, declared on `.sb-map__region` and mapped onto

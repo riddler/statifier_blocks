@@ -18,6 +18,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use StatifierBlocks.EditorLiveCase
 
     alias StatifierBlocks.Describe
+    alias StatifierBlocks.Editor.MapRegions
     alias StatifierBlocks.Map, as: BlockMap
     alias StatifierBlocks.Map.Info
     alias StatifierBlocks.MapFixtures
@@ -434,6 +435,78 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         refute LazyHTML.to_html(region(view)) =~ "sb-map__description-note"
       end
     end
+
+    defp region_html(document, attrs) do
+      palette = Palette.core()
+
+      base = %{
+        id: "map-description",
+        document: document,
+        view_model: ViewModel.build(document, palette, []),
+        palette: palette,
+        selected: nil
+      }
+
+      render_component(
+        &MapRegions.description_region/1,
+        Map.merge(base, attrs)
+      )
+    end
+
+    describe "the map attr" do
+      # A host's page passes no `map`, and its region is the region it had:
+      # the how-to-read paragraph in the idle description, the hover layer
+      # and the store.
+      # Sabotage: made the attr default to `false`; this went red on the
+      # paragraph, the layer and the store.
+      test "its default leaves a host's region unchanged", %{conn: conn} do
+        document = MapFixtures.document!("library_loan")
+        {_graph, _elements, idle} = described("library_loan")
+
+        default = region_html(document, %{})
+        assert default == region_html(document, %{map: true})
+
+        assert LazyHTML.text(one(default, "#map-description .sb-map__description-text")) ==
+                 idle.explanation
+
+        assert count_of(default, "#map-description-hover") == 1
+        assert count_of(default, "#map-description-store") == 1
+
+        {:ok, view, _html} = mount_host(conn, document)
+        assert LazyHTML.text(region(view)) =~ idle.explanation
+      end
+
+      # Sabotage: dropped the `:if` on the explanation paragraph; this went
+      # red on the idle paragraph.
+      # Sabotage: made the paragraph's `:if` read `@map` alone; this went
+      # red on the selected block's explanation.
+      test "false drops the how-to-read paragraph, the layer and the store, and nothing else" do
+        document = MapFixtures.document!("library_loan")
+        {_graph, elements, idle} = described("library_loan")
+
+        none = region_html(document, %{map: false})
+        assert count_of(none, "#map-description-hover") == 0
+        assert count_of(none, "#map-description-store") == 0
+        assert count_of(none, "#map-description .sb-map__description-text") == 0
+        refute LazyHTML.text(one(none, "#map-description")) =~ idle.explanation
+        assert LazyHTML.text(one(none, "#map-description")) =~ idle.title
+        assert LazyHTML.attribute(one(none, "#map-description"), "aria-live") == ["polite"]
+
+        [_root, {second, _depth, _kind} | _rest] =
+          ViewModel.outline(MapFixtures.view_model!("library_loan"))
+
+        expected = Enum.find(elements, &(&1.id == second.block_id))
+        selected = region_html(document, %{map: false, selected: second.block_id})
+
+        assert count_of(selected, "#map-description .sb-map__description-text") == 1
+
+        assert LazyHTML.text(one(selected, "#map-description .sb-map__description-text")) ==
+                 expected.explanation
+      end
+    end
+
+    defp count_of(html, selector),
+      do: html |> LazyHTML.from_fragment() |> LazyHTML.query(selector) |> Enum.count()
 
     # ADR-0005 decision 14 holds for these components as for the editor.
     # Sabotage: renamed the canvas's class to `map__canvas`; this went red.

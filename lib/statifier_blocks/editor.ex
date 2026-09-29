@@ -505,6 +505,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `selected_id` a host may write, honoured in `update/2` through
     `rebuild/1`*.
 
+    ## The description region under the canvas
+
+    Under the canvas the editor draws one description region, the same
+    `StatifierBlocks.Editor.MapRegions.description_region/1` a host mounts
+    beside the Map, read from the editor's own document, view model,
+    palette and selection: the selected block's description, its note
+    first, or the document's own when nothing is selected. It is live
+    (`aria-live="polite"`), so a selection on the canvas is read out, and
+    it shows values and never controls: the inspector stays the one place
+    that edits. The editor draws no map, so the region is rendered with
+    `map={false}`: no hover layer, no store, and no paragraph on how to
+    read a map in the document's description. It is drawn wherever the
+    canvas is, a read-only mount included, and no `profile` key hides it.
+    See ADR-0005's 2026-09-29 amendment, *the shell arrangement: one
+    description region under the canvas*.
+
     ## "Save as a step", and the declaration a host receives (`on_collapse`)
 
     The other seam out, and the one that had to be built without becoming a
@@ -651,6 +667,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Connectors,
       Datamodel,
       Declarations,
+      Describe,
       Document,
       Edit,
       Environment,
@@ -673,6 +690,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ConfigForm,
       Drawer,
       Inspector,
+      MapRegions,
       PaletteBrowser,
       RunPane,
       SaveStepTray,
@@ -1075,6 +1093,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         )
         |> assign(:save_as_step_rows, save_as_step_rows(assigns))
         |> assign(:publish_line, publish_line(assigns.publish_status))
+        |> assign(:describable?, describable?(assigns.document, assigns.palette))
 
       ~H"""
       <div
@@ -1179,6 +1198,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               rows={@save_as_step_rows}
               target={@myself}
             />
+
+            <div
+              :if={@describable?}
+              class="sb-editor__description"
+              data-editor-description="true"
+            >
+              <MapRegions.description_region
+                id={"#{@id}-description"}
+                document={@document}
+                view_model={@view_model}
+                palette={@palette}
+                selected={@selected_id}
+                map={false}
+              />
+            </div>
           </div>
 
           <Inspector.inspector
@@ -3868,6 +3902,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             BlockType.fetch_value(draft, path) != BlockType.fetch_value(committed, path)
           end)
       end
+    end
+
+    # Whether the description region under the canvas can describe this
+    # document. The region reads `Describe.outline/3`, which expands every
+    # composite to learn its outcomes, and a composite whose declaration
+    # cannot expand raises there. The canvas draws such a document and the
+    # expand gesture refuses it (`expanded_members/2`), so the region is left
+    # out for it rather than taking the editor down: a document the editor
+    # can draw is never refused for what its description would say.
+    @spec describable?(Document.t(), Palette.t()) :: boolean()
+    defp describable?(%Document{} = document, %Palette{} = palette) do
+      _outline = Describe.outline(document, palette, [])
+      true
+    rescue
+      ArgumentError -> false
     end
 
     # The selected block's note, read off the document: the view model's node
