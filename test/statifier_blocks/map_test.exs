@@ -265,6 +265,44 @@ defmodule StatifierBlocks.MapTest do
       for type <- ["core.send", "core.await", "core.on_event", "core.sequence", "myapp.intake"],
           do: assert(BlockMap.caption(type) == nil, type)
     end
+
+    # A branch's `caption_width` is the fork mark's 26px room plus its
+    # caption at the map's estimate, and the branch is held that wide plus
+    # its padding. A branch with no condition arm draws only its two
+    # standing arms, so its header is narrower than its caption, and the
+    # caption is what sets its least width.
+    #
+    # Sabotage: made band_width/1 leave out @fork_room; this went red. Made
+    # the branch's `least:` 0; this went red. Each reverted from a copy.
+    test "a branch's caption sets its least width when it is wider than its header" do
+      branch = Block.new("core.branch", id: "shelve", config: %{"arms" => []})
+
+      graph =
+        Block.new("core.sequence", id: "root", slots: %{"body" => [branch]})
+        |> Document.new()
+        |> build()
+        |> BlockMap.graph()
+
+      node = find(graph, "shelve")
+      caption = BlockMap.caption("core.branch")
+      caption_room = 26 + String.length(caption) * 7 + 24
+
+      header_room =
+        ([node["title"] | node["lines"]] |> Enum.map(&String.length/1) |> Enum.max()) * 7 + 24
+
+      assert node["caption"] == caption
+      assert node["caption_width"] == caption_room
+      assert header_room < caption_room
+
+      [_height, width] =
+        Regex.run(
+          ~r/^\((\d+),(\d+)\)$/,
+          node["layoutOptions"]["org.eclipse.elk.nodeSize.minimum"],
+          capture: :all_but_first
+        )
+
+      assert String.to_integer(width) == caption_room + 2 * 12
+    end
   end
 
   describe "event names in words" do
