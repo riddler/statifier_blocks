@@ -999,6 +999,35 @@ defmodule StatifierBlocks.DescribeTest do
 
       refute Enum.any?(outline(Document.new(root)).edges, &(&1.kind == :timer))
     end
+
+    # `outline/3` never answers a timer edge without a duration and an
+    # event, so only an edge built by hand reaches the line's fallbacks.
+    #
+    # Sabotage: in `Describe.edge_line/2`'s timer clause, drop the
+    # `"its delay"` fallback (`|| ""`) -> the lines read `In , ...`, red.
+    # Sabotage: in the same clause, answer `flat(edge.event || "")` for a
+    # missing event -> the first line reads `In its delay,  reaches ...`, red.
+    test "a hand-built timer edge with no readable delay or event reads its delay and its event" do
+      described =
+        by_hand(
+          [
+            hand_node("due", "core.send", "Send loan.due"),
+            hand_node("rule", "core.on_event", "When loan.due, abandon")
+          ],
+          [
+            edge(:timer, "root", {:block, "due"}, {:block, "rule"}),
+            edge(:timer, "root", {:block, "due"}, {:block, "rule"},
+              event: "loan.due",
+              delay: "soon"
+            )
+          ]
+        )
+
+      assert Describe.render(described, []) |> Enum.take(-2) == [
+               "In its delay, its event reaches When loan.due, abandon",
+               "In its delay, loan.due reaches When loan.due, abandon"
+             ]
+    end
   end
 
   describe "the phrasing seam for a timer edge" do
