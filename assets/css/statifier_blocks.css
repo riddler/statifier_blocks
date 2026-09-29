@@ -3137,6 +3137,19 @@
   color: var(--sb-error);
 }
 
+/* The description region under the canvas: `MapRegions.description_region/1`,
+ * drawn by the editor with no map beside it (ADR-0005's Amendment of
+ * 2026-09-29 on the shell arrangement). It is the last flex child of
+ * `.sb-editor__main`, so it never shrinks the way the canvas panel does in the
+ * bounded mode; a long description scrolls inside its own box instead of
+ * pushing the canvas out of the column. Its text is styled by the Map's
+ * description rules further down, reading the editor's tokens here. */
+.sb-editor__description {
+  flex: none;
+  max-height: 16rem;
+  overflow: auto;
+}
+
 .sb-palette {
   grid-area: palette;
   position: relative;
@@ -4879,17 +4892,21 @@ button.sb-inspector__group-row:hover {
  *
  * The Map and its description region (`StatifierBlocks.Editor.MapRegions`,
  * drawn by the `StatifierBlocksMap` hook), moved from the reference host's
- * stylesheet with the host's names turned into this package's. Neither
- * region sits inside `.sb-editor`, so neither reads the editor's token
- * block: the `--sb-*` palette they read is whatever the host page sets on
- * an ancestor, which is where a host themes them.
+ * stylesheet with the host's names turned into this package's. On a
+ * host's page neither region sits inside `.sb-editor`, so neither reads the
+ * editor's token block: the `--sb-*` palette they read is whatever the host
+ * page sets on an ancestor, which is where a host themes them. The editor
+ * draws the description region under its canvas, and there it reads the
+ * editor's own tokens like the rest of the editor; it never draws the map
+ * region.
  *
  * The `--sb-map-*` tokens are the names the hook's SVG reads, declared on
  * the map region's root and mapped onto the palette, so a page that themes
  * the palette dresses the map without a block of its own. The drawing
  * carries a fallback for every one of them, which is what the map looks
  * like on a page that sets none. They are the one family declared outside
- * the editor's root, because the map region is not inside it.
+ * the editor's root, because the map region is never inside it: the editor
+ * draws no map.
  */
 .sb-map__region {
   --sb-map-block-fill: var(--sb-bg);
