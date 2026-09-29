@@ -1795,10 +1795,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # that sizes the strip's height resolves the same at rest and revealed,
       # and the members' own boxes are the same in every state (the describe
       # "the reservation holds across SELECTION too", below).
+      # The strip's rows are also pinned in the loop: `flex-wrap` resolves to
+      # `wrap` in both states, since a strip held to one row in both is the
+      # same height in both and still does not hold the rows its members wrap
+      # to.
       # No pixel height is read: there is no browser in this suite.
-      # Sabotage (run): `flex-wrap: nowrap` back on the rest rule - the strip
-      # keeps one row at rest and wraps only when revealed, and this goes red
-      # on `flex-wrap`.
+      # Sabotage (run): `flex-wrap: nowrap` back on the rest rule alone - the
+      # loop goes red on `flex-wrap` at rest, before any assert after it.
       test "a card whose text is shorter than its wrapped strip is the same height at rest and on hover",
            %{conn: conn} do
         {:ok, view, _html} =
@@ -1825,6 +1828,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         rest = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-node__strip\s*\{(.*?)\n\}/ms)
         {_selectors, revealed} = reclaim_rule!(css)
 
+        rows = %{"flex-wrap" => "wrap"}
+
         for property <-
               ~w(display flex-direction flex-wrap align-content align-items gap row-gap
                  height min-height max-height padding line-height font-size) do
@@ -1834,10 +1839,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           assert on_hover == at_rest,
                  "the strip's `#{property}` is #{inspect(at_rest)} at rest and " <>
                    "#{inspect(on_hover)} on hover, so its height moves"
-        end
 
-        assert declared(rest, "flex-wrap") == "wrap",
-               "the strip keeps one row at rest, so its wrapped rows are not reserved"
+          assert at_rest == Map.get(rows, property, at_rest),
+                 "the strip's `#{property}` is #{inspect(at_rest)} at rest and on hover, " <>
+                   "so the strip keeps one row and its wrapped rows are not reserved"
+        end
       end
 
       # A reveal rule for a strip control is only safe while the strip

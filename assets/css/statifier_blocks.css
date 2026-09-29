@@ -1140,12 +1140,12 @@
 
 /* The strip reclaims its members (ADR-0005's Amendment of 2026-09-25 on
  * item 4). At rest the rule above clips what the title's minimum leaves no
- * room for: every member it can clip is hidden at rest anyway, and a
- * clipped box cannot take a pointer outside the card. That is the yield.
- * Here the strip gets all of them back: on hover, on the selected card,
- * while a strip control has keyboard focus (the keyboard's hover), and
- * whenever the strip holds a member that is revealed at all times - the delete offer, or a folded container's `+` - because a
- * control on show must never be the one clipped.
+ * room for: every member it can clip is hidden at rest anyway, and a clipped
+ * box cannot take a pointer outside the card. That is the yield. Here the
+ * strip gets all of them back: on hover, on the selected card, while a strip
+ * control has keyboard focus (the keyboard's hover), and whenever the strip
+ * holds a member that is revealed at all times - the delete offer, or a folded
+ * container's `+` - because a control on show must never be the one clipped.
  *
  * It reclaims them by giving up the clip, inside the column rather than by
  * widening it, and in the rows the rule above already wraps them to. The
