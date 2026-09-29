@@ -413,6 +413,12 @@ defmodule StatifierBlocks.AssetsTest do
       package = "assets/package.json" |> File.read!() |> Jason.decode!()
       assert "vendor/elk.bundled.js" in package["files"]
       assert "vendor/elkjs-LICENSE.md" in package["files"]
+
+      # The npm manifest ships that file, so its licence names both, as the
+      # hex package's `licenses:` does.
+      # Sabotage: setting assets/package.json's "license" back to "MIT" -
+      # this goes red on the field.
+      assert package["license"] == "(MIT AND EPL-2.0)"
     end
   end
 
