@@ -210,6 +210,45 @@ defmodule StatifierBlocks.Map.InfoTest do
              ]
     end
 
+    # A rule's "Then", beside its "Listens for", names the history a
+    # resumable group re-enters at when the rule resumes it; the same words
+    # close the rule's line in a step's interrupt rules and on its dashed
+    # edge. A rule that abandons names none, and neither does one that
+    # resumes a plain group. A rule with no event yet says so. Neither
+    # teaching document has a resumable group, so one is written here.
+    #
+    # Sabotage: made the rule's "Then" leave out history/1; this went red.
+    # Made history/1 answer "" for every edge; this went red. Made the
+    # rule's "Listens for" answer nil for an unnamed event; this went red.
+    # Made interrupt_line/2 leave out history/1; this went red. Each
+    # reverted from a copy.
+    test "a rule's Then names the history a resumable group re-enters at" do
+      for mode <- ["shallow", "deep"] do
+        held = describe_root(resumable_root(mode))
+        at = "resumes Resumable group at #{mode} history"
+
+        assert [{"Place", _place}, {"Listens for", "loan.renewed"}, {"Then", ^at}] =
+                 held["renew"].facts
+
+        assert [{"Place", _place}, {"Listens for", "An event not named yet"}, {"Then", then}] =
+                 held["lost"].facts
+
+        assert then == "abandons Resumable group"
+
+        assert fact(held["back"], "Interrupt rules") == [
+                 "When the loan is renewed, #{at}",
+                 "On its event, abandons Resumable group"
+               ]
+
+        assert held["renew->held/body"].sentence == "When the loan is renewed, #{at}"
+        assert held["lost->held/exit"].sentence == "On its event, abandons Resumable group"
+      end
+
+      plain = describe_root(resume_root())
+      assert fact(plain["renew"], "Then") == "resumes Group (Run interruptible steps)"
+      refute plain["renew->held/body"].sentence =~ "history"
+    end
+
     # A group's body is a pane of its own on the map, and says which group
     # it is the body of and which steps it holds, in order.
     #
@@ -911,6 +950,34 @@ defmodule StatifierBlocks.Map.InfoTest do
             Block.new("core.on_event",
               id: "renew",
               config: %{"event" => "loan.renewed", "outcome" => "resume"}
+            )
+          ]
+        }
+      )
+
+    Block.new("core.sequence", id: "root", slots: %{"body" => [group]})
+  end
+
+  # A loan held at the history `mode`: the renewal rule resumes the group's
+  # body there, and a rule whose event is not named yet abandons it.
+  defp resumable_root(mode) do
+    group =
+      Block.new("core.resumable_group",
+        id: "held",
+        config: %{"history" => mode},
+        slots: %{
+          "body" => [
+            Block.new("core.send", id: "notice", config: %{"event" => "loan.overdue"}),
+            Block.new("core.await", id: "back", config: %{"event" => "copy.returned"})
+          ],
+          "interrupts" => [
+            Block.new("core.on_event",
+              id: "renew",
+              config: %{"event" => "loan.renewed", "outcome" => "resume"}
+            ),
+            Block.new("core.on_event",
+              id: "lost",
+              config: %{"event" => " ", "outcome" => "abandon"}
             )
           ]
         }
