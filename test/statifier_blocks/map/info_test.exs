@@ -472,8 +472,10 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert loan.explanation =~ BlockMap.empty_text()
       assert loan.explanation =~ "a dashed arrow runs from an interrupt rule"
       assert loan.explanation =~ "a dot inside a ring where it finishes"
-      assert loan.explanation =~ "An hourglass marks a step that waits"
-      assert loan.explanation =~ "a clock a message sent after a delay"
+      assert loan.explanation =~ "An hourglass marks a step that waits for an event"
+      # Sabotage: cut the timed wait from the clock's clause in the
+      # how-to-read line; this went red. Reverted from a copy.
+      assert loan.explanation =~ "a clock a timed wait or a message sent after a delay"
       assert loan.explanation =~ "a dotted arrow, labelled with the delay"
       assert loan.explanation =~ "or point at the map"
       assert fact(loan, "What starts it") == "Starts when told to"

@@ -234,15 +234,17 @@ defmodule StatifierBlocks.MapLayoutTest do
     end
 
     # Every await box of both library fixtures carries the wait mark, the
-    # one delayed send the clock mark, and every other box - an undelayed
-    # send included - neither, as the markup carries them.
+    # loan's wait and the one delayed send the clock mark, and every other
+    # box - an undelayed send included - neither, as the markup carries them.
     #
     # Sabotage: made drawMark draw nothing; this went red. Reverted from a
-    # copy.
-    test "both library fixtures mark their awaits and their delayed send, and nothing else",
+    # copy. Sabotage: made mark/1 answer nil for core.wait; this went red.
+    # Reverted from a copy.
+    test "both library fixtures mark their awaits, their wait and their delayed send, and nothing else",
          %{tmp_dir: dir} do
       for {key, expected} <- [
-            {"library_loan", %{"blk_ll_late_return" => ["wait"]}},
+            {"library_loan",
+             %{"blk_ll_late_return" => ["wait"], "blk_ll_loan_period" => ["clock"]}},
             {"patron_registration",
              %{
                "blk_pr_deadline" => ["clock"],

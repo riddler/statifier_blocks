@@ -156,8 +156,9 @@ defmodule StatifierBlocks.Map.Info do
                  "the arrow into it. " <>
                  "An arrow runs from a step to the one after it; a dashed arrow runs " <>
                  "from an interrupt rule to where it takes its group, out of it or " <>
-                 "back to the head of its body. An hourglass marks a step that waits, " <>
-                 "and a clock a message sent after a delay; a dotted arrow, labelled " <>
+                 "back to the head of its body. An hourglass marks a step that waits " <>
+                 "for an event, and a clock a timed wait or a message sent after a " <>
+                 "delay; a dotted arrow, labelled " <>
                  "with the delay, runs from that message to the rule or the wait that " <>
                  "hears it. A box saying " <>
                  "\"#{BlockMap.empty_text()}\" is a slot no step fills yet. " <>

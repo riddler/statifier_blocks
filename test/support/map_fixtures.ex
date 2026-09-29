@@ -13,6 +13,12 @@ defmodule StatifierBlocks.MapFixtures do
   this package, never written by hand, so `StatifierBlocks.MapTest` holding
   the package's graph equal to them is the claim that the Map moved without
   changing what it answers.
+
+  Since then the package's own `StatifierBlocks.Map` is the owner, and a
+  change to what it answers regenerates a graph from it, never by hand:
+  the library loan's graph was regenerated when a timed wait gained the
+  clock mark, and differs from the reference host's by that one mark on
+  its loan period.
   """
 
   alias StatifierBlocks.{Decode, Document, Palette, ViewModel}
@@ -52,7 +58,7 @@ defmodule StatifierBlocks.MapFixtures do
   @spec view_model!(String.t()) :: ViewModel.t()
   def view_model!(key), do: key |> document!() |> ViewModel.build(Palette.core(), [])
 
-  @doc "The graph the reference host's map module answered for `key`."
+  @doc "The graph the reference host's map module answered for `key`, as regenerated since."
   @spec host_graph!(String.t()) :: map()
   def host_graph!(key) when key in @keys,
     do: JSON.decode!(File.read!(Path.join(@graphs, "#{key}.graph.json")))

@@ -20,6 +20,7 @@
                   "lines": [
                     "Wait 21d"
                   ],
+                  "mark": "clock",
                   "title": "Wait",
                   "width": 150
                 }
