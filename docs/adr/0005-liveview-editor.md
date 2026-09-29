@@ -14054,3 +14054,52 @@ Consequence that `description_region/1` "gains an attr whose default changes
 nothing" is about the `map` attr, and it holds.
 
 Filed with `sb-u2cm`.
+
+## Note (2026-09-29): the Amendment of 2026-09-28 on item 4's control strip reverses two answers of the Amendment of 2026-09-25, under a section headed as a narrowing
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing the Amendment of 2026-09-28 on item 4's control strip (`:13569`) did
+not already decide, and edits no line above it. It is added at the foot of
+the file, so no line another record cites moves. Every cite into this file
+below was read at `a2e008c`; the stylesheet cites were read at the same
+commit, in `assets/css/statifier_blocks.css`, and are written anchor first,
+line second.
+
+### What the heading says, and what the section does
+
+The Amendment of 2026-09-28 heads its section 4 "What this narrows"
+(`:13637`), and its opening paragraph keeps every clause above it "as
+printed except where this section says which of their sentences it narrows"
+(`:13576-13577`). The first bullet of that section names two sentences of
+the Amendment of 2026-09-25 that it does not narrow but reverses: the
+Amendment of 2026-09-25 decided each answer, and the Amendment of 2026-09-28
+decides the opposite. Its own Why paragraph says so plainly: "This section
+changes both answers" (`:13586-13587`).
+
+1. **The rest rule's `nowrap`.** The Amendment of 2026-09-25, section 4
+   ("The yield and the reclaim", `:13181`), decides that at rest the strip's
+   rule "now lays its members out on one line (`flex-wrap: nowrap`)"
+   (`:13184-13185`). The Amendment of 2026-09-28, section 3 ("The
+   decision", `:13611`), decides that the same rule "declares `flex-wrap:
+   wrap` in place of `flex-wrap: nowrap`" (`:13614-13615`). At rest the
+   strip wraps: the `.sb-node__chrome > .sb-node__strip` rule (`:1130`)
+   declares `flex-wrap: wrap` (`:1135`).
+2. **The reclaim rule's `wrap`.** The same section 4 of 2026-09-25 decides
+   that the reclaim rule "declares `flex-wrap: wrap` and `overflow: visible`
+   and nothing else" (`:13199`). The same section 3 of 2026-09-28 decides
+   that it "declares `overflow: visible` alone" and "no longer declares a
+   wrap of its own" (`:13623-13624`). The reclaim rule declares no wrap: the
+   rule headed `.sb-node__chrome:hover > .sb-node__strip` (`:1163-1166`)
+   declares `overflow: visible` (`:1167`) and nothing else.
+
+Section 4's heading is read with this Note beside it: for those two
+sentences, "narrows" means "reverses". This Note does not re-class the other
+sentences that section lists.
+
+### What this Note does not do
+
+It edits no line above it, renames no heading, moves no status line, and
+changes no code, test or changelog fragment. Both Amendments stand as
+printed, and each keeps its status.
+
+Filed with `sb-vz73`.
