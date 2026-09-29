@@ -330,6 +330,14 @@ defmodule StatifierBlocks.Validation do
   # defaults an absent key to it, so a decoded JSON `null` arrives here as
   # `nil` and is refused with every other non-string. A binary the encoder
   # could not write as a JSON string is refused too.
+  #
+  # Public for the reason `datamodel/1` is: `{:update_note, id, note}` is the
+  # note's second writer (ADR-0005's Amendment of 2026-09-29, 2s), and its
+  # refusal has to be the one a stored document would get. `StatifierBlocks.Edit`
+  # calls this rather than restating the grammar.
+  @spec note(Block.id(), term()) :: :ok | {:error, error()}
+  def note(id, note), do: check_note(id, note)
+
   @spec check_note(Block.id() | nil, term()) :: :ok | {:error, error()}
   defp check_note(reported_id, note) do
     if is_binary(note) and String.valid?(note) do

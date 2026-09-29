@@ -115,12 +115,30 @@ defmodule StatifierBlocks.DocumentGenerator do
   defp gen_command(document) do
     blocks = Document.blocks(document)
 
-    case Enum.random(1..5) do
+    case Enum.random(1..6) do
       1 -> gen_insert(document, blocks)
       2 -> gen_remove(document, blocks)
       3 -> gen_move(document, blocks)
       4 -> gen_update_config(blocks)
       5 -> gen_set_datamodel(document)
+      6 -> gen_update_note(blocks)
+    end
+  end
+
+  # The note command (ADR-0005's Amendment of 2026-09-29, 2s) joins decision
+  # 3's law here for the fifth command's reason: its inverse is the note that
+  # was there before, empty included, so a generated sequence that writes,
+  # clears and rewrites notes has to unwind to the document it started from.
+  # One roll in five names a block the document does not hold, and one a
+  # note that is not a string, so both of `apply/2`'s refusals for it are
+  # folded over too.
+  @spec gen_update_note([Block.t()]) :: Edit.t()
+  defp gen_update_note(blocks) do
+    case Enum.random(1..5) do
+      1 -> {:update_note, "blk_ghost_" <> gen_word(), gen_word()}
+      2 -> {:update_note, Enum.random(blocks).id, :not_a_note}
+      3 -> {:update_note, Enum.random(blocks).id, ""}
+      _ -> {:update_note, Enum.random(blocks).id, gen_word() <> " " <> gen_word()}
     end
   end
 

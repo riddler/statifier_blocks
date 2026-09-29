@@ -161,5 +161,13 @@ defmodule StatifierBlocks.Recipe do
   # the document, not a slot of anything, so a recipe may write it too.
   defp reach({:set_accepts, _names}, minted, _enclosing_id), do: {:cont, minted}
 
+  # A note is written on a block, not on the document, so it is bounded the
+  # way `:update_config` is: a recipe may write the note of a block its own
+  # compound inserted, and nothing else. A note on a block that was already
+  # there is a write into a region the author is not looking at.
+  defp reach({:update_note, id, _note}, minted, _enclosing_id) do
+    if MapSet.member?(minted, id), do: {:cont, minted}, else: {:halt, :out_of_reach}
+  end
+
   defp reach(_other, _minted, _enclosing_id), do: {:halt, :out_of_reach}
 end

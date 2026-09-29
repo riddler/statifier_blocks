@@ -166,6 +166,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     only two honest choices are wrapping anywhere and clipping bytes the
     author is here to read.
 
+    ## The note (ADR-0005's Amendment of 2026-09-29, 2s)
+
+    With a block selected, the Config tab opens on the block's **Note**: a
+    textarea holding the author-written note, above the Block and
+    Configuration sections. It is on this tab because this tab is where a
+    block is edited, and it is not a fifth tab for 3A's reason: a note is
+    about the selected block. It is its own form posting its own event, so
+    a change is one `{:update_note, id, note}` and never passes through the
+    config form's decode. Emptying it removes the note. A read-only mount
+    draws the note as text, and draws nothing when there is no note.
+
     The Configuration section's empty state is a **box**, not the one-line
     sentence the other tabs use. It is the only empty state in the editor
     standing where a control would be, and an unboxed sentence in that
@@ -207,6 +218,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     )
 
     attr(:node, :any, default: nil, doc: "the selected `ViewModel.Node`, or nil")
+
+    attr(:note, :any,
+      default: nil,
+      doc: "the selected block's note, read off the document (`\"\"` for none), or nil"
+    )
 
     attr(:slot_label, :any,
       default: nil,
@@ -379,6 +395,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             Select a block on the canvas to inspect it.
           </p>
 
+          <.note_section
+            :if={@tab == :config and @node != nil}
+            node={@node}
+            note={@note || ""}
+            read_only={@read_only}
+            debounce={@debounce}
+            target={@target}
+          />
+
           <.block_section :if={@tab == :config} node={@node} slot_label={@slot_label} />
 
           <section :if={@tab == :config} class="sb-inspector__section">
@@ -428,6 +453,50 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             block_runs={@block_runs}
           />
         </div>
+      </section>
+      """
+    end
+
+    attr(:node, :any, required: true)
+    attr(:note, :string, required: true)
+    attr(:read_only, :boolean, required: true)
+    attr(:debounce, :any, required: true)
+    attr(:target, :any, required: true)
+
+    # The note's own form: a block-id and the textarea, posting `note-change`
+    # on each change. The id is per block so a new selection is a new form
+    # and LiveView does not carry one block's unsent text onto another.
+    defp note_section(%{read_only: true} = assigns) do
+      ~H"""
+      <section :if={@note != ""} class="sb-inspector__section sb-inspector__note">
+        <h3 class="sb-inspector__section-title">Note</h3>
+        <p class="sb-inspector__note-text">{@note}</p>
+      </section>
+      """
+    end
+
+    defp note_section(assigns) do
+      ~H"""
+      <section class="sb-inspector__section sb-inspector__note">
+        <form
+          id={"sb-inspector-note-" <> @node.block_id}
+          class="sb-inspector__note-form"
+          phx-change="note-change"
+          phx-submit="note-change"
+          phx-target={@target}
+        >
+          <input type="hidden" name="block-id" value={@node.block_id} />
+          <label class="sb-inspector__section-title" for={"sb-inspector-note-input-" <> @node.block_id}>
+            Note
+          </label>
+          <textarea
+            id={"sb-inspector-note-input-" <> @node.block_id}
+            class="sb-field__input sb-inspector__note-input"
+            name="note"
+            rows="3"
+            phx-debounce={@debounce}
+          >{Phoenix.HTML.Form.normalize_value("textarea", @note)}</textarea>
+        </form>
       </section>
       """
     end
