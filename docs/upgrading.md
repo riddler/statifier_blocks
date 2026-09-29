@@ -1,7 +1,9 @@
-# Upgrading a host from 0.31 to 0.34
+# Upgrading a host from 0.31 to 0.34, and from 0.39 to 0.40
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.34.0, one minor at a time. A host here is the code that embeds the package:
+0.34.0, one minor at a time, and from 0.39.0 to 0.40.0. It does not cover
+0.34 to 0.39; the CHANGELOG's sections for those releases say what each one
+changed. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
@@ -9,7 +11,7 @@ about it, and says **NONE** where the answer is nothing.
 
 Take the minors in order, and move the pin with each one, as the README
 recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`, then
-`"~> 0.34.0"`.
+`"~> 0.34.0"`; from 0.39, to `"~> 0.40.0"`.
 
 What an **author** changes in a document is a separate page:
 [Migrating a document from 0.27 to 0.34](guides/migrating-documents-0.27-to-0.34.md).
@@ -87,3 +89,38 @@ release below.
 editor mounted without the new `publish_status` assign renders exactly what it
 rendered on 0.33.0. The release's additions are opt-in; the CHANGELOG says
 what they are.
+
+## 0.39 to 0.40
+
+- **If you match every member of `StatifierBlocks.Edit.t()` by hand**, add
+  a clause for `{:update_note, id, note}`, the new command that writes a
+  block's author note; an empty note removes it. `Edit.apply/2` answers
+  its inverse, `{:update_note, id, previous_note}`, and refuses a note that
+  is not a string with `{:malformed_block, id, {:note, :not_a_string}}`,
+  the term `Document.validate/1` answers for such a note. A host that only
+  passes commands on to `Edit.apply/2` or `Edit.History` changes nothing.
+- **The editor draws a description region under its canvas**:
+  `StatifierBlocks.Editor.MapRegions.description_region/1`, read from the
+  editor's own document, palette and selection, with no map beside it. It
+  is drawn in a read-only mount too, and no `profile` key hides it. There
+  is nothing to pass for it.
+- **If you mount `description_region/1` yourself**, it takes two new
+  attrs, both optional: `map`, `true` by default, and `false` for a region
+  with no map beside it (no hover layer, no store and no how-to-read
+  paragraph in the idle description); and `label`, the live region's
+  `aria-label`, `"Description"` by default. A host that passes neither gets
+  the region it had.
+- **If you set the `--sb-*` palette on `.sb-map__description`**, set it on
+  `.sb-map__description-frame` instead, the wrapper the region now sits in
+  beside its hover layer, so the layer reads it too.
+- **If you stamp the `StatifierBlocksMap` hook's ids on your own element**
+  rather than mounting `map_region/1` and `description_region/1`, stamp
+  `data-info-hover` with the id of an `aria-hidden`, `hidden` element
+  beside the region for the hook to fill. The hook finds its hover layer
+  there and no longer reads `data-info-region`, so without it the map has
+  no hover. A hover no longer changes what the region announces; only a
+  new selection does.
+- **If you pass `phrase` to `map_region/1` or `description_region/1`**,
+  pass `nil` or a function of one argument. Any other value now raises an
+  `ArgumentError` naming the attr, where it raised a `FunctionClauseError`;
+  `nil` and a one-argument function render as before.
