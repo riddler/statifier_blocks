@@ -879,9 +879,6 @@ defmodule StatifierBlocks.ThemeAuditTest do
     end
   end
 
-  # The tier of every token, read from the stylesheet's header comment. Read
-  # from the RAW source on purpose: this is the one check whose subject is the
-  # comment rather than what the browser sees.
   # The `.sb-map__region` token block out of the stylesheet after the
   # editor's root, and what is left once it is taken out.
   defp map_root(css) do
@@ -895,6 +892,9 @@ defmodule StatifierBlocks.ThemeAuditTest do
     end
   end
 
+  # The tier of every token, read from the stylesheet's header comment. Read
+  # from the RAW source on purpose: this is the one check whose subject is the
+  # comment rather than what the browser sees.
   defp tiers(raw) do
     ~r/^\s*\*\s+([123])\s+(--sb-[a-z0-9-]+)\s*$/m
     |> Regex.scan(raw)
