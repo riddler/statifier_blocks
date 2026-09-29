@@ -407,8 +407,9 @@ function drawNode(node) {
 
 // A timer block's mark, a 14px glyph at the box's top right, level with the
 // title (the server left the title room for it): an hourglass for a wait
-// (`core.await`), a clock face for a delayed send. It is drawn inside the
-// block's group, so a click on it selects the block and nothing else.
+// on an event (`core.await`), a clock face for a timed wait (`core.wait`)
+// or a delayed send. It is drawn inside the block's group, so a click on it
+// selects the block and nothing else.
 const MARK_STYLE = "fill: none; stroke: var(--sb-map-mark, #64748b); stroke-width: 1.5"
 
 function drawMark(node) {

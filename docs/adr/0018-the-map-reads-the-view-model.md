@@ -552,3 +552,48 @@ holds in the editor with nothing to be silent about: a block selected on
 the canvas is a selection, and there is no hover.
 
 Filed with `sb-k8qj`.
+
+## Note (2026-09-29): a timed wait carries the clock mark
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-09-29, where the
+code holds it, and how two sentences elsewhere now read.
+
+The rule: a `core.wait` carries the clock mark. The clock says time
+passes; the hourglass says a step waits for an event. A `core.await` keeps
+the hourglass (the wait mark) and a delayed `core.send` keeps the clock; a
+wait's duration is required, so every wait carries the clock. The clock on
+a wait is a mark only: a wait takes no part in a timer edge, and
+`@timer_targets` (`lib/statifier_blocks/map.ex`, read at `a2e008c` at
+`:316`) is unchanged, so the timer edges stay the ones `Describe.outline/3`
+answers.
+
+Where it holds:
+
+- `mark/1` (`lib/statifier_blocks/map.ex`, `defp mark`) answers `"clock"`
+  for a `core.wait`, and the moduledoc's "Timer marks" section says so. The
+  hook draws the clock face it already drew for a delayed send;
+  `assets/js/statifier_blocks_map.js` changes only in a comment.
+- The idle description's paragraph on how to read the map (`@how_to_read`,
+  `lib/statifier_blocks/map/info.ex`) says an hourglass marks a step that
+  waits for an event, and a clock a timed wait or a message sent after a
+  delay.
+- `test/statifier_blocks/map_test.exs`, "a wait carries the clock mark and
+  hears no timer edge", pins the mark, and pins that a delayed send's timer
+  edge runs to the await that hears its event and none runs to the wait.
+  The fixture tests there and in `test/statifier_blocks/map_layout_test.exs`
+  count the library loan's wait among the marked boxes, and
+  `test/fixtures/map/library_loan.graph.json` carries its mark.
+
+How two sentences elsewhere now read:
+
+- `ADR-0017` decision 4 says the reference host's map "marks a
+  `core.await` with a wait mark and a delayed `core.send` with a clock
+  mark". It describes that map at that record's writing; the Map this
+  record decides also marks a `core.wait` with the clock.
+- The flip Note's rows for decisions (a) and (d) cite `map.ex:375`
+  (`def graph`) and `map.ex:824` (`defp timer_parties`), read at
+  `362a0e9`. Both lines move with this request; re-locate them by those
+  anchors.
+
+Filed with `sb-r2kc`.

@@ -29,7 +29,8 @@ defmodule StatifierBlocks.MapTest do
     # The move changes nothing the graph answers: for each teaching
     # document, the package's graph under the library world's words is the
     # JSON value the reference host's map module answered at the commit the
-    # fixtures were copied from.
+    # fixtures were copied from, less what the package has changed since:
+    # the clock mark on the library loan's timed wait (see MapFixtures).
     #
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
     test "each teaching document's graph is the reference host's" do
@@ -492,8 +493,11 @@ defmodule StatifierBlocks.MapTest do
 
     # Sabotage: made mark/1 answer nil for core.await; this went red.
     # Reverted from a copy.
-    test "the library fixtures mark every await and the one delayed send, and no other" do
-      assert marks(graph("library_loan")) == %{"blk_ll_late_return" => "wait"}
+    test "the library fixtures mark every await, the wait and the one delayed send, and no other" do
+      assert marks(graph("library_loan")) == %{
+               "blk_ll_late_return" => "wait",
+               "blk_ll_loan_period" => "clock"
+             }
 
       assert marks(graph("patron_registration")) == %{
                "blk_pr_deadline" => "clock",
@@ -503,9 +507,9 @@ defmodule StatifierBlocks.MapTest do
     end
 
     # Derived rather than listed: every await in every fixture carries the
-    # wait mark, every send carries the clock mark exactly when its delay
-    # is set, and no other block carries a mark.
-    test "every fixture marks its awaits and its delayed sends, and nothing else" do
+    # wait mark, every wait the clock mark, every send the clock mark
+    # exactly when its delay is set, and no other block carries a mark.
+    test "every fixture marks its awaits, its waits and its delayed sends, and nothing else" do
       for {key, view_model} <- view_models() do
         expected =
           for {%Node{} = node, _depth, _kind} <- ViewModel.outline(view_model),
@@ -545,6 +549,42 @@ defmodule StatifierBlocks.MapTest do
                find(BlockMap.graph(view_model), "held")
 
       assert width >= String.length(title) * 7 + 24 + 22
+    end
+
+    # A timed wait carries the clock, as a delayed send does, and not the
+    # hourglass an await carries. The clock is a mark only: the send's
+    # timer edge still runs to the await that hears its event, and nothing
+    # runs to the wait.
+    #
+    # Sabotage: made mark/1 answer "wait" for core.wait; this went red.
+    # Reverted from a copy.
+    test "a wait carries the clock mark and hears no timer edge" do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              Block.new("core.send",
+                id: "reminder",
+                config: %{"event" => "loan.overdue", "delay" => "21d"}
+              ),
+              Block.new("core.wait", id: "loan_period", config: %{"duration" => "21d"}),
+              Block.new("core.await", id: "overdue", config: %{"event" => "loan.overdue"})
+            ]
+          }
+        )
+
+      graph = root |> Document.new() |> build() |> BlockMap.graph()
+
+      assert marks(graph) == %{
+               "reminder" => "clock",
+               "loan_period" => "clock",
+               "overdue" => "wait"
+             }
+
+      assert Enum.map(BlockMap.timers(graph), &{&1["from"], &1["to"]}) == [
+               {"reminder", "overdue"}
+             ]
     end
   end
 
@@ -1105,6 +1145,7 @@ defmodule StatifierBlocks.MapTest do
   # The mark a block should carry, read off the fixture's own form values
   # rather than the map's code.
   defp expected_mark(%Node{type: "core.await"}), do: "wait"
+  defp expected_mark(%Node{type: "core.wait"}), do: "clock"
 
   defp expected_mark(%Node{type: "core.send", form: %{fields: fields}}) do
     case Enum.find(fields, &(&1.key == "delay")) do

@@ -222,11 +222,15 @@ defmodule StatifierBlocks.Map do
 
   ## Timer marks
 
-  Two blocks wait on a clock in different ways, and a box says which with a
+  Blocks wait on a clock in different ways, and a box says which with a
   small mark at its top right: a `core.await` carries the wait mark (it
-  waits, in its own step, for an event or its timeout), and a `core.send`
-  with a delay carries the clock mark (the event it arms fires later, after
-  the step has moved on). A delay counts when
+  waits, in its own step, for an event or its timeout), a `core.wait`
+  carries the clock mark (time passes: it holds its step for its
+  duration, which it always has, since the duration is required), and a
+  `core.send` with a delay carries the clock mark too (the event it arms
+  fires later, after the step has moved on). The clock says time passes;
+  the hourglass says a step waits for an event. The clock on a wait is a
+  mark only: a wait hears no timer edge. A delay counts when
   `StatifierBlocks.Core.Duration.duration?/1` accepts it, the test the
   send's own sentence and the timer edges use; a send with no delay
   carries neither mark. A mark is drawn inside its block's box, so a click
@@ -772,6 +776,7 @@ defmodule StatifierBlocks.Map do
   # See the moduledoc's "Timer marks".
   @spec mark(Node.t()) :: String.t() | nil
   defp mark(%Node{type: "core.await"}), do: "wait"
+  defp mark(%Node{type: "core.wait"}), do: "clock"
   defp mark(%Node{type: "core.send"} = node), do: if(delayed?(node), do: "clock")
   defp mark(%Node{}), do: nil
 
