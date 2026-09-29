@@ -25,7 +25,7 @@
 | [0015 Amendment 2026-09-28](0015-block-document-json-schema.md#amendment-2026-09-28-decision-6-generated-host-definitions-type-their-declared-fields) | Decision 6: a host type's generated definition types its declared fields through the same mapping, and the invariant is restated on the binding check | accepted |
 | [0016](0016-document-describes-itself.md) | A document describes itself deterministically - block sentences joined by flow-graph edges read from structure, a host phrasing seam, and no model anywhere | accepted |
 | [0017](0017-block-types-explain-themselves.md) | Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe | accepted |
-| [0018](0018-the-map-reads-the-view-model.md) | The Map is a reader of the view model - a drawn projection beside a host's list, elkjs vendored whole, draw-only hooks, and one struct in | proposed |
+| [0018](0018-the-map-reads-the-view-model.md) | The Map is a reader of the view model - a drawn projection beside a host's list, elkjs vendored whole, draw-only hooks, and one struct in | accepted |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
