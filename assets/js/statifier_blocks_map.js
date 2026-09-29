@@ -768,6 +768,14 @@ function named(doc, id) {
 // `data-map-canvas` (which the page keeps out of LiveView's patching) or,
 // lacking one, into the element itself.
 //
+// An element with no `data-map-canvas` child is not supported. LiveView
+// patches the element itself, so a drawing written into it can be taken
+// away by the next patch, and the re-mark of a moved selection and the kept
+// error pane below both assume the drawing is still there. The hook still
+// draws into the element, as it always has, and says so once per mount with
+// a `console.warn` naming the missing child. `map_region/1` always renders
+// the child.
+//
 // A patch that changes only the selection re-marks the drawing rather than
 // laying it out again, and one carrying the same unparsable graph as the last
 // leaves the error pane as it stands. A layout still running when a newer
@@ -834,7 +842,16 @@ export const StatifierBlocksMap = {
   // Resolves once whatever this call started has been drawn, so a caller
   // outside the browser can wait for it; LiveView ignores it.
   draw() {
-    const target = this.el.querySelector("[data-map-canvas]") || this.el
+    const canvas = this.el.querySelector("[data-map-canvas]")
+    if (!canvas && !this.warnedNoCanvas) {
+      this.warnedNoCanvas = true
+      console.warn(
+        "StatifierBlocksMap: the hook's element has no [data-map-canvas] child, " +
+          "so the map is drawn into the element itself, which LiveView patches; " +
+          "this is not supported. map_region/1 renders the child.",
+      )
+    }
+    const target = canvas || this.el
     const editable = this.el.dataset.editable === "true"
     const text = this.el.dataset.graph
     let parsed

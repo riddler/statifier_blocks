@@ -1765,6 +1765,14 @@ let liveSocket = new LiveSocket("/live", Socket, {
 On the `NODE_PATH` route the specifier is
 `statifier_blocks/assets/js/statifier_blocks_map.js`.
 
+The hook draws into a child of its element marked `data-map-canvas`, which
+`map_region/1` renders with `phx-update="ignore"` so that LiveView leaves
+the drawing alone. A host that attaches the hook to its own element gives
+it that child. An element without one is not supported: the hook draws into
+the element itself, which LiveView patches, so a patch can take the drawing
+away, and it warns once per mount in the browser console, naming the
+missing child.
+
 That import pulls in `assets/vendor/elk.bundled.js`, elkjs 0.9.3 under the
 Eclipse Public License 2.0 (its licence ships beside it), and pulls it in
 whole: 1,606,238 bytes as shipped and 466,990 bytes gzipped, none of which a

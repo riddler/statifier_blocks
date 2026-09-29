@@ -10,8 +10,10 @@
 //
 // The scenario is `{"element": {...data attributes...}, "steps": [...]}`.
 // `element` is the hook element's dataset before mounting, beside the graph
-// (for example `{"editable": "true", "selectEvent": "select-row"}`). Each
-// step is one of:
+// (for example `{"editable": "true", "selectEvent": "select-row"}`).
+// `"canvas": false` mounts the hook on an element with no
+// `data-map-canvas` child, so the hook draws into the element itself; the
+// counts below are then the element's. Each step is one of:
 //
 //   {"select": "<block id>"}  a patch that changes only the selection: the
 //                             graph carries `selected` on that block's node
@@ -28,7 +30,8 @@
 // entry per step with the layouts run so far, the times the canvas has been
 // drawn into so far (`writes`), the block the drawing marks selected and the
 // drawing's kind; and `pushes`, every pushEvent the hook made, in order, as
-// `{event, payload}`.
+// `{event, payload}`; and `warnings`, every console.warn the hook made, in
+// order, each as the text of its arguments joined by a space.
 import {readFileSync} from "node:fs"
 import ELK from "../../../assets/vendor/elk.bundled.js"
 import {StatifierBlocksMap} from "../../../assets/js/statifier_blocks_map.js"
@@ -90,15 +93,19 @@ function clickTarget(id, on) {
   return {closest: (selector) => (selector === group.selector ? group : null)}
 }
 
+const warnings = []
+console.warn = (...args) => warnings.push(args.map(String).join(" "))
+
 const drawing = canvas()
+const withCanvas = scenario.canvas !== false
 const listeners = []
 const pushes = []
 const hook = Object.create(StatifierBlocksMap)
-hook.el = {
-  dataset: {...scenario.element, graph: JSON.stringify(graph)},
-  querySelector: (selector) => (selector === "[data-map-canvas]" ? drawing : null),
-  addEventListener: (type, listener) => listeners.push({type, listener}),
-}
+hook.el = withCanvas ? {} : drawing
+hook.el.dataset = {...scenario.element, graph: JSON.stringify(graph)}
+hook.el.querySelector = (selector) =>
+  selector === "[data-map-canvas]" && withCanvas ? drawing : null
+hook.el.addEventListener = (type, listener) => listeners.push({type, listener})
 hook.pushEvent = (event, payload) => pushes.push({event, payload})
 
 await hook.mounted()
@@ -124,4 +131,4 @@ for (const step of scenario.steps) {
   steps.push({step, layouts, writes: drawing.writes, marked: drawing.marked, drawn: kindOf()})
 }
 
-process.stdout.write(JSON.stringify({layouts, steps, pushes}))
+process.stdout.write(JSON.stringify({layouts, steps, pushes, warnings}))
