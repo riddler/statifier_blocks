@@ -1,6 +1,6 @@
 # ADR-0018: The Map is a reader of the view model - a drawn projection beside a host's list, elkjs vendored whole, draw-only hooks, and one struct in
 
-Status: proposed (2026-09-28, drafted for `sb-7v78` under the operator's
+Status: accepted (2026-09-28, drafted for `sb-7v78` under the operator's
 campaign consent; the rulings it records were taken by the operator on
 2026-09-28). It merges at proposed; flipping it to accepted is a separate
 request through the same `docs/adr/` gate, after the code that builds it
@@ -309,3 +309,91 @@ The point the sentence makes is unchanged: the Map and that renderer stay
 separate, and no merge of the two is decided here.
 
 Filed with `sb-ew7o`.
+
+## Note (2026-09-28): the Map's captions read the core palette's type explanations
+
+A dated note, not an amendment: it changes no decision in this record. The
+sentences it reads stay as written.
+
+Decision (a) says `StatifierBlocks.Map` is built from the view model and the
+host's options "and from nothing else", and decision (d) says "It reads no
+document or palette of its own". The code at `v0.39.0` (`362a0e9`) reads one
+more thing. `StatifierBlocks.Map.graph/2` puts a one-line caption on a
+branch's band and on a group's rules column (`defp put_band/2`,
+`lib/statifier_blocks/map.ex:556`; `defp put_caption/3`, `:1009`). That
+caption is `StatifierBlocks.Map.caption/1` (`map.ex:438`, `def caption`),
+which asks the core palette, `StatifierBlocks.Palette.core/0`
+(`lib/statifier_blocks/palette.ex:206`), for the type and takes the first
+sentence of `StatifierBlocks.BlockType.explain/1` of it. The reference host's
+map, which the package's Map moved, did the same (statifier_examples
+`lib/statifier_examples_web/plan_map.ex`, its `def caption`, read at that
+repository's commit `c620756`).
+
+What it reads is type metadata: the paragraph a core block type explains
+itself with. It is not the document, it is not a second state kept between
+renders, and it is not a second walk: every box and edge is still read off
+the view model's nodes and slots, and the caption is chosen by the node's
+type. Decisions (a) and (d)'s "and from nothing else" and "It reads no
+document or palette of its own" are read with that one exception.
+
+Where captions come from is `ADR-0017` decision 4, "What a renderer draws
+from each" (`docs/adr/0017-block-types-explain-themselves.md:154`): the
+explanation, `BlockType.explain/1` of the block's type, is drawn "as a
+caption of one line under a **structural container**".
+
+Filed with `sb-ok65`.
+
+## Note (2026-09-28): this record is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the head status line (`:3`), by one word, `proposed` to `accepted`.
+Everything else is this Note and the one above it, at the foot of the file,
+so no line another record cites moves.
+
+The code this record decides shipped in statifier_blocks 0.39.0, published
+on Hex from the `v0.39.0` tag at `362a0e9`, whose `CHANGELOG.md` section
+names `StatifierBlocks.Map`, `StatifierBlocks.Map.Info`,
+`StatifierBlocks.Editor.MapRegions`, the `StatifierBlocksMap` hook at its own
+entry point and the vendored elkjs file under Added. Every claim the record
+makes was checked against `main` at `362a0e9`, as read with the Note above
+on captions and the Note of this date on statifier-ui's renderer. Every
+`lib/`, `assets/`, `test/` and CI cite below was read there and is written
+anchor first, line second.
+
+### Each decision, and where it reads today
+
+| Decision | Read at `362a0e9` |
+|---|---|
+| (a), a pure reader of the view model | `StatifierBlocks.Map.graph/2` (`map.ex:375`, `def graph`) takes the view model and a keyword list of `:selected` and `:phrase`, and does not call `StatifierBlocks.Describe`; its captions read the core palette, as the Note above says. `test/statifier_blocks/map_test.exs` holds its end, interrupt and timer edges equal to `Describe.outline/3`'s for every fixture (the tests "every fixture's ends are Describe's, one per way it finishes", "every fixture's interrupt edges are Describe's" and "every fixture's timer edges are Describe's"). No module under `lib/statifier_blocks/map` names Phoenix |
+| (b), elkjs 0.9.3 vendored whole | `assets/vendor/elk.bundled.js` has the SHA-256 the record prints, and is 1,606,238 bytes and 466,990 bytes at `gzip -9`; `assets/vendor/elkjs-LICENSE.md` sits beside it; `.claude/firewall-vendor.txt` carries its line with `upstream=elkjs@0.9.3` and `licence=`; the hook imports it by relative path (`assets/js/statifier_blocks_map.js:34`); `README.md`, section "The hook, and what it costs", states the cost and names the import |
+| (c), the first draw-only hook | `StatifierBlocksMap` (`statifier_blocks_map.js:721`) draws into the `data-map-canvas` child, re-marks a moved selection without a layout, sends a click only as the host list's own event through its one `this.pushEvent` (`:741`), and swaps the description region's text on hover without a push; ADR-0005's Amendment of 2026-09-28 on decision 7, accepted in this request, carries the rule |
+| (d), one struct in | the view model comes from `ViewModel.build/3` (`view_model.ex:519`, `def build`); the timer edges read `ViewModel.outline/1` (`defp timer_parties/1`, `map.ex:824`); a block's findings are its `ViewModel.Node`'s `findings` (`defmodule Node`, `view_model.ex:319`), which `StatifierBlocks.Map.Info` lists (`defp findings/1`, `map/info.ex:433`) |
+| (d), the description region | `StatifierBlocks.Map.Info.elements/6` (`map/info.ex:184`) and `idle/4` (`:206`); `StatifierBlocks.Editor.MapRegions.map_region/1` (`editor/map_regions.ex:111`) renders an `aria-hidden` region and `description_region/1` (`:156`) an `aria-live="polite"` one, with the note first; the module sits under `StatifierBlocks.Editor.*` inside the `Code.ensure_loaded?(Phoenix.LiveView)` guard (`:1`); `test/statifier_blocks/editor/map_regions_test.exs` proves the list is the keyboard path ("every block the map draws is reachable from the list", "a gesture on the map arrives under the list's own name") |
+| Consequences, Node in the tests | CI's `actions/setup-node@v4` step (`.github/workflows/ci.yml:51`); the hook-count tests in `test/statifier_blocks/assets_test.exs`, describe "one hook pushes commands; the others only measure or draw (decision 7, 7e)" |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The head status line says "proposed (2026-09-28 ..."; it is flipped by one
+  word above. Its "It merges at proposed; flipping it to accepted is a
+  separate request ... after the code that builds it has shipped in a
+  published version" is met by this request and 0.39.0.
+- The Context calls ADR-0001's Amendment of 2026-09-28 "at proposed". That
+  described the day it was written; that Amendment is flipped to accepted in
+  this same request, with its own Note at the foot of that record.
+
+### Sentences that no longer hold as written
+
+- Decisions (a) and (d)'s "and from nothing else" and "It reads no document
+  or palette of its own" are read as the Note above on captions reads them.
+- "This record decides; the code lands beside it ... the others follow it"
+  described the day it was written; all of it is in 0.39.0.
+- Cites that have moved since `ff04855`, each anchor still naming the thing
+  the record says: `licenses:` is at `mix.exs:115`, and now reads
+  `["MIT", "EPL-2.0"]`, the wording decision (b) left to the release
+  preparation (the package's own licence file stays MIT); `package()`'s
+  `files:` is at `mix.exs:128` and still lists `assets` whole.
+
+Filed with `sb-ok65`.
