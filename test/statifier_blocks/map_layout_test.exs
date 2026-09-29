@@ -1174,6 +1174,47 @@ defmodule StatifierBlocks.MapLayoutTest do
       assert %{"layouts" => 4, "writes" => 4, "drawn" => "map"} = back
     end
 
+    # An element with no `data-map-canvas` child is not supported: the hook
+    # still draws into the element itself, as it always has, and warns once
+    # for the mount, not once per patch. With the child it warns not at all.
+    #
+    # Sabotage: made the hook warn on every draw (the once-per-mount flag
+    # never set); the patches warned again and this went red on the count.
+    # Removed the warning; red on the count. Made the hook look for the
+    # child under another selector, so every mount warned; the element with
+    # the child warned and this went red. Each reverted from a copy.
+    test "an element with no canvas child is drawn into and warned about once",
+         %{tmp_dir: dir} do
+      graph = library_graph("library_loan")
+
+      patches = [
+        %{"select" => "blk_ll_due"},
+        %{"raw" => "{not a graph"},
+        %{"graph" => graph}
+      ]
+
+      %{"steps" => [mounted, selected, error, back], "warnings" => warnings} =
+        run_hook(dir, "no-canvas", graph, %{
+          "canvas" => false,
+          "element" => %{"editable" => "true"},
+          "steps" => patches
+        })
+
+      assert [warning] = warnings
+      assert warning =~ "[data-map-canvas]"
+      assert warning =~ "not supported"
+      assert %{"writes" => 1, "drawn" => "map"} = mounted
+      assert %{"writes" => 1, "drawn" => "map", "marked" => ["blk_ll_due"]} = selected
+      assert %{"writes" => 2, "drawn" => "error"} = error
+      assert %{"writes" => 3, "drawn" => "map"} = back
+
+      assert %{"warnings" => [], "steps" => [%{"drawn" => "map"} | _]} =
+               run_hook(dir, "with-canvas", graph, %{
+                 "element" => %{"editable" => "true"},
+                 "steps" => patches
+               })
+    end
+
     # A click is sent under the name the host stamped on the element, never
     # one of the hook's own: the same clicks under two sets of names push
     # those names, and with none stamped they push nothing at all.
