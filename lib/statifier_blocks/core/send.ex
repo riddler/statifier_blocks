@@ -192,9 +192,12 @@ defmodule StatifierBlocks.Core.Send do
   When the block carries a delay the line names it first, because when
   the event goes out is half of what this block does: `In 7 days, send
   loan.fines_notice`. The short duration form is put in words, one word
-  per unit and largest first (`1h30m` reads as `1 hour 30 minutes`); any
-  other spelling the field accepts, a fraction or a repeated unit, is
-  shown exactly as stored. An absent, empty or unreadable delay is no
+  per unit and largest first (`1h30m` reads as `1 hour 30 minutes`). A
+  leading zero or a zero component is in that form too and is put in
+  words the same way, each number by its value: `07d` reads as `7 days`,
+  `1h0m` as `1 hour 0 minutes` and `0d` as `0 days`. Any other spelling
+  the field accepts, a fraction or a repeated unit, is shown exactly as
+  stored. An absent, empty or unreadable delay is no
   delay, and the line is then `Send <event>`, unchanged.
 
       iex> StatifierBlocks.Core.Send.sentence(%{"event" => "order.paid"})
@@ -224,8 +227,13 @@ defmodule StatifierBlocks.Core.Send do
   end
 
   # The short form: whole numbers, each unit at most once, largest first -
-  # the spelling a person types and `Duration.to_delay/1` renders. `mo`
-  # and `ms` are tried before `m`, the order predicator's lexer reads them.
+  # the spelling a person types and `Duration.to_delay/1` renders. It is
+  # wider than what `to_delay/1` renders: that never writes a leading zero
+  # or a zero component (only `0s` for no time at all), but the match
+  # accepts both and puts them in words, each number by its value - `07d`
+  # reads `7 days`, `1h0m` reads `1 hour 0 minutes`, `0d` reads `0 days`.
+  # `mo` and `ms` are tried before `m`, the order predicator's lexer reads
+  # them.
   @short_form ~r/\A(?:[0-9]+y)?(?:[0-9]+mo)?(?:[0-9]+w)?(?:[0-9]+d)?(?:[0-9]+h)?(?:[0-9]+m)?(?:[0-9]+s)?(?:[0-9]+ms)?\z/
   @component ~r/([0-9]+)(mo|ms|y|w|d|h|m|s)/
   @unit_words %{
