@@ -73,9 +73,9 @@ defmodule StatifierBlocks.Map.Info do
   first step is a `:start` too;
   `:edge` is a connector, a branch's rejoin among them; `:interrupt` is
   the dashed edge an interrupt rule draws to where it takes its group;
-  `:timer` is the dotted edge from a send with a delay to the rule or the
-  wait that hears the event it sends; and `:idle` is the document,
-  described when nothing is selected. A
+  `:timer` is the dotted edge from a send with a delay to the interrupt
+  rule or the await that hears the event it sends; and `:idle` is the
+  document, described when nothing is selected. A
   branch's description names its arms in order, which is what the band
   over them on the map says. Each description is keyed by the id the map
   draws it under, so the Map hook, `StatifierBlocksMap`, looks one up by
@@ -149,19 +149,30 @@ defmodule StatifierBlocks.Map.Info do
   @enforce_keys [:kind, :title, :explanation]
   defstruct [:id, :kind, :title, :explanation, note: nil, sentence: nil, settings: [], facts: []]
 
-  @how_to_read "Every box on the map is a step, drawn inside the step that holds it. " <>
-                 "The filled dot is where the document starts, and a dot inside a ring " <>
-                 "where it finishes: a solid ring when its last step finishes, a dashed " <>
-                 "ring when an interrupt rule abandons that step, the outcome named on " <>
-                 "the arrow into it. " <>
-                 "An arrow runs from a step to the one after it; a dashed arrow runs " <>
-                 "from an interrupt rule to where it takes its group, out of it or " <>
-                 "back to the head of its body. An hourglass marks a step that waits " <>
-                 "for an event, and a clock a timed wait or a message sent after a " <>
-                 "delay; a dotted arrow, labelled " <>
-                 "with the delay, runs from that message to the rule or the wait that " <>
-                 "hears it. A box saying " <>
-                 "\"#{BlockMap.empty_text()}\" is a slot no step fills yet. " <>
+  @how_to_read "Every box on the map is a step, drawn inside the step that holds it, with " <>
+                 "its type's name on top and what it does under it. A shaded box inside " <>
+                 "a step is a place it holds steps: a branch's arms or a parallel's lanes " <>
+                 "side by side, a group's body as a pane with its interrupt rules in a " <>
+                 "column beside it, or a shelf of drafts. A dashed box saying " <>
+                 "\"#{BlockMap.empty_text()}\" is a place no step fills yet. " <>
+                 "The filled dot is where the document starts, its arrow captioned with " <>
+                 "what starts it, and a dot inside a ring where it finishes: a solid ring " <>
+                 "when its last step finishes, a dashed ring, reached by a dashed arrow, " <>
+                 "when an interrupt rule abandons that step, the outcome named on the " <>
+                 "arrow into it. An arrow runs from a step to the one after it. " <>
+                 "A branch's box lists its arms in the order it tries them, each with its " <>
+                 "condition, and a band with a fork mark stands over the arms' boxes; " <>
+                 "after whichever arm runs, the arms come back together at a dot on the " <>
+                 "branch's bottom edge, where a heavier arrow leads on. A one-line " <>
+                 "caption, on a branch's band or under a group's rules column, says what " <>
+                 "that kind of step does. A dashed arrow runs from an interrupt rule to " <>
+                 "where it takes its group: out of it, or back to the head of its body. " <>
+                 "An hourglass marks a step that waits for an event, and a clock a timed " <>
+                 "wait or a message sent after a delay; a dotted arrow, labelled with the " <>
+                 "delay, runs from that message to the interrupt rule or the hourglass " <>
+                 "step that hears it. The selected step's box is outlined, and on a page " <>
+                 "that can edit, a \"+\" at a box's lower right corner is where a step can " <>
+                 "be added right after it. " <>
                  "Select a step in the list, or point at the map, to read about it here."
 
   @unresolved "A block of a type this palette does not know, so nothing can be said about what it does."

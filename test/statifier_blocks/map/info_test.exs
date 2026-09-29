@@ -470,7 +470,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert loan.title == "Riverbend Public Library loan"
       assert loan.sentence =~ "A patron borrows a copy"
       assert loan.explanation =~ BlockMap.empty_text()
-      assert loan.explanation =~ "a dashed arrow runs from an interrupt rule"
+      assert loan.explanation =~ "A dashed arrow runs from an interrupt rule"
       assert loan.explanation =~ "a dot inside a ring where it finishes"
       assert loan.explanation =~ "An hourglass marks a step that waits for an event"
       # Sabotage: cut the timed wait from the clock's clause in the
@@ -501,6 +501,143 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert idle.title == document.id
       assert idle.sentence == nil
       assert fact(idle, "Listens for") == "No events"
+    end
+  end
+
+  describe "the paragraph on how to read the map" do
+    # Every class the Map hook draws a mark under, with the words in the
+    # paragraph that name that mark. The classes are read out of the hook
+    # itself, so a mark the hook starts drawing fails the first test here
+    # until the paragraph names it.
+    @hook "assets/js/statifier_blocks_map.js"
+
+    @named %{
+      "block" => "Every box on the map is a step",
+      "block--container" => "drawn inside the step that holds it",
+      "title" => "its type's name on top",
+      "sentence" => "what it does under it",
+      "slot" => "A shaded box inside a step is a place it holds steps",
+      "slot-label" => "a branch's arms or a parallel's lanes",
+      "empty" => "A dashed box saying",
+      "empty-text" => "is a place no step fills yet",
+      "start" => "The filled dot is where the document starts",
+      "end" => "a dot inside a ring where it finishes",
+      "end-ring" => "a solid ring when its last step finishes",
+      "end-dot" => "a dashed ring, reached by a dashed arrow",
+      "edge--end" => "the outcome named on the arrow into it",
+      "edge" => "An arrow runs from a step to the one after it",
+      "band" => "a band",
+      "band-group" => "stands over the arms' boxes",
+      "fork" => "a fork mark",
+      "join" => "the arms come back together at a dot",
+      "edge--rejoin" => "a heavier arrow leads on",
+      "caption" => "A one-line caption",
+      "edge--interrupt" => "A dashed arrow runs from an interrupt rule",
+      "mark" => "An hourglass marks a step that waits for an event",
+      "edge--timer" => "a dotted arrow",
+      "timer-caption" => "labelled with the delay",
+      "block--selected" => "The selected step's box is outlined",
+      "gap" => "a \"+\" at a box's lower right corner"
+    }
+
+    # The canvas itself, and the pane drawn in place of a map that could
+    # not be laid out: neither is a mark on a map.
+    @not_marks ["svg", "error", "error-title", "error-reason", "error-hint"]
+
+    # Each value the graph gives a mark, a slot or an end, and the words
+    # that name that one.
+    @variants %{
+      "wait" => "An hourglass",
+      "clock" => "a clock a timed wait or a message sent after a delay",
+      "arm" => "a branch's arms",
+      "body" => "a group's body as a pane",
+      "rail" => "its interrupt rules in a column beside it",
+      "tray" => "a shelf of drafts",
+      "done" => "a solid ring",
+      "abandon" => "a dashed ring"
+    }
+
+    # Sabotage: cut the fork mark from the paragraph; this went red on
+    # "fork". Reverted from a copy. Sabotage: added a class the paragraph
+    # does not name to a comment in the hook; this went red. Reverted from
+    # a copy.
+    test "names every mark the hook draws" do
+      {_graph, _descriptions, idle} = described("library_loan")
+
+      drawn =
+        ~r/sb-map__([a-z][a-z-]*[a-z])/
+        |> Regex.scan(File.read!(@hook), capture: :all_but_first)
+        |> List.flatten()
+        |> Enum.uniq()
+
+      assert Enum.sort(drawn -- @not_marks) == Enum.sort(Map.keys(@named))
+
+      for {class, words} <- @named do
+        assert idle.explanation =~ words, "the paragraph does not name #{class}"
+      end
+    end
+
+    # Sabotage: made the clock's clause name only a message sent after a
+    # delay; this went red on "clock". Reverted from a copy.
+    test "names every kind of mark, slot and end the graph gives" do
+      {_graph, _descriptions, idle} = described("library_loan")
+
+      given =
+        Enum.flat_map(@library, fn key ->
+          {graph, _descriptions, _idle} = described(key)
+          graph_values(graph)
+        end)
+        |> Enum.uniq()
+
+      assert given -- Map.keys(@variants) == []
+
+      for {value, words} <- @variants do
+        assert idle.explanation =~ words, "the paragraph does not name #{value}"
+      end
+    end
+
+    # Sabotage: named the fork mark a second time, in the caption's
+    # sentence; this went red. Reverted from a copy.
+    test "names each mark once and says no sentence twice" do
+      {_graph, _descriptions, idle} = described("library_loan")
+      text = idle.explanation
+
+      for words <- Map.values(@named) ++ Map.values(@variants) do
+        assert length(String.split(text, words)) == 2, "named more than once: #{words}"
+      end
+
+      sentences = String.split(text, ~r/(?<=[.;])\s+/, trim: true)
+      assert sentences == Enum.uniq(sentences)
+    end
+
+    # The rejoin in plain words, and the arm's condition said once: in the
+    # branch's list of arms, not again where the arms come back together.
+    #
+    # Sabotage: made the rejoin clause read "after whichever arm's
+    # condition holds"; this went red. Reverted from a copy.
+    test "says the rejoin in plain words and the condition once" do
+      {_graph, _descriptions, idle} = described("library_loan")
+
+      assert [rejoin] =
+               idle.explanation
+               |> String.split(~r/(?<=[.;])\s+/)
+               |> Enum.filter(&(&1 =~ "come back together"))
+
+      refute rejoin =~ "condition"
+      assert length(String.split(idle.explanation, "condition")) == 2
+    end
+
+    # A timer edge runs to an interrupt rule or an await; the paragraph
+    # names what hears it so it cannot be read as the timed wait the clock
+    # marks.
+    #
+    # Sabotage: put back "to the rule or the wait that hears it"; this went
+    # red. Reverted from a copy.
+    test "names what hears a timer as a rule or an hourglass step" do
+      {_graph, _descriptions, idle} = described("library_loan")
+
+      assert idle.explanation =~ "to the interrupt rule or the hourglass step that hears it"
+      refute idle.explanation =~ "the wait that hears it"
     end
   end
 
@@ -786,6 +923,13 @@ defmodule StatifierBlocks.Map.InfoTest do
 
   defp label(module, key) do
     %{} |> module.config_schema() |> Enum.find(&(&1.key == key)) |> Map.fetch!(:label)
+  end
+
+  # Every mark, slot style and end outcome a graph gives, at any depth.
+  defp graph_values(node) do
+    own = [node["mark"], node["style"], node["kind"] == "end" && node["outcome"]]
+    inside = node |> Map.get("children", []) |> Enum.flat_map(&graph_values/1)
+    Enum.filter(own, &is_binary/1) ++ inside
   end
 
   # Every id the graph draws below its root: nodes, connectors, interrupt
