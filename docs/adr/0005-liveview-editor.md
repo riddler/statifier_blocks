@@ -14103,3 +14103,79 @@ changes no code, test or changelog fragment. Both Amendments stand as
 printed, and each keeps its status.
 
 Filed with `sb-vz73`.
+
+## Note (2026-09-29): the Map hook keeps the selection and its hover handlers beside the three values the flip Note lists
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no line above it. It is added at the foot of the file, so
+no line another record cites moves. Every cite into
+`assets/js/statifier_blocks_map.js` below was read at `2469e01` and is
+written anchor first, line second; every cite into this file and into
+`test/` reads at the same commit.
+
+### What the flip Note's list leaves out
+
+The Note of 2026-09-28 that flips the three Amendments of that date
+(`:13684`) answers clause 7f's "holds no behaviour" with a list (`:13708`):
+what the hook keeps is the drawn graph's source string, a counter and a
+flag. At `2469e01` `StatifierBlocksMap` (`export const StatifierBlocksMap`,
+`:723`) still keeps those three - `this.source` (`draw()`, `:794`),
+`this.drawn` (`:795`) and `this.revealInsert` (`mounted()`'s click
+listener, `:742`) - and it also keeps these, which the list does not name:
+
+- **`this.selected`**, the block the server names as selected. `draw()`
+  sets it on every call (`:787`), from the graph's own `selected` mark or,
+  lacking one, the element's `data-selected`, before anything reads it. It
+  is read only to mark the drawing: on an unchanged graph (`:790`) and when
+  a layout lands (`:801`).
+- **`this.hover`**, the show and the restore that `hover/2` answers
+  (`export function hover`, `:672`), built once in `mounted()` (`:727`). It
+  holds no value of its own: it asks for the hover layer and the store
+  afresh on every call, and the one mark it writes, `data-map-hover`, sits
+  on the layer element (`:688`), not on the hook.
+- **`this.onOver` and `this.onOut`**, the document's `mouseover` and
+  `mouseout` listeners, set in `mounted()` (`:731`, `:732`) and kept so
+  that `destroyed()` (`:761`) can remove them (`:764-765`).
+
+The hover handling changed after the flip Note was read at `362a0e9`:
+ADR-0018's Note of 2026-09-29, "selection speaks, hover is silent", records
+that the hook now writes a hover layer drawn in the description region's
+place rather than the region itself. The two hover entries above are read
+as that Note leaves them.
+
+### Why clause 7f still holds
+
+Clause 7f (`:13479-13483`) allows a draw-only hook nothing that survives a
+re-render except what it needs to skip a layout it has drawn, to drop one a
+newer graph has overtaken, and to scroll into view what a click it sent has
+opened.
+
+- `this.selected` carries nothing from one render into the next: each
+  `draw()` overwrites it before it is read, so a mark is always the
+  selection the latest patch named. A layout still running when a
+  selection-only patch arrives marks that newer selection when it lands
+  (`:801`). The value is a copy of what the server rendered, never a
+  selection the hook made; the test "ten selections cause zero layouts, and
+  a new graph causes one" (`test/statifier_blocks/map_layout_test.exs:1003`)
+  marks each selection the server names without a layout.
+- The hover handlers are fixed at mount and hold no value a re-render could
+  change: they read the layer, the store and the pointer's target on each
+  event. They write only the hover layer, push nothing and change no
+  selection. The test "a hover fills the layer from the store and never
+  writes the region" (`test/statifier_blocks/map_hover_test.exs:62`) holds
+  the first, and "pushes nothing to the server" (`map_hover_test.exs:148`)
+  holds the second and that `destroyed()` leaves no listener on the
+  document.
+
+None of these is a validity rule or document state, and none decides what
+is drawn, selected or sent. The flip Note's answer under "Sentences that no
+longer hold as written" (`:13748`) stands for clause 7f; its list of what
+the hook keeps reads complete with the entries above.
+
+### What this Note does not do
+
+It edits no line above it, amends no clause of decision 7, and changes no
+code, test or changelog fragment. The flip Note and the Amendment it flips
+stand as printed, and each keeps its status.
+
+Filed with `sb-zx8u`.
