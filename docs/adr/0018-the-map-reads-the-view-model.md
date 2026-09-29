@@ -317,8 +317,8 @@ sentences it reads stay as written.
 
 Decision (a) says `StatifierBlocks.Map` is built from the view model and the
 host's options "and from nothing else", and decision (d) says "It reads no
-document or palette of its own". The code at `v0.39.0` (`362a0e9`) reads one
-more thing. `StatifierBlocks.Map.graph/2` puts a one-line caption on a
+document or palette of its own". The code at `v0.39.0` (`362a0e9`) reads more
+than that. `StatifierBlocks.Map.graph/2` puts a one-line caption on a
 branch's band and on a group's rules column (`defp put_band/2`,
 `lib/statifier_blocks/map.ex:556`; `defp put_caption/3`, `:1009`). That
 caption is `StatifierBlocks.Map.caption/1` (`map.ex:438`, `def caption`),
@@ -334,7 +334,8 @@ itself with. It is not the document, it is not a second state kept between
 renders, and it is not a second walk: every box and edge is still read off
 the view model's nodes and slots, and the caption is chosen by the node's
 type. Decisions (a) and (d)'s "and from nothing else" and "It reads no
-document or palette of its own" are read with that one exception.
+document or palette of its own" are read with that exception, and with the
+one the Note below states for the description region.
 
 Where captions come from is `ADR-0017` decision 4, "What a renderer draws
 from each" (`docs/adr/0017-block-types-explain-themselves.md:154`): the
@@ -343,12 +344,50 @@ caption of one line under a **structural container**".
 
 Filed with `sb-ok65`.
 
+## Note (2026-09-28): the description region's data reads the document
+
+A dated note, not an amendment: it changes no decision in this record. The
+sentences it reads stay as written.
+
+Decision (d)'s bullet on the description region says
+`StatifierBlocks.Map.Info` answers its descriptions "from the same view model
+and outline and the palette's `explain/1`", and its paragraph "One struct
+in" says "It reads no document or palette of its own". At `v0.39.0`
+(`362a0e9`), `StatifierBlocks.Map.Info.elements/6`
+(`lib/statifier_blocks/map/info.ex:184`, `def elements`) and `idle/4`
+(`map/info.ex:206`, `def idle`) also take, as their first argument, the
+`%StatifierBlocks.Document{}` the view model was built from, and read it:
+
+- `elements/6` reads each block's `note` from it (`defp notes/1`,
+  `map/info.ex:270`, through `Document.blocks/1`), which is the note
+  `ADR-0001`'s Amendment of 2026-09-28, clause `2g`, puts above the built-in
+  text, as the same bullet of decision (d) says;
+- `idle/4` reads the document's `id`, its `metadata` `"name"` and
+  `"description"`, and its `accepts` list (`defp starts/1`,
+  `map/info.ex:228`).
+
+The reference host's description module, which `Map.Info` moved, read the
+same four things in its `def idle` (statifier_examples
+`lib/statifier_examples_web/plan_description.ex`, read at that repository's
+commit `c620756`); its `def elements` took no document, because no block
+carried a note there yet.
+
+What `Map.Info` reads from the document is what the document says about
+itself and an author's note on a block: nothing the view model derives, no
+state kept between renders, and no walk that places a box. `graph/2` still
+takes no document. Decision (d)'s "from the same view model and outline and
+the palette's `explain/1`" and its "It reads no document or palette of its
+own" are read with this exception for the description region, beside the
+one the Note above states for the captions.
+
+Filed with `sb-ok65`.
+
 ## Note (2026-09-28): this record is flipped to accepted
 
 A dated Note rather than an amendment: it carries no `Status:` line, decides
 nothing, and edits no clause. The only line this request changes above it is
 the head status line (`:3`), by one word, `proposed` to `accepted`.
-Everything else is this Note and the one above it, at the foot of the file,
+Everything else is this Note and the two above it, at the foot of the file,
 so no line another record cites moves.
 
 The code this record decides shipped in statifier_blocks 0.39.0, published
@@ -356,8 +395,9 @@ on Hex from the `v0.39.0` tag at `362a0e9`, whose `CHANGELOG.md` section
 names `StatifierBlocks.Map`, `StatifierBlocks.Map.Info`,
 `StatifierBlocks.Editor.MapRegions`, the `StatifierBlocksMap` hook at its own
 entry point and the vendored elkjs file under Added. Every claim the record
-makes was checked against `main` at `362a0e9`, as read with the Note above
-on captions and the Note of this date on statifier-ui's renderer. Every
+makes was checked against `main` at `362a0e9`, as read with the two Notes
+above, on captions and on the description region's data, and the Note of
+this date on statifier-ui's renderer. Every
 `lib/`, `assets/`, `test/` and CI cite below was read there and is written
 anchor first, line second.
 
@@ -369,7 +409,7 @@ anchor first, line second.
 | (b), elkjs 0.9.3 vendored whole | `assets/vendor/elk.bundled.js` has the SHA-256 the record prints, and is 1,606,238 bytes and 466,990 bytes at `gzip -9`; `assets/vendor/elkjs-LICENSE.md` sits beside it; `.claude/firewall-vendor.txt` carries its line with `upstream=elkjs@0.9.3` and `licence=`; the hook imports it by relative path (`assets/js/statifier_blocks_map.js:34`); `README.md`, section "The hook, and what it costs", states the cost and names the import |
 | (c), the first draw-only hook | `StatifierBlocksMap` (`statifier_blocks_map.js:721`) draws into the `data-map-canvas` child, re-marks a moved selection without a layout, sends a click only as the host list's own event through its one `this.pushEvent` (`:741`), and swaps the description region's text on hover without a push; ADR-0005's Amendment of 2026-09-28 on decision 7, accepted in this request, carries the rule |
 | (d), one struct in | the view model comes from `ViewModel.build/3` (`view_model.ex:519`, `def build`); the timer edges read `ViewModel.outline/1` (`defp timer_parties/1`, `map.ex:824`); a block's findings are its `ViewModel.Node`'s `findings` (`defmodule Node`, `view_model.ex:319`), which `StatifierBlocks.Map.Info` lists (`defp findings/1`, `map/info.ex:433`) |
-| (d), the description region | `StatifierBlocks.Map.Info.elements/6` (`map/info.ex:184`) and `idle/4` (`:206`); `StatifierBlocks.Editor.MapRegions.map_region/1` (`editor/map_regions.ex:111`) renders an `aria-hidden` region and `description_region/1` (`:156`) an `aria-live="polite"` one, with the note first; the module sits under `StatifierBlocks.Editor.*` inside the `Code.ensure_loaded?(Phoenix.LiveView)` guard (`:1`); `test/statifier_blocks/editor/map_regions_test.exs` proves the list is the keyboard path ("every block the map draws is reachable from the list", "a gesture on the map arrives under the list's own name") |
+| (d), the description region | `StatifierBlocks.Map.Info.elements/6` (`map/info.ex:184`) and `idle/4` (`:206`), which also take the document, as the Note above on the description region's data says; `StatifierBlocks.Editor.MapRegions.map_region/1` (`editor/map_regions.ex:111`) renders an `aria-hidden` region and `description_region/1` (`:156`) an `aria-live="polite"` one, with the note first; the module sits under `StatifierBlocks.Editor.*` inside the `Code.ensure_loaded?(Phoenix.LiveView)` guard (`:1`); `test/statifier_blocks/editor/map_regions_test.exs` proves the list is the keyboard path ("every block the map draws is reachable from the list", "a gesture on the map arrives under the list's own name") |
 | Consequences, Node in the tests | CI's `actions/setup-node@v4` step (`.github/workflows/ci.yml:51`); the hook-count tests in `test/statifier_blocks/assets_test.exs`, describe "one hook pushes commands; the others only measure or draw (decision 7, 7e)" |
 
 ### Sentences that name a status
@@ -387,7 +427,14 @@ They are met here, not edited.
 ### Sentences that no longer hold as written
 
 - Decisions (a) and (d)'s "and from nothing else" and "It reads no document
-  or palette of its own" are read as the Note above on captions reads them.
+  or palette of its own" are read as the Note above on captions reads them:
+  `graph/2` also reads the core palette's type explanations for its
+  captions.
+- Decision (d)'s "from the same view model and outline and the palette's
+  `explain/1`" and its "It reads no document or palette of its own" are
+  read as the Note above on the description region's data reads them:
+  `Map.Info.elements/6` and `idle/4` also take the document and read a
+  block's note and the document's id, name, description and `accepts`.
 - "This record decides; the code lands beside it ... the others follow it"
   described the day it was written; all of it is in 0.39.0.
 - Cites that have moved since `ff04855`, each anchor still naming the thing
