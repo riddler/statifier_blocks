@@ -470,3 +470,162 @@ The Amendment's status paragraph says flipping it is "a separate request
 through the same `docs/adr/` gate, after the code that builds it has shipped
 in a published version". This request is that one, and 0.37.0 is that
 version.
+
+## Amendment (2026-09-29): decision 2's edge lines name a container by a noun
+
+**Status: proposed (2026-09-29, ruled by the operator, 2026-09-29).** It
+merges at proposed; flipping this section's status line to accepted is a
+separate request through the same `docs/adr/` gate, after the code that
+builds it has shipped in a published version. The record's own `Status:`
+line (`:3`) is not changed by it.
+
+Cites into code already on `main` were read at `a2e008c` and carry their
+anchors. The code items 1 to 4 decide is added by the same request as this
+Amendment, and its cites name the function without a line. Re-locate by
+anchor, not by number.
+
+### Why this is an amendment
+
+Decision 2's table writes the container of every edge line as
+`<S(container)>`, the block's sentence, and a container's sentence is an
+imperative. The library loan's lines read "Run its steps in order starts
+with ..." and "... ends Run its steps in order": an instruction where a
+reader expects a name. Naming a container by something other than its
+sentence changes what decision 2 decides, so it is recorded here with a
+status line rather than as a Note. The same request states how two
+sentences of decisions 1 and 4 are read against the code (items 5 and 6),
+and decides the wording of two later changes to the default lines (items 7
+and 8), whose code lands in requests of their own.
+
+### The amendment
+
+1. **A container is named by a noun.** In decision 2's edge lines, the
+   container and a `<target>` that is a container's `{:exit, id}`,
+   `{:entry, id}` or `{:body, id}` read the container's noun, `N(x)`,
+   where they read its sentence before: the block's title where it has
+   one (the author's own name, the view model node's `title`), else a
+   short noun for its type (item 2). A step, an endpoint `{:block, id}`,
+   keeps its sentence in every line, and the node lines are unchanged.
+   The rows of decision 2's table that name a container read:
+
+   | Line | Default |
+   |---|---|
+   | `:entry` | `<N(container)> starts with <S(to)>` |
+   | `:exit` | `<S(from)> (<outcomes, comma-separated>) ends <N(container)>` |
+   | `:branch` | `<N(container)>: when <condition>, <target>`; `otherwise, <target>` and `if undecided, <target>` for those two slots |
+   | `:interrupt` | `On <event>, <S(from)> abandons <N(container)>`, or `On <event>, <S(from)> resumes <N(container)>`, followed by ` at <history> history` when history is set |
+
+   A `<target>` that is `{:exit, id}` reads `the end of <N(id)>`.
+   `render/2` writes these lines in `defp edge_line/2` and `defp target/2`
+   in `lib/statifier_blocks/describe.ex`.
+2. **The nouns are held in the describe, keyed by the resolved module.**
+   A block with no title is named by the module the palette resolves its
+   type to, the key the container edges dispatch on (item 5):
+
+   | Module | Noun |
+   |---|---|
+   | `StatifierBlocks.Core.Sequence` | `the steps` |
+   | `StatifierBlocks.Core.Group`, `StatifierBlocks.Core.ResumableGroup` | `the group` |
+   | `StatifierBlocks.Core.Branch` | `the branch` |
+   | `StatifierBlocks.Core.Parallel` | `the lanes` |
+   | `StatifierBlocks.Core.Foreach` | `the loop` |
+
+   A block of any other module is named `the` and its palette label in
+   lower case: the label its palette entry declares, or its type name
+   where it declares none, as the view model's title falls back. No
+   block-type callback is added for the noun. A host that wants other
+   words gives the block a title, or rewords the line through decision 3's
+   phrasing seam. The table is `@nouns` in
+   `lib/statifier_blocks/describe.ex`, read by `defp node_noun/2`.
+3. **A capital, and the verb.** A noun that opens a line with a
+   lower-case `the` is written with a capital there (`The steps`, `The
+   branch`), a title included: the rule reads the noun's text, not where
+   the noun came from, so a container titled `the intake` opens a line as
+   `The intake`. Any other title is written as its author wrote it. In the
+   `:entry` line a noun whose text is `the steps` or `the lanes`, a title
+   included, takes `start with` where every other noun takes `starts
+   with`. The library loan's lines read `The steps start with
+   Decide: When "owes", otherwise`, `Send loan.closed (done) ends the
+   steps`, `The branch: otherwise, the end of the branch`, and `On
+   loan.reported_lost, When loan.reported_lost, abandon abandons the
+   group`.
+4. **A field for the noun.** Decision 1's node table gains a tenth row:
+   `StatifierBlocks.Describe.Node` carries `noun`, item 1's noun for a
+   block with slots that the palette resolved, and `nil` for a block with
+   no slots, which is never an edge's container, and for a block the
+   palette cannot resolve, which draws no edge inside itself. `outline/3`
+   fills it, because only `outline/3` holds the palette; `render/2` reads
+   it, and names a node that carries no noun (one built by hand) by its
+   sentence, as before.
+5. **The key the container edges dispatch on.** Decision 1 names the
+   four edge-drawing containers by type name, `core.sequence`,
+   `core.group`, `core.resumable_group` and `core.branch`, and its reading
+   table (the Note of 2026-09-27 that flips this record, row "1, the four
+   types") cites `container_edges/4` the same way. The code dispatches on
+   the module the palette resolves a block's type name to:
+   `StatifierBlocks.Core.Sequence`, `StatifierBlocks.Core.Group`,
+   `StatifierBlocks.Core.ResumableGroup` or `StatifierBlocks.Core.Branch`
+   (`lib/statifier_blocks/describe.ex:280`, `defp container_edges`, read
+   at `a2e008c`), taken from the resolved type in `defp edges/3`
+   (`describe.ex:268`, read at `a2e008c`). Under `Palette.core/0` the two
+   agree. A palette that registers a host's own module under
+   `core.sequence` gets that block described by containment only, and one
+   that registers `StatifierBlocks.Core.Sequence` under a host's name gets
+   a sequence's edges (the tests `a host's own module under core.sequence
+   is described by containment only` and `the package's sequence under a
+   host's name draws a sequence's edges` in
+   `test/statifier_blocks/describe_test.exs`). Decision 1's type names are
+   read as the modules `Palette.core/0` resolves them to, and item 2's
+   nouns are keyed the same way.
+6. **A module load is decision 4's one exception.** Decision 4 says that
+   nothing in `StatifierBlocks.Describe` calls a process. One call can
+   reach one: `Code.ensure_loaded?/1`, which makes sure of a module before
+   it is asked, and has the runtime's code server load a module that is
+   not yet loaded. `render/2` makes it for the host's phrasing module
+   (`describe.ex:604`, `defp phrase`, read at `a2e008c`), and `outline/3`
+   reaches it for a palette's block-type modules through
+   `StatifierBlocks.Palette.declares?/3` (`lib/statifier_blocks/palette.ex:651`
+   and `:656`, `def declares?`, read at `a2e008c`). It is the one
+   exception: the describe starts no process and sends no message of its
+   own, and the test `the compiled modules import nothing that reaches
+   one` allows `Code.ensure_loaded?/1` by name and no other call into a
+   process from the describe's four modules. The moduledoc's section "Pure,
+   and no model anywhere" says the same.
+7. **An embedded delayed send (the wording; a later request builds it).**
+   A step keeps its sentence in an edge line, so a delayed `core.send`
+   keeps its sentence, `In 7 days, send loan.overdue`, capital `In`
+   included, as every embedded sentence keeps its own first letter
+   (`After Wait 14d`). Its comma is what makes a template's own comma
+   ambiguous, the `:interrupt` line's `On <event>, ` and the `:sequence`
+   line's `(<outcomes>), `, so wherever an edge line embeds a delayed
+   send's sentence it is set in double quotation marks: `The steps start
+   with "In 7 days, send loan.overdue"`, `After "In 7 days, send
+   loan.overdue" (done), Wait 14d`. Every other embedded sentence, and a
+   delayed send's own node line, is written as before. The request that
+   builds this changes those lines and adds a test per template; this
+   request changes neither.
+8. **The timer edge's line (the wording; a later request lands it).** The
+   line stays `In <delay>, <event> reaches <S(to)>`, the delay in the
+   words `core.send`'s sentence uses and `<S(to)>` the sentence of the
+   rule or await it reaches, a step's sentence under item 1. A timer edge
+   with no readable delay or event, which only a hand-built edge can be,
+   reads `its delay` and `its event` in their places. The container a
+   timer edge carries, the send's parent, appears in no default line.
+
+### What this amendment does not change
+
+- **No edge is added, dropped or reordered.** `outline/3` answers the same
+  edges as before, and every node line reads as before; only the words of
+  an edge line that names a container change.
+- **The phrasing seam is unchanged.** A callback still receives the
+  structured node or edge and the default line; the default now carries
+  the noun, and a node carries its `noun` field.
+- **Decisions 1 and 4 are not reworded.** Items 5 and 6 say how their
+  sentences are read against the code.
+- **`StatifierBlocks.Map.Info` is unchanged.** It names a container in its
+  own words; the one line of `render/2` it shows, a timer edge's, names no
+  container.
+- **`docs/block-level-flow-graph.md` is not edited.**
+
+Filed with `sb-7y5r` and `sb-tzkg`, whose request builds items 1 to 6.
+Items 7 and 8 are built under `sb-nzf7` and `sb-gruj`.

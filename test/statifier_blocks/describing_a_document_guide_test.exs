@@ -31,9 +31,9 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
     "Run its steps in order",
     "Send loan.checked_out",
     "Wait for loan.returned, giving up after 21d",
-    "Run its steps in order starts with Send loan.checked_out",
+    "The steps start with Send loan.checked_out",
     "After Send loan.checked_out (done), Wait for loan.returned, giving up after 21d",
-    "Wait for loan.returned, giving up after 21d (received, timed_out) ends Run its steps in order"
+    "Wait for loan.returned, giving up after 21d (received, timed_out) ends the steps"
   ]
 
   # In claim order: every `#=>` line of the README section, the name the
@@ -88,15 +88,15 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
       "Send loan.closed"
     ],
     interrupt_lines: [
-      "On loan.renewed, When loan.renewed, resume resumes Resumable group at shallow history",
-      "On loan.reported_lost, When loan.reported_lost, abandon abandons Resumable group"
+      "On loan.renewed, When loan.renewed, resume resumes the group at shallow history",
+      "On loan.reported_lost, When loan.reported_lost, abandon abandons the group"
     ],
     reworded_lines: [
       "A renewal",
       "A report that the book is lost",
       "A renewal restarts the wait for the return"
     ],
-    lost_line: "On loan.reported_lost, When loan.reported_lost, abandon abandons Resumable group",
+    lost_line: "On loan.reported_lost, When loan.reported_lost, abandon abandons the group",
     same_count?: true
   ]
 

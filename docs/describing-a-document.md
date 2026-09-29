@@ -153,7 +153,14 @@ arms = for %Edge{kind: :branch} = edge <- outline.edges, do: {edge.condition, ed
 
 `render/2` answers one line per node, in node order, then one line per edge,
 in edge order. A line is non-blank English with no newline, carriage return
-or tab, and a block's id never appears in a default line:
+or tab, and a block's id never appears in a default line.
+
+An edge line names a step by its sentence and a container by its node's
+`noun`: the container's title where it has one, else a short noun for its
+type - `the steps` for a sequence, `the group` for a group or a resumable
+group, `the branch` - else `the` and its palette label in lower case. So the
+loan's resumable group is `Resumable group` as a step of the loan and `the
+group` in the lines its own edges draw:
 
 ```elixir
 lines = Describe.render(outline, [])
@@ -162,7 +169,7 @@ node_lines = Enum.take(lines, length(outline.nodes))
 #=> ["Run its steps in order", "Decide: When \"owes\", otherwise (one of)", "Send loan.fines_notice", "Wait for fines.paid", "Send loan.checked_out", "Resumable group", "Wait for loan.returned, giving up after 21d", "When loan.renewed, resume", "When loan.reported_lost, abandon", "Send loan.closed"]
 
 interrupt_lines = Enum.filter(lines, &String.starts_with?(&1, "On "))
-#=> ["On loan.renewed, When loan.renewed, resume resumes Resumable group at shallow history", "On loan.reported_lost, When loan.reported_lost, abandon abandons Resumable group"]
+#=> ["On loan.renewed, When loan.renewed, resume resumes the group at shallow history", "On loan.reported_lost, When loan.reported_lost, abandon abandons the group"]
 ```
 
 ## Reword lines with a phrasing module
@@ -196,7 +203,7 @@ reworded_lines = Enum.filter(reworded, &String.starts_with?(&1, "A "))
 #=> ["A renewal", "A report that the book is lost", "A renewal restarts the wait for the return"]
 
 lost_line = List.last(reworded)
-#=> "On loan.reported_lost, When loan.reported_lost, abandon abandons Resumable group"
+#=> "On loan.reported_lost, When loan.reported_lost, abandon abandons the group"
 ```
 
 The callback answers its own line or `:default`. An answer that is blank,
@@ -211,8 +218,8 @@ The seam rewords lines one at a time. It does not add, drop or reorder them,
 and it never sees or changes the outline: `render/2` with and without a
 phrasing module answers the same number of lines in the same order. A
 node's rewording is its own line only; an edge line that names that block
-still quotes the block's default sentence, so reword the edge too when it
-should match.
+still quotes the block's default sentence, or its noun where the block is the
+edge's container, so reword the edge too when it should match.
 
 ```elixir
 same_count? = length(reworded) == length(lines)

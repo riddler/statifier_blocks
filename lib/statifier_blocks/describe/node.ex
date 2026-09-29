@@ -13,10 +13,11 @@ defmodule StatifierBlocks.Describe.Node do
   | `outcomes` | the outcome names `StatifierBlocks.BlockType.outcomes/2` declares for the block's config, in declaration order |
   | `summary` | the block's summary chips, kept apart from `sentence` and never joined into it |
   | `fan_label` | `StatifierBlocks.ViewModel.fan_label/1`: `"one of"`, `"all of"` or `nil` |
+  | `noun` | what an edge line calls this block where it names it as a container: its title where it has one, else a short noun for its type (`"the steps"`, `"the group"`); `nil` for a block with no slots or one the palette cannot resolve |
 
   A block whose type the palette cannot resolve is its placeholder: its
   type name as its sentence, no chips, and the one `"done"` outcome a type
-  declaring no `outcomes/1` has.
+  declaring no `outcomes/1` has, and no `noun`.
   """
 
   alias StatifierBlocks.{Block, ViewModel}
@@ -30,7 +31,8 @@ defmodule StatifierBlocks.Describe.Node do
           sentence: String.t(),
           outcomes: [String.t()],
           summary: [String.t()],
-          fan_label: String.t() | nil
+          fan_label: String.t() | nil,
+          noun: String.t() | nil
         }
 
   @enforce_keys [:id, :type, :depth, :kind, :sentence]
@@ -43,6 +45,7 @@ defmodule StatifierBlocks.Describe.Node do
     parent: nil,
     outcomes: [],
     summary: [],
-    fan_label: nil
+    fan_label: nil,
+    noun: nil
   ]
 end

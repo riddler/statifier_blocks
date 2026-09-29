@@ -1157,7 +1157,7 @@ loan =
 outline = loan |> Document.new(id: "bdoc_library_loan") |> Describe.outline(Palette.core(), [])
 
 lines = Describe.render(outline, [])
-#=> ["Run its steps in order", "Send loan.checked_out", "Wait for loan.returned, giving up after 21d", "Run its steps in order starts with Send loan.checked_out", "After Send loan.checked_out (done), Wait for loan.returned, giving up after 21d", "Wait for loan.returned, giving up after 21d (received, timed_out) ends Run its steps in order"]
+#=> ["Run its steps in order", "Send loan.checked_out", "Wait for loan.returned, giving up after 21d", "The steps start with Send loan.checked_out", "After Send loan.checked_out (done), Wait for loan.returned, giving up after 21d", "Wait for loan.returned, giving up after 21d (received, timed_out) ends the steps"]
 
 edge_kinds = Enum.map(outline.edges, & &1.kind)
 #=> [:entry, :sequence, :exit]
@@ -1194,7 +1194,7 @@ defmodule MyApp.LoanPhrasing do
 end
 
 reworded = Describe.render(outline, phrasing: MyApp.LoanPhrasing)
-#=> ["Run its steps in order", "Send loan.checked_out", "Wait for loan.returned, giving up after 21d", "Run its steps in order starts with Send loan.checked_out", "Once the book is out, wait for its return", "Wait for loan.returned, giving up after 21d (received, timed_out) ends Run its steps in order"]
+#=> ["Run its steps in order", "Send loan.checked_out", "Wait for loan.returned, giving up after 21d", "The steps start with Send loan.checked_out", "Once the book is out, wait for its return", "Wait for loan.returned, giving up after 21d (received, timed_out) ends the steps"]
 ```
 
 The seam rewords lines; it does not add, drop or reorder them. For the lines

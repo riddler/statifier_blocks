@@ -91,9 +91,9 @@ defmodule StatifierBlocks.Core.Group do
   type. It says what separates a group from a sequence - its steps can be
   interrupted - rather than counting the rules in `interrupts`, which are
   blocks with lines of their own (`StatifierBlocks.Core.OnEvent`'s
-  "When ..., abandon") and are read there. It is kept short because it is
-  also the name other lines use for the group, as in "When ..., abandon
-  abandons Run interruptible steps" (`StatifierBlocks.Describe`).
+  "When ..., abandon") and are read there. It is kept short because other
+  lines also name the group by it, as in "abandons Group (Run
+  interruptible steps)" (`StatifierBlocks.Map.Info`).
 
       iex> StatifierBlocks.Core.Group.sentence(%{})
       "Run interruptible steps"

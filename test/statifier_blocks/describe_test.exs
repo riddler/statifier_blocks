@@ -138,19 +138,19 @@ defmodule StatifierBlocks.DescribeTest do
                "When loan.renewed, resume",
                "When loan.reported_lost, abandon",
                "Send loan.closed",
-               ~s(Run its steps in order starts with Decide: When "owes", otherwise),
+               ~s(The steps start with Decide: When "owes", otherwise),
                ~s[After Decide: When "owes", otherwise (done), Send loan.checked_out],
                "After Send loan.checked_out (done), Resumable group",
                "After Resumable group (done), Send loan.closed",
-               "Send loan.closed (done) ends Run its steps in order",
-               ~s(Decide: When "owes", otherwise: when patron.fines_owed > 0, Send loan.fines_notice),
+               "Send loan.closed (done) ends the steps",
+               "The branch: when patron.fines_owed > 0, Send loan.fines_notice",
                "After Send loan.fines_notice (done), Wait for fines.paid",
-               ~s[Wait for fines.paid (received, timed_out) ends Decide: When "owes", otherwise],
-               ~s(Decide: When "owes", otherwise: otherwise, the end of Decide: When "owes", otherwise),
-               "Resumable group starts with Wait for loan.returned, giving up after 21d",
-               "Wait for loan.returned, giving up after 21d (received, timed_out) ends Resumable group",
-               "On loan.renewed, When loan.renewed, resume resumes Resumable group at shallow history",
-               "On loan.reported_lost, When loan.reported_lost, abandon abandons Resumable group"
+               "Wait for fines.paid (received, timed_out) ends the branch",
+               "The branch: otherwise, the end of the branch",
+               "The group starts with Wait for loan.returned, giving up after 21d",
+               "Wait for loan.returned, giving up after 21d (received, timed_out) ends the group",
+               "On loan.renewed, When loan.renewed, resume resumes the group at shallow history",
+               "On loan.reported_lost, When loan.reported_lost, abandon abandons the group"
              ]
     end
 
@@ -315,8 +315,8 @@ defmodule StatifierBlocks.DescribeTest do
              ]
 
       assert Describe.render(described, []) |> Enum.drop(2) == [
-               "Run interruptible steps starts with the end of Run interruptible steps",
-               "On again, When again, resume resumes Run interruptible steps"
+               "The group starts with the end of the group",
+               "On again, When again, resume resumes the group"
              ]
     end
 
@@ -376,7 +376,7 @@ defmodule StatifierBlocks.DescribeTest do
       assert edge(:interrupt, "g", {:block, "h1"}, {:exit, "g"}) in described.edges
       refute Enum.any?(described.edges, &(&1.from == {:block, "h2"}))
 
-      assert "On its event, When an event, abandon abandons Run interruptible steps" in Describe.render(
+      assert "On its event, When an event, abandon abandons the group" in Describe.render(
                described,
                []
              )
@@ -423,7 +423,7 @@ defmodule StatifierBlocks.DescribeTest do
              ]
 
       assert Describe.render(described, []) |> List.last() =~
-               ~r/^On user\.cancel, .* abandons Run interruptible steps$/
+               ~r/^On user\.cancel, .* abandons the group$/
     end
 
     # A handler the palette cannot resolve is read from the document's own
@@ -491,6 +491,163 @@ defmodule StatifierBlocks.DescribeTest do
 
       assert %Describe{edges: [], nodes: [%Node{id: "root"}, %Node{id: "send", depth: 1}]} =
                Describe.outline(loan_steps("core.sequence"), palette, [])
+    end
+  end
+
+  describe "a container is named by a noun in the edge lines" do
+    # A host's container: one body slot, a `label` field an author names
+    # a block by, and a palette label of its own. It draws no edge of its
+    # own, so the lines below are rendered over edges written by hand.
+    defmodule Route do
+      @moduledoc false
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: [{"body", :any, "Stops"}]
+
+      @impl true
+      def config_schema(_config),
+        do: [%{key: "label", type: :string, label: "Name", required?: false, default: ""}]
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def palette_entry, do: %{label: "Delivery route", group: "Parcels"}
+    end
+
+    defp route(config) do
+      palette = Palette.new(%{"parcel.route" => Route, "core.send" => StatifierBlocks.Core.Send})
+
+      delivered = Block.new("core.send", id: "send", config: %{"event" => "parcel.delivered"})
+
+      described =
+        Block.new("parcel.route", id: "route", config: config, slots: %{"body" => [delivered]})
+        |> Document.new()
+        |> Describe.outline(palette, [])
+
+      %{
+        described
+        | edges: [
+            edge(:entry, "route", {:entry, "route"}, {:block, "send"}),
+            edge(:exit, "route", {:block, "send"}, {:exit, "route"}, outcomes: ["done"]),
+            edge(:branch, "route", {:entry, "route"}, {:exit, "route"}, condition: :otherwise)
+          ]
+      }
+    end
+
+    # Sabotage: in `Describe`'s noun table, map `Branch` to "the steps" ->
+    # the branch's noun reads "the steps", red.
+    # Sabotage: in `Describe.node_noun/2`, drop the no-slots clause -> the send
+    # carries "the send", red.
+    test "an untitled core container is named by its module's noun; a leaf and an unresolvable block by none" do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              Block.new("core.group", id: "group"),
+              Block.new("core.resumable_group", id: "resumable"),
+              Block.new("core.branch", id: "branch"),
+              Block.new("core.parallel", id: "parallel", config: %{"lanes" => ["a", "b"]}),
+              Block.new("core.foreach", id: "foreach"),
+              Block.new("parcel.unknown", id: "unknown", slots: %{"body" => []}),
+              Block.new("core.send", id: "send", config: %{"event" => "parcel.delivered"})
+            ]
+          }
+        )
+
+      nouns =
+        root |> Document.new() |> outline() |> Map.fetch!(:nodes) |> Map.new(&{&1.id, &1.noun})
+
+      assert nouns == %{
+               "root" => "the steps",
+               "group" => "the group",
+               "resumable" => "the group",
+               "branch" => "the branch",
+               "parallel" => "the lanes",
+               "foreach" => "the loop",
+               "unknown" => nil,
+               "send" => nil
+             }
+    end
+
+    # Sabotage: in `Describe.node_noun/2`, read the palette label ahead of the
+    # title -> the route is "the delivery route", red.
+    test "a titled container is named by its title in every line that names it" do
+      described = route(%{"label" => "Morning round"})
+
+      assert %Node{id: "route", noun: "Morning round"} = hd(described.nodes)
+
+      assert described |> Describe.render([]) |> Enum.drop(2) == [
+               "Morning round starts with Send parcel.delivered",
+               "Send parcel.delivered (done) ends Morning round",
+               "Morning round: otherwise, the end of Morning round"
+             ]
+    end
+
+    # Sabotage: in `Describe.opening/1`, capitalise only a noun from the
+    # module table (`"the " <> rest` guarded by `in @plural_nouns`) -> the
+    # title "the intake" opens its line lower-case, red.
+    # Sabotage: in `Describe.edge_line/2`, answer "starts" for every noun ->
+    # the title "the steps" reads "The steps starts", red.
+    test "a title beginning with the is capitalised and takes its verb from its text" do
+      assert route(%{"label" => "the intake"}) |> Describe.render([]) |> Enum.at(2) ==
+               "The intake starts with Send parcel.delivered"
+
+      assert route(%{"label" => "the steps"}) |> Describe.render([]) |> Enum.at(2) ==
+               "The steps start with Send parcel.delivered"
+    end
+
+    # Sabotage: in `Describe.node_noun/2`, drop `String.downcase/1` -> the route
+    # is "the Delivery route", red.
+    # Sabotage: in `Describe.opening/1`, answer the noun unchanged -> the
+    # entry line opens "the delivery route", red.
+    test "an untitled host container is named by the and its palette label in lower case" do
+      described = route(%{})
+
+      assert %Node{id: "route", noun: "the delivery route"} = hd(described.nodes)
+
+      assert described |> Describe.render([]) |> Enum.drop(2) == [
+               "The delivery route starts with Send parcel.delivered",
+               "Send parcel.delivered (done) ends the delivery route",
+               "The delivery route: otherwise, the end of the delivery route"
+             ]
+    end
+
+    # Sabotage: in `Describe.container_name/1`, answer "a block" for a node
+    # with no noun -> the entry line reads "a block starts with ...", red.
+    test "a node that carries no noun is named by its sentence" do
+      described = %Describe{
+        id: "bdoc_parcel",
+        revision: 0,
+        nodes: [
+          %Node{
+            id: "route",
+            type: "parcel.route",
+            depth: 0,
+            kind: :step,
+            sentence: "Deliver the parcels"
+          },
+          %Node{
+            id: "send",
+            type: "core.send",
+            depth: 1,
+            kind: :step,
+            sentence: "Send parcel.delivered"
+          }
+        ],
+        edges: [edge(:entry, "route", {:entry, "route"}, {:block, "send"})]
+      }
+
+      assert Describe.render(described, []) |> List.last() ==
+               "Deliver the parcels starts with Send parcel.delivered"
     end
   end
 
@@ -750,9 +907,9 @@ defmodule StatifierBlocks.DescribeTest do
       "Run its steps in order",
       "Wait 14d",
       "Send loan.overdue",
-      "Run its steps in order starts with Wait 14d",
+      "The steps start with Wait 14d",
       "After Wait 14d (done), Send loan.overdue",
-      "Send loan.overdue (done) ends Run its steps in order"
+      "Send loan.overdue (done) ends the steps"
     ]
 
     defp described do
@@ -778,7 +935,7 @@ defmodule StatifierBlocks.DescribeTest do
                "Tell the patron the loan is overdue",
                "It begins with a pause.",
                "After Wait 14d (done), Send loan.overdue",
-               "Send loan.overdue (done) ends Run its steps in order"
+               "Send loan.overdue (done) ends the steps"
              ]
     end
 
