@@ -28,6 +28,7 @@ defmodule StatifierBlocks.MapLayoutTest do
 
   use ExUnit.Case, async: true
 
+  alias StatifierBlocks.Decode
   alias StatifierBlocks.Describe
   alias StatifierBlocks.Describe.Edge
   alias StatifierBlocks.Map, as: BlockMap
@@ -37,6 +38,7 @@ defmodule StatifierBlocks.MapLayoutTest do
 
   @driver Path.expand("../support/js/statifier_blocks_map_layout.mjs", __DIR__)
   @hook_driver Path.expand("../support/js/statifier_blocks_map_hook.mjs", __DIR__)
+  @flow_graph_loan Path.expand("../fixtures/flow_graph_note/library_loan.json", __DIR__)
 
   @moduletag :tmp_dir
 
@@ -178,6 +180,51 @@ defmodule StatifierBlocks.MapLayoutTest do
           refute path =~ "stroke-dasharray", "#{key}: #{path}"
         end
       end
+    end
+
+    # A resume rule is drawn back to the head of its group's body: the path
+    # leaves the top of the rule's box at its middle and ends on the head's
+    # right side, level with the head's middle, since the head stands to the
+    # left of the rules column. Neither teaching document has a resume
+    # rule, so the library loan of the flow graph note carries the case: its
+    # loan period resumes on a renewal. Read off the markup's own path data.
+    # The run between the two ends is left unpinned.
+    #
+    # Sabotage: made interruptsOf draw a resume edge to the head's left side
+    # rather than its right; this went red. Reverted from a copy.
+    test "a resume edge leaves the top of its rule and ends on the head of the body",
+         %{tmp_dir: dir} do
+      {:ok, document} = Decode.decode(File.read!(@flow_graph_loan))
+      graph = document |> ViewModel.build(Palette.core(), []) |> BlockMap.graph()
+
+      assert %{"from" => "blk_LREN", "group" => "blk_LLEN", "to" => "body"} in BlockMap.interrupts(
+               graph
+             )
+
+      %{"drawn" => "map", "boxes" => boxes, "interrupts" => drawn} =
+        run(dir, "flow_graph_loan", graph)
+
+      id = "blk_LREN->blk_LLEN/body"
+      edge = Enum.find(drawn, &(&1["id"] == id)) || flunk("#{id} is not drawn")
+
+      assert %{"source" => "blk_LREN", "target" => "blk_LLEN", "to" => "body", "dashed" => true} =
+               edge
+
+      rule = boxes["blk_LREN"]
+      head = boxes["blk_LRET"]
+      x = centre(rule)
+      y = head["y"] + head["height"] / 2
+
+      # The head stands to the left of the rule, the case that draws the
+      # edge in from the head's side.
+      assert head["x"] + head["width"] < x
+
+      [start | _rest] = points = path_points(edge["d"])
+      stop = List.last(points)
+      assert_in_delta start.x, x, 0.5
+      assert_in_delta start.y, rule["y"], 0.5
+      assert_in_delta stop.x, head["x"] + head["width"], 0.5
+      assert_in_delta stop.y, y, 0.5
     end
 
     # The registration's deadline send is drawn joined to the rule that

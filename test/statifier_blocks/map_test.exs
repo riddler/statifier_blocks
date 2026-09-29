@@ -457,6 +457,41 @@ defmodule StatifierBlocks.MapTest do
       assert Enum.map(BlockMap.timers(graph), &{&1["from"], &1["to"]}) == described
     end
 
+    # A delay of whitespace alone is not a duration: `delayed?/1` hands the
+    # field to `Duration.duration?/1` as the form holds it, untrimmed, so
+    # such a send carries no clock mark and draws no timer edge to the await
+    # that names its event, and Describe's outline agrees.
+    #
+    # Sabotage: made delayed?/1 answer true for a delay of whitespace alone;
+    # this went red. Reverted from a copy.
+    test "a send whose delay is whitespace alone carries no clock and draws no timer edge" do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              Block.new("core.send",
+                id: "reminder",
+                config: %{"event" => "loan.overdue", "delay" => "   "}
+              ),
+              Block.new("core.await", id: "overdue", config: %{"event" => "loan.overdue"})
+            ]
+          }
+        )
+
+      document = Document.new(root)
+      graph = document |> build() |> BlockMap.graph()
+
+      assert marks(graph) == %{"overdue" => "wait"}
+      assert BlockMap.timers(graph) == []
+      refute Map.has_key?(graph, "timers")
+
+      assert for(
+               %Edge{kind: :timer} = edge <- Describe.outline(document, Palette.core(), []).edges,
+               do: edge
+             ) == []
+    end
+
     # A send on the drafts shelf arms nothing, and neither is a rule there
     # heard: a shelved block takes part in no timer edge, as in Describe.
     #
