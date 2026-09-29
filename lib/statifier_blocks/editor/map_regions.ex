@@ -55,7 +55,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     server: the selected block's `StatifierBlocks.Map.Info` description, or
     `StatifierBlocks.Map.Info.idle/4` when nothing is selected. A block's
     author-written note leads, above the built-in text (ADR-0001's Amendment
-    of 2026-09-28, clause `2g`). It shows values and never controls.
+    of 2026-09-28, clause `2g`). It shows values and never controls. The
+    region's accessible name is its `aria-label`, `"Description"` unless the
+    host passes its own words in `label`.
 
     Beside the region, and hidden, it renders the store the hook's hover
     reads: one child per element the map draws, `data-describes` naming the
@@ -185,6 +187,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           "no store and no how-to-read paragraph in the idle description"
     )
 
+    attr(:label, :string,
+      default: "Description",
+      doc:
+        "the live region's accessible name, rendered as its `aria-label`; " <>
+          "a host passes its own words for it, in its own language"
+    )
+
     attr(:class, :string, default: nil, doc: "a class of the host's, added to the region's own")
 
     @doc "The Map's description region, its hover layer and its hidden store; see the moduledoc."
@@ -220,7 +229,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           id={@id}
           class={["sb-map__description", @class]}
           aria-live="polite"
-          aria-label="Description"
+          aria-label={@label}
           data-map-description={@current.kind}
         >
           <.description description={@current} explanation={@map or @current.kind != :idle} />
