@@ -53,6 +53,20 @@ or on a selector that reaches that element:
 Load your stylesheet after the package's, so a tie in specificity goes your
 way.
 
+The Map's tokens follow the same rule on a different element. The Map
+region is not inside `.sb-editor`, and the package declares its
+`--sb-map-*` tokens on `.sb-map__region` itself, so a host overrides one
+of them on `.sb-map__region`, or on a selector that reaches that element;
+a declaration on an ancestor of the region loses to the package's own:
+
+```text
+/* No: the region's own declarations win over anything inherited. */
+.myapp-page { --sb-map-edge: #93a0b2; }
+
+/* Yes: the same element the package declares the Map's tokens on. */
+.myapp-page .sb-map__region { --sb-map-edge: #93a0b2; }
+```
+
 ## The three tiers
 
 Not three sets of tokens - three answers to "what am I taking on by setting
