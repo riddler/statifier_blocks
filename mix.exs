@@ -94,6 +94,10 @@ defmodule StatifierBlocks.MixProject do
         "Edit algebra and view model": [
           ~r/^StatifierBlocks\.(Edit|Finding|ViewModel)($|\.)/
         ],
+        "The Map": [
+          ~r/^StatifierBlocks\.Map($|\.)/,
+          ~r/^StatifierBlocks\.Editor\.MapRegions$/
+        ],
         "LiveView editor": [
           ~r/^StatifierBlocks\.Editor($|\.)/
         ],

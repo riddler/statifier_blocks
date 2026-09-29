@@ -145,6 +145,15 @@
  *     2  --sb-canvas-grid
  *     2  --sb-band-even
  *     2  --sb-band-odd
+ *     2  --sb-map-block-fill
+ *     2  --sb-map-block-stroke
+ *     2  --sb-map-slot-fill
+ *     2  --sb-map-slot-stroke
+ *     2  --sb-map-empty-fill
+ *     2  --sb-map-empty-stroke
+ *     2  --sb-map-edge
+ *     2  --sb-map-mark
+ *     2  --sb-map-band-fill
  *
  *     3  --sb-color-scheme
  *
@@ -4845,4 +4854,160 @@ button.sb-inspector__group-row:hover {
       "drawer";
     grid-template-rows: minmax(0, 1fr) auto auto auto;
   }
+}
+
+/* ------------------------------------------------------------------- map
+ *
+ * The Map and its description region (`StatifierBlocks.Editor.MapRegions`,
+ * drawn by the `StatifierBlocksMap` hook), moved from the reference host's
+ * stylesheet with the host's names turned into this package's. Neither
+ * region sits inside `.sb-editor`, so neither reads the editor's token
+ * block: the `--sb-*` palette they read is whatever the host page sets on
+ * an ancestor, which is where a host themes them.
+ *
+ * The `--sb-map-*` tokens are the names the hook's SVG reads, declared on
+ * the map region's root and mapped onto the palette, so a page that themes
+ * the palette dresses the map without a block of its own. The drawing
+ * carries a fallback for every one of them, which is what the map looks
+ * like on a page that sets none. They are the one family declared outside
+ * the editor's root, because the map region is not inside it.
+ */
+.sb-map__region {
+  --sb-map-block-fill: var(--sb-bg);
+  --sb-map-block-stroke: var(--sb-border-strong);
+  --sb-map-slot-fill: var(--sb-bg-muted);
+  --sb-map-slot-stroke: var(--sb-border);
+  --sb-map-empty-fill: transparent;
+  --sb-map-empty-stroke: var(--sb-fg-subtle);
+  --sb-map-edge: var(--sb-fg-subtle);
+  --sb-map-mark: var(--sb-fg-muted);
+  --sb-map-band-fill: var(--sb-bg-sunken);
+
+  display: flex;
+  min-width: 0;
+}
+
+.sb-map__canvas {
+  flex: 1;
+  min-width: 0;
+  max-height: 75vh;
+  overflow: auto;
+  padding: var(--sb-space);
+  border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius-sm, 3px);
+  background: var(--sb-bg-canvas);
+}
+
+.sb-map__svg {
+  display: block;
+}
+
+/* 12px is the size the server's width estimate (7px a character) is
+   written for; a larger size here would run text out of its boxes. */
+.sb-map__svg text {
+  font-family: inherit;
+  font-size: 12px;
+  fill: var(--sb-fg);
+}
+
+.sb-map__title {
+  font-weight: 600;
+}
+
+.sb-map__sentence,
+.sb-map__slot-label {
+  fill: var(--sb-fg-muted);
+}
+
+/* A container's one-line caption: under a group's rules column's label,
+   and on a branch's band; and the delay a dotted timer edge is labelled
+   with. Same 12px as every other line, so the width estimate holds; set
+   apart by its slant. */
+.sb-map__svg .sb-map__caption {
+  fill: var(--sb-fg-muted);
+  font-style: italic;
+}
+
+/* The start dot and the end marks select nothing, so they do not look
+   clickable. An end mark's ring, solid for done and dashed for abandon,
+   is drawn by the hook; the outcome on the edge into it is a caption. */
+.sb-map__svg .sb-map__start,
+.sb-map__svg .sb-map__end {
+  cursor: default;
+}
+
+.sb-map__svg .sb-map__empty-text {
+  fill: var(--sb-fg-subtle);
+  font-style: italic;
+}
+
+.sb-map__block,
+.sb-map__gap {
+  cursor: pointer;
+}
+
+.sb-map__svg .sb-map__empty {
+  cursor: pointer;
+}
+
+/* The drawing sets each box's stroke inline, so the selection has to win
+   over a style attribute. */
+.sb-map__block--selected > rect {
+  stroke: var(--sb-accent, #6c8cff) !important;
+  stroke-width: 2;
+}
+
+.sb-map__error {
+  color: var(--sb-fg);
+  font-size: var(--sb-text-sm);
+}
+
+.sb-map__error-reason,
+.sb-map__error-hint {
+  color: var(--sb-fg-muted);
+}
+
+/* The description region: words, never controls. The note an author wrote
+   for a block leads it, above the built-in text. */
+.sb-map__description {
+  margin-bottom: var(--sb-space);
+  padding-bottom: var(--sb-space);
+  border-bottom: 1px solid var(--sb-border);
+  font-size: var(--sb-text-sm);
+  color: var(--sb-fg);
+}
+
+.sb-map__description-note {
+  margin: 0 0 var(--sb-space-half);
+}
+
+.sb-map__description-title {
+  margin: 0;
+  font-weight: var(--sb-weight-medium, 500);
+}
+
+.sb-map__description-sentence,
+.sb-map__description-text,
+.sb-map__description-heading {
+  margin: var(--sb-space-half) 0 0;
+  color: var(--sb-fg-muted);
+}
+
+.sb-map__description-facts {
+  margin: var(--sb-space-half) 0 0;
+}
+
+.sb-map__description-facts dt {
+  font-weight: var(--sb-weight-medium, 500);
+}
+
+.sb-map__description-facts dd {
+  margin: 0 0 var(--sb-space-half);
+  color: var(--sb-fg-muted);
+  overflow-wrap: anywhere;
+}
+
+.sb-map__description-facts ul {
+  margin: 0;
+  padding-left: 1rem;
 }
