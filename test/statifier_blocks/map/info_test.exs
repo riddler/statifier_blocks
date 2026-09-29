@@ -521,10 +521,12 @@ defmodule StatifierBlocks.Map.InfoTest do
       "empty" => "A dashed box saying",
       "empty-text" => "is a place no step fills yet",
       "start" => "The filled dot is where the document starts",
+      "start-caption" => "its arrow captioned with what starts it",
       "end" => "a dot inside a ring where it finishes",
       "end-ring" => "a solid ring when its last step finishes",
       "end-dot" => "a dashed ring, reached by a dashed arrow",
       "edge--end" => "the outcome named on the arrow into it",
+      "end-caption" => "the outcome named on the arrow into it",
       "edge" => "An arrow runs from a step to the one after it",
       "band" => "a band",
       "band-group" => "stands over the arms' boxes",
@@ -544,6 +546,11 @@ defmodule StatifierBlocks.Map.InfoTest do
     # not be laid out: neither is a mark on a map.
     @not_marks ["svg", "error", "error-title", "error-reason", "error-hint"]
 
+    # The classes the hook builds by interpolation, each with every class it
+    # can build. An interpolated class the hook adds and this table does not
+    # list fails the test, so none escapes the scan.
+    @interpolated %{"${which}-caption" => ["start-caption", "end-caption"]}
+
     # Each value the graph gives a mark, a slot or an end, and the words
     # that name that one.
     @variants %{
@@ -560,15 +567,28 @@ defmodule StatifierBlocks.Map.InfoTest do
     # Sabotage: cut the fork mark from the paragraph; this went red on
     # "fork". Reverted from a copy. Sabotage: added a class the paragraph
     # does not name to a comment in the hook; this went red. Reverted from
-    # a copy.
+    # a copy. Sabotage: cut "its arrow captioned with what starts it" from
+    # the paragraph; this went red on "start-caption". Reverted from a copy.
+    # Sabotage: added an interpolated class the table does not list to a
+    # comment in the hook; this went red. Reverted from a copy.
     test "names every mark the hook draws" do
       {_graph, _descriptions, idle} = described("library_loan")
+      hook = File.read!(@hook)
 
-      drawn =
+      plain =
         ~r/sb-map__([a-z][a-z-]*[a-z])/
-        |> Regex.scan(File.read!(@hook), capture: :all_but_first)
+        |> Regex.scan(hook, capture: :all_but_first)
+        |> List.flatten()
+
+      built =
+        ~r/sb-map__(\$\{[^}]*\}[a-z-]*)/
+        |> Regex.scan(hook, capture: :all_but_first)
         |> List.flatten()
         |> Enum.uniq()
+
+      assert Enum.sort(built) == Enum.sort(Map.keys(@interpolated))
+
+      drawn = Enum.uniq(plain ++ Enum.flat_map(built, &Map.fetch!(@interpolated, &1)))
 
       assert Enum.sort(drawn -- @not_marks) == Enum.sort(Map.keys(@named))
 
