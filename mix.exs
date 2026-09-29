@@ -1,7 +1,7 @@
 defmodule StatifierBlocks.MixProject do
   use Mix.Project
 
-  @version "0.38.0"
+  @version "0.39.0"
   @source_url "https://github.com/riddler/statifier_blocks"
 
   # ADR-0005 decision 1's acceptance property: the package must compile clean
@@ -112,7 +112,7 @@ defmodule StatifierBlocks.MixProject do
   defp package do
     [
       name: "statifier_blocks",
-      licenses: ["MIT"],
+      licenses: ["MIT", "EPL-2.0"],
       # `assets` is in the list because the hook and the stylesheet ship as
       # source (ADR-0005 decisions 7 and 14, sui-ADR-0009's delivery model),
       # and source that is not in the tarball is not public API however

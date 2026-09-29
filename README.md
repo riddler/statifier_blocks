@@ -51,7 +51,7 @@ off a closed built-in vocabulary.
 ```elixir
 def deps do
   [
-    {:statifier_blocks, "~> 0.38.0"}
+    {:statifier_blocks, "~> 0.39.0"}
   ]
 end
 ```
@@ -1793,3 +1793,7 @@ when the two disagree, the record is the contract and the code is the bug.
 
 MIT - see
 [LICENSE](https://github.com/riddler/statifier_blocks/blob/main/LICENSE).
+
+One file is not: `assets/vendor/elk.bundled.js`, elkjs 0.9.3 vendored
+unmodified for the Map hook, is under the Eclipse Public License 2.0, and its
+licence text ships beside it as `assets/vendor/elkjs-LICENSE.md`.
