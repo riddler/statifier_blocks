@@ -402,6 +402,27 @@ defmodule StatifierBlocks.Core.SendTest do
       assert phrased.("0s") == "In 0 seconds, send parcel.delivered"
     end
 
+    # Sabotage: phrased each component from its digits as stored rather
+    # than from their value -> "07 days", red (verified).
+    test "puts a leading zero in words by the number's value" do
+      assert Send.sentence(%{"event" => "loan.fines_notice", "delay" => "07d"}) ==
+               "In 7 days, send loan.fines_notice"
+    end
+
+    # Sabotage: dropped a zero component from the phrase -> "1 hour",
+    # red (verified).
+    test "puts a zero component in words, not dropped" do
+      assert Send.sentence(%{"event" => "loan.fines_notice", "delay" => "1h0m"}) ==
+               "In 1 hour 0 minutes, send loan.fines_notice"
+    end
+
+    # Sabotage: sent a short form whose every component is zero to the
+    # stored spelling -> "In 0d", red (verified).
+    test "puts a lone zero component in words" do
+      assert Send.sentence(%{"event" => "loan.fines_notice", "delay" => "0d"}) ==
+               "In 0 days, send loan.fines_notice"
+    end
+
     # Sabotage: dropped the largest-first check from the short-form match
     # -> "3h2h" phrased as "3 hours 2 hours" and "30m1h" out of order, red
     # (verified).
