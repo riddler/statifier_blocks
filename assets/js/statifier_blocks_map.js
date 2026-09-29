@@ -18,7 +18,9 @@
 // map's element (`data-select-event`, `data-insert-event`), with the payload
 // the list sends for the same gesture. A host that stamps no name gets a
 // drawing that sends nothing. test/statifier_blocks/assets_test.exs holds
-// this file to that.
+// this file to that. Hover pushes nothing at all: it swaps the description
+// region's text in the page, from descriptions the server already rendered
+// (see "Hover" below).
 //
 // Its own entry point, `statifier_blocks/map`, and not the default export of
 // `statifier_blocks`: the import below pulls in the whole of the vendored
@@ -601,6 +603,99 @@ export function markSelected(target, id) {
   }
 }
 
+// ------------------------------------------------------------------ hover
+//
+// The description region, on hover: pointing at anything the map draws
+// shows that element's description in the region, and pointing away puts
+// back what the region said before - the selected block's description, or
+// the document's when nothing is selected.
+//
+// Every description was computed by the server (`StatifierBlocks.Map.Info`)
+// and rendered into the page's hidden store, one entry per map id under
+// `data-describes`, in the same markup the region draws. The hook finds the
+// region and the store by the ids the host stamps on its element,
+// `data-info-region` and `data-info-store`; a host that stamps neither gets
+// no hover. This code only copies an entry into the region and back: it
+// pushes nothing to the server, adds no command, and never changes what is
+// selected. It listens on the document, so the map may be redrawn under it
+// at any time.
+//
+// The region stays the list's: the map is `aria-hidden`, and a keyboard or
+// a screen reader reaches every description by selecting a row, which the
+// server renders into the region itself.
+
+// The map id of the drawn element `target` belongs to, or null when it
+// belongs to none. A connector or an interrupt edge carries its id in
+// `data-map-edge`; a block, a slot's box or an empty slot's marker in
+// `data-map-node`, on the group its rect, text and timer mark sit inside.
+// A gap's "+" describes nothing of its own.
+export function describedId(target) {
+  if (!target || typeof target.closest !== "function") return null
+  if (target.closest("[data-map-gap]")) return null
+
+  const edge = target.closest("[data-map-edge]")
+  if (edge) return edge.dataset.mapEdge
+
+  const node = target.closest("[data-map-node]")
+  if (node) return node.dataset.mapNode
+
+  return null
+}
+
+// The store's entry for `id`, or null. Compared by value rather than by an
+// attribute selector, because a map id carries `>` and `/`.
+export function entryFor(store, id) {
+  if (!store) return null
+  for (const entry of store.children) {
+    if (entry.dataset.describes === id) return entry
+  }
+  return null
+}
+
+// The swap and the restore, over a region and a store. `region()` and
+// `store()` are asked afresh on every call, since a patch may replace
+// either.
+//
+// `show(id)` puts the entry for `id` into the region and marks the region
+// with `data-map-hover`; the first swap keeps what the region said, so
+// `restore()` can put it back. An id with no entry restores instead.
+//
+// A patch that reaches the region while it shows a hovered entry redraws
+// the server's own content there and drops the mark; the kept content is
+// then stale, so it is discarded rather than put back.
+export function hover(region, store) {
+  let resting = null
+
+  function restore() {
+    const el = region()
+    if (el && resting !== null && el.dataset.mapHover !== undefined) {
+      el.innerHTML = resting
+      delete el.dataset.mapHover
+    }
+    resting = null
+  }
+
+  function show(id) {
+    const el = region()
+    const entry = id === null ? null : entryFor(store(), id)
+    if (!el || !entry) return restore()
+
+    if (el.dataset.mapHover === undefined) resting = el.innerHTML
+    if (el.dataset.mapHover === id) return
+
+    el.innerHTML = entry.innerHTML
+    el.dataset.mapHover = id
+  }
+
+  return {show, restore}
+}
+
+// The element the host names by `id` in the hook element's dataset, or
+// null when it names none.
+function named(doc, id) {
+  return typeof id === "string" && id !== "" ? doc.getElementById(id) : null
+}
+
 // The LiveView hook. The graph arrives JSON-encoded in `data-graph` on the
 // hook's element, the selected block's id as the graph's own `selected`
 // mark (or, lacking one, in `data-selected`), and whether the page can edit
@@ -619,8 +714,25 @@ export function markSelected(target, id) {
 // insert the list opened may sit below the map. The map is hidden from
 // assistive technology; the list and the panel are the keyboard path to
 // every one of these gestures but the insert into an empty slot.
+//
+// A pointer arriving over any element the map draws swaps the description
+// region to that element's description; one arriving over nothing the map
+// draws, or leaving the window, puts the region back (see "Hover" above).
 export const StatifierBlocksMap = {
   mounted() {
+    const doc = this.el.ownerDocument
+    if (doc) {
+      this.hover = hover(
+        () => named(doc, this.el.dataset.infoRegion),
+        () => named(doc, this.el.dataset.infoStore),
+      )
+      this.onOver = (event) => this.hover.show(describedId(event.target))
+      this.onOut = (event) => {
+        if (!event.relatedTarget) this.hover.restore()
+      }
+      doc.addEventListener("mouseover", this.onOver)
+      doc.addEventListener("mouseout", this.onOut)
+    }
     this.el.addEventListener("click", (event) => {
       const events = listEvents(this.el)
       const gesture = mapGesture(event.target, this.el.dataset.editable === "true", events)
@@ -642,6 +754,14 @@ export const StatifierBlocksMap = {
       }
     }
     return drawn
+  },
+
+  destroyed() {
+    const doc = this.el.ownerDocument
+    if (doc && this.onOver) {
+      doc.removeEventListener("mouseover", this.onOver)
+      doc.removeEventListener("mouseout", this.onOut)
+    }
   },
 
   // Resolves once whatever this call started has been drawn, so a caller
