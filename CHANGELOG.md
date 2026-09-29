@@ -11,6 +11,56 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.41.0] 2026-09-29
+
+0.41.0 changes how the Map draws three things and how Describe names a
+container. The Map draws the happy path straight through a group whose
+body holds a container, the Map hook laying such a document out a second
+time; it draws the clock mark on a timed wait; and its how-to-read text
+names every mark it draws. The changes to existing answers are under
+Changed: `StatifierBlocks.Describe.render/2` names a container in its edge
+lines by a noun rather than by its sentence, and sets an embedded delayed
+send's sentence in double quotation marks, so a host that matched the old
+edge lines reads the new words; and the Map hook warns once in the
+browser console when its element has no `data-map-canvas` child.
+`StatifierBlocks.Describe.Node` gains the `noun` field. 0.41.0 is a
+minor, because what an existing function answers changes and a public
+struct gains a field. The package gains no Hex dependency.
+
+### Added
+
+- `StatifierBlocks.Describe.Node` carries `noun`, the name an edge line gives the block when it is the edge's container: its title, else a short noun for its type, and `nil` for a block with no slots or one the palette cannot resolve.
+
+### Changed
+
+- The Map draws the happy path straight through a group whose body holds a
+  container, such as a branch: the Map hook lays that document out twice,
+  the second time with the group's edges attached where its body's steps
+  stand, instead of at the middle of the group.
+
+- The paragraph on how to read the map, in the idle description, names
+  every mark the Map draws once each: the shaded slot boxes, the band and
+  its fork mark, the captions, the rejoin's dot and heavier arrow, the
+  selection outline and the "+" on a page that can edit, beside the marks
+  it already named. It says a dotted timer arrow runs to the interrupt
+  rule or the hourglass step that hears it.
+
+- `StatifierBlocks.Describe.render/2` names a container by a noun in its edge lines rather than by its sentence: its title where it has one, else a short noun for its type (`The steps start with Wait 14d`, `Send loan.overdue (done) ends the steps`, `abandons the group`); a host's container reads `the` and its palette label in lower case. Node lines, and a step named in an edge line, keep their sentence. A host that matched the old edge lines reads the new words or rewords them through `StatifierBlocks.Describe.Phrasing`.
+
+- `StatifierBlocks.Describe.render/2` sets a delayed `core.send`'s sentence in double quotation marks wherever an edge line embeds it, so its own comma no longer reads as the line's: `The steps start with "In 7 days, send loan.overdue"`, `After "In 7 days, send loan.overdue" (done), Wait 14d`. The send's node line, an undelayed send and every other step read as before. A host that matched the old edge lines reads the new words or rewords them through `StatifierBlocks.Describe.Phrasing`.
+
+- The Map draws the clock mark on a timed wait (`core.wait`), as it does on
+  a delayed send: the clock says time passes, and the hourglass on an
+  await says a step waits for an event. The mark is a mark only; a wait
+  still takes no part in a timer edge. The paragraph on how to read the
+  map, in the idle description, says so.
+
+- The Map hook warns once per mount in the browser console when its element
+  has no `data-map-canvas` child. It still draws into the element itself, as
+  before, but that is not supported: LiveView patches the element, so a
+  patch can take the drawing away. `map_region/1` always renders the child;
+  a host that attaches the hook to its own element gives it one.
+
 ## [0.40.0] 2026-09-29
 
 0.40.0 lets an author write a block's note in the editor, and shows the
@@ -3740,6 +3790,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.41.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.41.0
 [0.40.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.40.0
 [0.39.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.39.0
 [0.38.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.38.0
