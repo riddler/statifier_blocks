@@ -5,7 +5,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     (ADR-0005 decisions 6, 8, 9, 13).
 
     Everything this component does is **translation**. Every author gesture
-    reduces to one of the four commands `StatifierBlocks.Edit` defines, and
+    reduces to one of the commands `StatifierBlocks.Edit` defines, and
     the mutation, its inverse and the set of places a block may be dropped are
     all pure functions of `{document, palette}` that were tested with LiveView
     absent from the dependency tree. What is left here is turning a `phx-`
@@ -759,7 +759,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       drop insert-drop remove remove-confirm remove-cancel expand undo redo
       dragstart dragend insert-dragstart
       palette-open palette-close palette-pick
-      config-change discard-draft field-list-add field-list-remove
+      config-change discard-draft field-list-add field-list-remove note-change
       declaration-add declaration-remove declaration-move declaration-change
       accepted-add accepted-remove accepted-move accepted-change
     )
@@ -1187,6 +1187,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             read_only={@read_only?}
             collapsed={@inspector_collapsed}
             node={@selected_node}
+            note={@selected_note}
             slot_label={@selected_slot}
             root={@view_model.root}
             document_findings={@view_model.findings}
@@ -1562,7 +1563,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # palette's fold above already has - and, like it, no hook and no client
     # state: the collapsed face is markup the server rendered.
     #
-    # It is deliberately NOT an `Edit` command. Decision 2's four commands are
+    # It is deliberately NOT an `Edit` command. Decision 2's commands are
     # the DOCUMENT's algebra; which containers this author has folded shut is
     # not in the document, is not undoable, and is not serialized, so it lives
     # here beside `selected_id` and is reset by `switch_document/2` the way a
@@ -1798,6 +1799,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_event("discard-draft", %{"block-id" => id}, socket) do
       {:noreply, socket |> drop_draft(id) |> rebuild()}
     end
+
+    # The Config tab's note textarea (ADR-0005's Amendment of 2026-09-29,
+    # 2s). Its own form and its own event, so the note never meets
+    # `ConfigForm.decode/3` and cannot collide with a config field that
+    # happens to be named "note". The change is one `{:update_note, id,
+    # note}` through the same funnel as every other command, so it is one
+    # undo entry; a note equal to the one the block holds commits nothing,
+    # so a change event that moved nothing leaves no entry to step through.
+    def handle_event("note-change", %{"block-id" => id, "note" => note}, socket)
+        when is_binary(id) and is_binary(note) do
+      if block_note(socket.assigns.document, id) == note do
+        {:noreply, socket}
+      else
+        {:noreply, commit(socket, {:update_note, id, note}, :keep)}
+      end
+    end
+
+    def handle_event("note-change", _params, socket), do: {:noreply, socket}
 
     def handle_event("field-list-add", %{"key" => key} = params, socket) do
       {:noreply, update_list(socket, key, params, :add)}
@@ -3518,6 +3537,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> assign(:expandable_ids, composite_ids(document, palette))
       |> assign(:selected_node, selected)
       |> assign(:selected_slot, Shell.slot_label(view_model.root, socket.assigns.selected_id))
+      |> assign(:selected_note, selected_note(document, selected))
       |> assign(:pending_fields, pending_fields(socket, selected))
       |> notify_select(selected)
       |> refresh_fixture_runs()
@@ -3847,6 +3867,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
             BlockType.fetch_value(draft, path) != BlockType.fetch_value(committed, path)
           end)
+      end
+    end
+
+    # The selected block's note, read off the document: the view model's node
+    # carries no note, because nothing it projects reads one. `nil` with no
+    # selection, and for an id the document no longer holds.
+    @spec selected_note(Document.t(), ViewModel.Node.t() | nil) :: String.t() | nil
+    defp selected_note(_document, nil), do: nil
+    defp selected_note(document, %ViewModel.Node{block_id: id}), do: block_note(document, id)
+
+    @spec block_note(Document.t(), Block.id()) :: String.t() | nil
+    defp block_note(document, id) do
+      case Enum.find(Document.blocks(document), &(&1.id == id)) do
+        %Block{note: note} -> note
+        nil -> nil
       end
     end
 

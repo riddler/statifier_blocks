@@ -31,7 +31,7 @@ defmodule StatifierBlocks.Edit do
      re-inserting at `i` in the shortened list is the identity, and that
      is true whether or not `P == Q and s == t`.
 
-  ## The six inverses
+  ## The inverses
 
   | Command | Inverse |
   |---|---|
@@ -41,6 +41,7 @@ defmodule StatifierBlocks.Edit do
   | `{:update_config, id, config}` | `{:update_config, id, previous_config}` |
   | `{:set_datamodel, entries}` | `{:set_datamodel, previous_entries}` |
   | `{:set_accepts, names}` | `{:set_accepts, previous_names}` |
+  | `{:update_note, id, note}` | `{:update_note, id, previous_note}` |
 
   ## The fifth command (ADR-0005's 2026-09-01 amendment, 2g-2h)
 
@@ -82,11 +83,32 @@ defmodule StatifierBlocks.Edit do
   and in its hash: a declared name an author deletes is document content,
   and undo has to bring it back.
 
+  ## The note command (ADR-0005's 2026-09-29 Amendment, 2s)
+
+  `{:update_note, id, note}` replaces the author-written `note` on the block
+  carrying `id` (ADR-0001's Amendment of 2026-09-28), and its inverse is
+  `{:update_note, id, previous_note}`. It is a command, like every other
+  write an editor makes to the document, so the note goes through
+  `Edit.History` and an undo brings back the note an author overwrote.
+
+  The empty string is the absent note: a note of `""` removes the block's
+  note, and canonical form omits it. Nothing is trimmed - a note is stored
+  as the author wrote it, whitespace included, and it is a reader of the
+  note that decides what a note of only whitespace says.
+
+  The note's grammar - a UTF-8 string - is checked here, as the two
+  declaration commands check theirs: a note is not config, so there is no
+  block type for `check_config/3` to ask. The one implementation of that
+  grammar is the block check `StatifierBlocks.Document.validate/1` runs, and
+  a note it refuses is refused here in the same
+  `{:malformed_block, id, {:note, :not_a_string}}` term, so `to_json/1`
+  can never raise on a document this command produced.
+
   ## The deliberate widening
 
-  The record's typespec block lists four error arms. This module ships two
-  more, and neither contradicts a decision - each names a case the record's
-  list does not enumerate:
+  The record's typespec block lists four error arms. This module ships
+  three more, and none contradicts a decision - each names a case the
+  record's list does not enumerate:
 
     * **`{:duplicate_block_id, Block.id()}`** - an `:insert` whose block (or
       whose subtree) carries an id already present in the document.
@@ -99,6 +121,10 @@ defmodule StatifierBlocks.Edit do
       position to detach it from and no inverse to write.
       `{:no_such_block, id}` would be a lie about a block that plainly
       exists.
+    * **`{:malformed_block, Block.id(), {:note, :not_a_string}}`** - an
+      `:update_note` whose note is not a UTF-8 string. The term is the one
+      `Document.validate/1` answers for such a note, for the reason the
+      note-command section above gives.
 
   The record's own `{:no_such_slot, block_id, slot_name}` arm is given the
   one meaning left to it once rule 2 above allows slot creation: a target
@@ -116,11 +142,12 @@ defmodule StatifierBlocks.Edit do
   and no document at all, so there is no partially applied document for a
   caller to mistake for a result.
 
-  **A compound is not a seventh edit.** Its leaves are drawn from the six and
-  nothing else - a list that is empty, or that holds a `:compound` of its
-  own, is refused rather than flattened - so every edit a document can
-  undergo is still one of the six. What the constructor buys is that
-  `Edit.History` pushes one inverse per commit, which makes a compound
+  **A compound is not another edit.** Its leaves are drawn from the commands
+  in the table of inverses above and nothing else - a list that is empty, or
+  that holds a `:compound` of its own, is refused rather than flattened - so
+  every edit a document can undergo is still one of those. What the
+  constructor buys is that `Edit.History` pushes one inverse per commit,
+  which makes a compound
   **one undo entry**: one gesture in, one gesture out, and no state between
   the halves that an author can stop in.
 
@@ -149,12 +176,13 @@ defmodule StatifierBlocks.Edit do
           | {:update_config, Block.id(), Block.config()}
           | {:set_datamodel, [DatamodelEntry.t()]}
           | {:set_accepts, [String.t()]}
+          | {:update_note, Block.id(), String.t()}
           | {:compound, [t()]}
 
   @doc """
   Applies one command, returning the new document and the command that
   undoes it. Total: refuses rather than raises. See the moduledoc's four
-  structural rules and six inverses.
+  structural rules and its table of inverses.
   """
   @spec apply(Document.t(), t()) ::
           {:ok, Document.t(), t()}
@@ -165,6 +193,7 @@ defmodule StatifierBlocks.Edit do
           | {:error, {:duplicate_block_id, Block.id()}}
           | {:error, {:cannot_remove_root, Block.id()}}
           | {:error, {:malformed_envelope, term()}}
+          | {:error, {:malformed_block, Block.id(), {:note, :not_a_string}}}
   def apply(%Document{} = document, {:insert, {parent_id, slot_name, index}, %Block{} = block}) do
     target = {parent_id, slot_name, index}
 
@@ -222,6 +251,14 @@ defmodule StatifierBlocks.Edit do
     end
   end
 
+  def apply(%Document{} = document, {:update_note, id, note}) do
+    with {:ok, block} <- find_block(document, id),
+         :ok <- Validation.note(id, note) do
+      new_document = replace_at_id(document, id, %{block | note: note})
+      {:ok, new_document, {:update_note, id, block.note}}
+    end
+  end
+
   def apply(%Document{} = document, {:compound, commands}) do
     with :ok <- check_compound(commands) do
       apply_compound(document, commands, [])
@@ -235,8 +272,9 @@ defmodule StatifierBlocks.Edit do
   and one layer below `Edit.History`, which is the only caller (see its
   moduledoc).
 
-  `:ok` for the three commands that are not `:update_config` - they never
-  touch a block's config, so there is nothing for a block type to validate.
+  `:ok` for every leaf command that is not `:update_config` - none of them
+  touches a block's config, so there is nothing for a block type to
+  validate.
   For an `:update_config`, resolves the named block's current type through
   `palette` and asks it the same two questions the compiler's `:config`
   stage and the editor's view model ask, against the **candidate** config
@@ -301,6 +339,12 @@ defmodule StatifierBlocks.Edit do
   # The same for an accepted-event list (ADR-0014 decision 6): no block type,
   # no palette to ask, and the grammar is `apply/2`'s.
   def check_config(%Palette{}, %Document{}, {:set_accepts, _names}), do: :ok
+
+  # A note is prose for a person reading the document, never config: no
+  # block type reads it, so none is asked, and that holds even on a block
+  # whose stored config its type would refuse. Its grammar is `apply/2`'s,
+  # which is where the moduledoc's note-command section says it belongs.
+  def check_config(%Palette{}, %Document{}, {:update_note, _id, _note}), do: :ok
 
   def check_config(%Palette{} = palette, %Document{} = document, {:update_config, id, config}) do
     with {:ok, block} <- find_block(document, id),

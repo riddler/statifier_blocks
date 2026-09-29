@@ -145,8 +145,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     check.
 
     The `-` half of that ruling now ships too, on container chrome only, as
-    `.sb-node__fold`. It is not a fifth command: ADR-0005's command set is
-    still `:insert`, `:move`, `:remove`, `:update_config`, and which
+    `.sb-node__fold`. It is not a command: no member of ADR-0005's command
+    set (`StatifierBlocks.Edit.t()`) folds a container, and which
     containers are folded shut is editor state the shell holds beside the
     selection (the amendment to decision 2, 2026-08-30). The fold is a native
     `<button>` carrying `aria-expanded`, so Enter and Space are the browser's

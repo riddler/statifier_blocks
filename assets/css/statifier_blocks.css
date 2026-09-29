@@ -3500,6 +3500,25 @@
   color: var(--sb-fg-muted);
 }
 
+/* The note above the two sections: the section label is the textarea's
+ * `<label>`, so it is a block like the `h3` it stands in for; the control is
+ * a field input that grows downward only, never wider than the pane. A
+ * read-only mount reads the note as prose, its line breaks kept. */
+.sb-inspector__note-form > .sb-inspector__section-title {
+  display: block;
+}
+
+.sb-inspector__note-input {
+  display: block;
+  resize: vertical;
+}
+
+.sb-inspector__note-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .sb-inspector__meta {
   margin: 0;
 }
