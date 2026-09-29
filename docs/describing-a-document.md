@@ -125,8 +125,10 @@ container. A `core.send` with a delay draws a `:timer` edge to every
 runs from the send to the rule or await, its container is the send's parent,
 its `event` is the sent event and its `delay` the send's delay as stored. It
 is not a transition; it says the send arms an event the other block waits
-for. A send with no delay, and any block inside a drafts shelf, draws none.
-Timer edges come after every other edge, and the default line reads
+for. A send whose delay is absent, empty or not a duration `core.send`
+accepts (`soon`, say) draws none. Only blocks the palette resolves take part,
+at either end, and a block inside a drafts shelf takes part in none. Timer
+edges come after every other edge, and the default line reads
 `In 24 hours, registration.deadline reaches ...`, the delay in the send's own
 words. The loan above has no delayed send, so its outline has none.
 
