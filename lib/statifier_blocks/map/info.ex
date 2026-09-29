@@ -83,13 +83,15 @@ defmodule StatifierBlocks.Map.Info do
 
   ## Hover
 
-  Pointing at a drawn element swaps the region's content, in the browser,
-  for that element's description, and pointing away puts back what the
-  region said: the selected block's description, or the idle one. It pushes
+  Pointing at a drawn element shows that element's description, in the
+  browser, in a hover layer drawn in the region's place, and pointing away
+  hides the layer, so the region shows again: the selected block's
+  description, or the idle one. The region itself is never written on a
+  hover, so what it announces changes only on a selection. It pushes
   nothing and changes no selection. The hook reads two ids off its own
-  element: `data-info-region`, the region's, and `data-info-store`, a hidden
-  element holding one child per description, `data-describes` naming the
-  map id and its inner markup what the region shows for it. A host that
+  element: `data-info-hover`, the hover layer's, and `data-info-store`, a
+  hidden element holding one child per description, `data-describes` naming
+  the map id and its inner markup what the region shows for it. A host that
   stamps neither gets a map with no hover.
   """
 

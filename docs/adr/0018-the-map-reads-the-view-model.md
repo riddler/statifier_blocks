@@ -444,3 +444,80 @@ They are met here, not edited.
   `files:` is at `mix.exs:128` and still lists `assets` whole.
 
 Filed with `sb-ok65`.
+
+## Note (2026-09-29): selection speaks, hover is silent
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-09-29, and the
+mechanism that holds it, and says how two sentences above now read.
+
+The rule: what the description region announces changes on a selection and
+never on a hover. A selection, made in the host's list or on the map (where
+it arrives as the list's own event), is rendered by the server into the
+region, which keeps `aria-live="polite"`; a hover changes the visible text
+and is not announced. Nothing here is claimed from a screen reader: the
+tests below prove what the announced node holds, and that is all they
+prove.
+
+Before this request the hover wrote the region itself. At `9a324a2`,
+`hover/2` (`assets/js/statifier_blocks_map.js:666`, `export function
+hover`) copied a store entry into the region's own markup
+(`statifier_blocks_map.js:686`) and put the kept content back on the way
+off (`:672`), so every hover rewrote the live node.
+
+The mechanism, which this request builds:
+
+- **A hover layer outside the region.** `description_region/1`
+  (`lib/statifier_blocks/editor/map_regions.ex`, `def description_region`)
+  renders, beside the region and inside one wrapper,
+  `sb-map__description-frame`, an element with the region's id and
+  `-hover` after it: `aria-hidden="true"`, `hidden`, and left alone by
+  LiveView (`phx-update="ignore"`). The region's own attributes are
+  unchanged, `aria-live` and its label included. `map_region/1` stamps the
+  layer's id in `data-info-hover`.
+- **The hook writes only the layer.** `hover/2` now takes the layer and
+  the store: `show` copies the entry into the layer and unhides it, and
+  `restore` hides and empties it. The hook reads the layer's id from
+  `data-info-hover` and never looks the region up. `aria-live` is never
+  toggled.
+- **The stylesheet draws the layer in the region's place.** The frame is a
+  one-cell grid holding both; while the layer is shown the region is made
+  transparent under it (`opacity`, which keeps it in the accessibility
+  tree), so the visible text is the hovered element's and the region's
+  content stays what the server wrote.
+
+The tests that pin it:
+
+- `test/statifier_blocks/map_hover_test.exs` runs the real hook through
+  Node over a page whose region records every write made to it; "a hover
+  fills the layer from the store and never writes the region" and "a
+  hover leaves the selected block's description in the region" hold that
+  record empty, the first for every element the map draws on both
+  teaching documents, the second after a selection patched the region.
+- `test/statifier_blocks/editor/map_regions_test.exs`, describe
+  "selection speaks, hover is silent": "a selection rewrites the live
+  region, and the hover layer sits outside it" proves the layer's place
+  and attributes and that a row's selection changes what the live region
+  holds; "the stylesheet stacks the shown layer over the region" holds the
+  rules above.
+
+How two sentences above now read:
+
+- Decision (c)'s bullet "**Hover swaps text client-side.**" says a hover
+  "puts that element's description ... into the description region, and
+  pointing away puts back what the region said". It now reads: a hover
+  shows that element's description in the hover layer drawn in the
+  region's place, and pointing away hides the layer. The rest of the
+  bullet holds as written: it pushes nothing, changes no selection, and
+  runs in the draw-only Map hook.
+- The flip Note's row for decision (c) says the hook "swaps the
+  description region's text on hover without a push"; it reads the same
+  way. That row's two line numbers, read at `362a0e9`, move with this
+  request; re-locate them by their anchors, `export const
+  StatifierBlocksMap` and its one `this.pushEvent`.
+
+Decision (d)'s "the description region is `aria-live="polite"` and is
+rendered on the server with the selected or idle content" holds as
+written, and now holds through a hover too.
+
+Filed with `sb-ltup`.

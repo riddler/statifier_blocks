@@ -228,6 +228,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     describe "what the map region stamps" do
       # Sabotage: dropped `data-info-store` from the element; this went red.
+      # Sabotage: dropped `data-info-hover` from the element; this went red.
       # Sabotage: dropped `phx-update="ignore"` from the canvas child; this
       # went red.
       test "the element carries every attribute the hook reads", %{conn: conn} do
@@ -239,6 +240,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert attribute(map, "data-editable") == "true"
         assert attribute(map, "data-insert-reveal") == "#inserting"
         assert attribute(map, "data-info-region") == "map-description"
+        assert attribute(map, "data-info-hover") == "map-description-hover"
         assert attribute(map, "data-info-store") == "map-description-store"
         assert has_element?(view, "#map-description-store[hidden]")
 
@@ -299,6 +301,88 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           |> Enum.uniq()
 
         assert described_by == ["map-description"]
+      end
+    end
+
+    describe "selection speaks, hover is silent" do
+      # What the region announces is what the server wrote there, and the
+      # server writes it on a selection. A hover is drawn by the hook in the
+      # layer beside the region, which the server renders empty, hidden,
+      # hidden from assistive technology and left alone by LiveView; the
+      # region never holds it. `StatifierBlocks.MapHoverTest` proves the hook
+      # never writes the region; this proves where the layer sits and that a
+      # selection does change the region. Nothing is claimed from a screen
+      # reader.
+      #
+      # Sabotage: rendered the hover layer inside the region's section; this
+      # went red on the layer's place.
+      # Sabotage: dropped `phx-update="ignore"` from the hover layer; this
+      # went red.
+      # Sabotage: rendered the layer after the region, which the
+      # stylesheet's sibling rule cannot reach; this went red on the order.
+      test "a selection rewrites the live region, and the hover layer sits outside it", %{
+        conn: conn
+      } do
+        {:ok, view, html} = mount_host(conn, MapFixtures.document!("library_loan"))
+        {_graph, elements, idle} = described("library_loan")
+
+        layer = one(html, "#map-description-hover")
+        assert attribute(layer, "aria-hidden") == "true"
+        assert attribute(layer, "phx-update") == "ignore"
+        assert LazyHTML.attribute(layer, "hidden") == [""]
+        assert LazyHTML.text(layer) |> String.trim() == ""
+        assert attribute(layer, "aria-live") == nil
+
+        refute has_element?(view, "#map-description #map-description-hover")
+        refute has_element?(view, "#map-description-hover #map-description")
+
+        ids =
+          html
+          |> LazyHTML.from_fragment()
+          |> LazyHTML.query(".sb-map__description-frame > *")
+          |> LazyHTML.attribute("id")
+
+        assert ids == ["map-description-hover", "map-description"]
+
+        before = LazyHTML.text(region(view))
+        assert before =~ idle.title
+
+        [_root, {second, _depth, _kind} | _rest] =
+          ViewModel.outline(MapFixtures.view_model!("library_loan"))
+
+        view |> element(~s([data-row="#{second.block_id}"] button)) |> render_click()
+
+        expected = Enum.find(elements, &(&1.id == second.block_id))
+        assert attribute(region(view), "aria-live") == "polite"
+        assert LazyHTML.text(region(view)) =~ expected.title
+        refute LazyHTML.text(region(view)) == before
+
+        layer = one(render(view), "#map-description-hover")
+        assert LazyHTML.attribute(layer, "hidden") == [""]
+        assert LazyHTML.text(layer) |> String.trim() == ""
+      end
+
+      # The stylesheet draws the layer in the region's place: one grid cell,
+      # the region transparent while the layer is shown, and the layer with
+      # no display of its own, so `hidden` keeps it out.
+      # Sabotage: dropped the rule that makes the region transparent under a
+      # shown layer; this went red.
+      test "the stylesheet stacks the shown layer over the region" do
+        css = File.read!(Path.expand("../../../assets/css/statifier_blocks.css", __DIR__))
+
+        assert css =~
+                 ~r/\.sb-map__description-hover:not\(\[hidden\]\)\s*\+\s*\.sb-map__description\s*\{\s*opacity:\s*0;/
+
+        assert css =~ ~r/\.sb-map__description-frame\s*\{\s*display:\s*grid;/
+
+        layer_rules =
+          for [_all, selectors, body] <- Regex.scan(~r/([^{}]+)\{([^}]*)\}/, css),
+              selector <- String.split(selectors, ","),
+              String.ends_with?(String.trim(selector), ".sb-map__description-hover"),
+              do: body
+
+        refute layer_rules == []
+        refute Enum.any?(layer_rules, &(&1 =~ "display"))
       end
     end
 

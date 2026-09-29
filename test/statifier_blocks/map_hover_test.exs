@@ -7,9 +7,18 @@ defmodule StatifierBlocks.MapHoverTest do
   Hover happens in the browser, so the only honest test of it runs the
   same JavaScript. `test/support/js/statifier_blocks_map_hover.mjs` mounts
   the real hook, which draws the graph through the real elkjs, over a page
-  holding the region and the store, points at every element the drawing
-  carries and at every child of each, and prints what the region held each
-  time. Node must be on the path, as for the map's layout tests.
+  holding the region, its hover layer and the store, points at every
+  element the drawing carries and at every child of each, and prints what
+  the layer and the region held each time. Node must be on the path, as for
+  the map's layout tests.
+
+  Selection speaks, hover is silent: the region is the announced node, and
+  a hover shows its description in the hover layer beside it and never
+  writes the region. The driver records every write the hook makes to the
+  region, and these tests hold that record empty. That a selection does
+  change the region is the server's render, proven where the region is
+  rendered, in `StatifierBlocks.Editor.MapRegionsTest`. Nothing here is
+  claimed from a screen reader.
 
   The tests move from the reference host's hover test at
   `statifier_examples@c620756`, where the hover was a hook of its own. The
@@ -38,60 +47,71 @@ defmodule StatifierBlocks.MapHoverTest do
   @moduletag :tmp_dir
 
   describe "hover" do
-    # Every element the map draws, and every child of each, fills the region
-    # with exactly that element's stored description, and moving off puts
-    # the idle description back byte for byte - on both teaching documents,
-    # so a shape only one document draws is still pointed at.
+    # Every element the map draws, and every child of each, fills the hover
+    # layer with exactly that element's stored description while the region
+    # keeps the idle description, and moving off hides and empties the layer
+    # - on both teaching documents, so a shape only one document draws is
+    # still pointed at. The hook writes nothing to the region at all.
     #
-    # Sabotage: made `show` copy nothing into the region; every hover came
+    # Sabotage: made `show` copy nothing into the layer; every hover came
     # back unshown and this went red. Reverted from a copy.
-    test "fills the region from the store and restores the idle content", %{tmp_dir: dir} do
+    # Sabotage: made the hook hand hover/2 the region in place of the layer,
+    # so a hover wrote the region as the hook did before; `regionWrites`
+    # came back non-empty and every hover unsilent, and this went red.
+    # Reverted from a copy.
+    test "a hover fills the layer from the store and never writes the region", %{tmp_dir: dir} do
       for key <- MapFixtures.keys() do
         result = run(dir, key, page(key))
 
         assert result["missing"] == [], "#{key}: drawn with no description"
+        assert result["regionWrites"] == [], "#{key}: the hook wrote the announced region"
         refute result["hovers"] == []
 
         for hover <- result["hovers"] do
           where = "#{key}: #{hover["element"]} #{hover["child"]}"
           assert hover["id"] == hover["element"], where
-          assert hover["shown"], "#{where}: the region did not show its entry"
-          assert hover["restored"], "#{where}: moving off did not restore the region"
+          assert hover["shown"], "#{where}: the layer did not show its entry"
+          assert hover["silent"], "#{where}: the region changed on a hover"
+          assert hover["restored"], "#{where}: moving off did not hide the layer"
         end
       end
     end
 
     # The rest of the pointer's paths: straight from one element to another,
-    # out of the window, onto a gap's "+", and off after a patch has already
-    # redrawn the region.
+    # out of the window, onto a gap's "+", and a selection that patches the
+    # region mid-hover.
     #
-    # Sabotage: made `restore` put the kept content back without asking for
-    # the hover mark; the patched region was overwritten and this went red.
-    # Reverted from a copy.
-    test "chained, out of the window, over a gap, and after a patch", %{tmp_dir: dir} do
+    # Sabotage: made `restore` hide the layer but keep its markup; every
+    # path came back false and this went red. Reverted from a copy.
+    test "chained, out of the window, over a gap, and a selection mid-hover", %{tmp_dir: dir} do
       for key <- MapFixtures.keys() do
+        result = run(dir, key, page(key))
+
         paths =
-          dir |> run(key, page(key)) |> Map.take(["chained", "outOfWindow", "gaps", "stale"])
+          Map.take(result, ["chained", "outOfWindow", "gaps", "patchedMidHover"])
 
         assert paths == %{
                  "chained" => true,
                  "outOfWindow" => true,
                  "gaps" => true,
-                 "stale" => true
+                 "patchedMidHover" => true
                },
                key
+
+        assert result["regionWrites"] == [], key
       end
     end
 
     # A row selected after the page is up patches the region with that
-    # block's description; moving off a hovered element then restores the
-    # selected block's description, not the document's the page mounted
-    # with.
+    # block's description; every hover then leaves that description in the
+    # region, not the document's the page mounted with, and moving off shows
+    # it again.
     #
-    # Sabotage: made hover/2 keep the region's content once, when the hook
-    # mounted, and restore that; every restore came back with the idle
-    # description and this went red. Reverted from a copy.
-    test "restores the selected block's description", %{tmp_dir: dir} do
+    # Sabotage: made the hook keep the region's content once, when it
+    # mounted, and write that back into the region when the pointer moved
+    # off; `regionWrites` came back with the mount content written back, and
+    # this went red. Reverted from a copy.
+    test "a hover leaves the selected block's description in the region", %{tmp_dir: dir} do
       idle = page("library_loan")
       {_graph, descriptions, _idle} = described("library_loan")
       selected = descriptions |> Enum.find(&(&1.id == "blk_ll_loan_period")) |> entry_html()
@@ -101,17 +121,20 @@ defmodule StatifierBlocks.MapHoverTest do
 
       result = run(dir, "selected", Map.put(idle, "patched", selected))
       refute result["hovers"] == []
-      assert Enum.all?(result["hovers"], & &1["restored"])
+      assert result["regionWrites"] == []
+      assert Enum.all?(result["hovers"], &(&1["silent"] and &1["restored"]))
     end
 
-    # A host that stamps no region and no store on the map's element gets a
-    # map with no hover: pointing at it changes nothing.
+    # A host that stamps no hover layer and no store on the map's element
+    # gets a map with no hover: pointing at it changes nothing, and the
+    # region it does name is not written.
     #
-    # Sabotage: made the hook look the region up by a fixed id when its
-    # element names none; the bare hook filled the region and this went
-    # red. Reverted from a copy.
-    test "a map whose element names no region swaps nothing", %{tmp_dir: dir} do
-      assert %{"unnamed" => true} = run(dir, "unnamed", page("patron_registration"))
+    # Sabotage: made the hook look the layer up by a fixed id when its
+    # element names none; the bare hook filled the layer and this went red.
+    # Reverted from a copy.
+    test "a map whose element names no layer shows nothing", %{tmp_dir: dir} do
+      assert %{"unnamed" => true, "regionWrites" => []} =
+               run(dir, "unnamed", page("patron_registration"))
     end
 
     # A hover never reaches the server: the hook pushes nothing, whatever it

@@ -1,0 +1,3 @@
+### Changed
+
+- The Map's description region no longer announces a hover: what `description_region/1`'s `aria-live="polite"` region holds changes only when the host renders a new selection, and a hover over the map shows its description in a new hover layer beside the region instead (`aria-hidden`, `hidden` until the `StatifierBlocksMap` hook fills it, left alone by LiveView), which the package stylesheet draws in the region's place. The region now sits with the layer inside a `.sb-map__description-frame` wrapper, and `map_region/1` also stamps the layer's id in `data-info-hover`; a host that set the `--sb-*` palette on `.sb-map__description` alone sets it on `.sb-map__description-frame` so the layer reads it too.
