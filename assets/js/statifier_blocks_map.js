@@ -769,8 +769,10 @@ function named(doc, id) {
 // lacking one, into the element itself.
 //
 // A patch that changes only the selection re-marks the drawing rather than
-// laying it out again. A layout still running when a newer graph arrives is
-// dropped when it lands, so a slow layout never draws over a newer one.
+// laying it out again, and one carrying the same unparsable graph as the last
+// leaves the error pane as it stands. A layout still running when a newer
+// graph arrives is dropped when it lands, so a slow layout never draws over a
+// newer one.
 //
 // A click becomes the event `mapGesture` names, under the host list's own
 // name for it, sent through the page's own handlers. After an insert armed
@@ -834,12 +836,18 @@ export const StatifierBlocksMap = {
   draw() {
     const target = this.el.querySelector("[data-map-canvas]") || this.el
     const editable = this.el.dataset.editable === "true"
+    const text = this.el.dataset.graph
     let parsed
 
+    // Text that is not JSON is kept as the source under its own prefix, which
+    // no parsed graph's source carries, so the same text on a later patch
+    // leaves the error pane standing and anything else draws.
     try {
-      parsed = JSON.parse(this.el.dataset.graph)
+      parsed = JSON.parse(text)
     } catch (reason) {
-      this.source = null
+      const unparsable = `unparsable|${text}`
+      if (unparsable === this.source) return Promise.resolve({drawn: "kept", laid: null})
+      this.source = unparsable
       this.drawn = (this.drawn || 0) + 1
       target.innerHTML = renderError(reason)
       return Promise.resolve({drawn: "error", laid: null})

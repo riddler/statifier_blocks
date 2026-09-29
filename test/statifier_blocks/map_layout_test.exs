@@ -1093,6 +1093,40 @@ defmodule StatifierBlocks.MapLayoutTest do
       assert layouts == 3
     end
 
+    # A graph the hook cannot parse draws the error pane once: the same
+    # unparsable text on the next patch leaves the pane standing, the canvas
+    # written no more. A different unparsable text draws the pane again, and
+    # the graph the hook mounted with, arriving after the pane, is laid out
+    # again rather than taken for the drawing already there.
+    #
+    # Sabotage: made the hook forget the unparsable text (the source reset to
+    # null, as before); the repeated text wrote the canvas a third time and
+    # this went red on the writes. Removed the early return on the same
+    # unparsable text; red the same way. Made the hook track the unparsable
+    # text apart and keep the mounted graph's source; the mounted graph came
+    # back as a re-mark of the error pane with no layout and this went red.
+    # Each reverted from a copy.
+    test "the same unparsable graph again leaves the error pane undrawn", %{tmp_dir: dir} do
+      graph = library_graph("patron_registration")
+
+      %{"steps" => [mounted, first, again, other, back]} =
+        run_hook(dir, "unparsable", graph, %{
+          "element" => %{"editable" => "true"},
+          "steps" => [
+            %{"raw" => "{not a graph"},
+            %{"raw" => "{not a graph"},
+            %{"raw" => "{nor this"},
+            %{"graph" => graph}
+          ]
+        })
+
+      assert %{"layouts" => 2, "writes" => 1, "drawn" => "map"} = mounted
+      assert %{"layouts" => 2, "writes" => 2, "drawn" => "error"} = first
+      assert %{"layouts" => 2, "writes" => 2, "drawn" => "error"} = again
+      assert %{"layouts" => 2, "writes" => 3, "drawn" => "error"} = other
+      assert %{"layouts" => 4, "writes" => 4, "drawn" => "map"} = back
+    end
+
     # A click is sent under the name the host stamped on the element, never
     # one of the hook's own: the same clicks under two sets of names push
     # those names, and with none stamped they push nothing at all.

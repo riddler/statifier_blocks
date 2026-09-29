@@ -18,13 +18,17 @@
 //                             and `data-selected` names it, as
 //                             `StatifierBlocks.Map.graph/2` answers it
 //   {"graph": <graph>}        a patch that hands the hook a different graph
+//   {"raw": "<text>"}         a patch whose `data-graph` is that text as it
+//                             stands, so text that is not JSON reaches the
+//                             hook unparsable
 //   {"click": "<block id>", "on": "block" | "gap"}
 //                             a click on that block's box or on its gap
 //
 // It prints `layouts`, the number of elkjs layouts run in all; `steps`, one
-// entry per step with the layouts run so far, the block the drawing marks
-// selected and the drawing's kind; and `pushes`, every pushEvent the hook
-// made, in order, as `{event, payload}`.
+// entry per step with the layouts run so far, the times the canvas has been
+// drawn into so far (`writes`), the block the drawing marks selected and the
+// drawing's kind; and `pushes`, every pushEvent the hook made, in order, as
+// `{event, payload}`.
 import {readFileSync} from "node:fs"
 import ELK from "../../../assets/vendor/elk.bundled.js"
 import {StatifierBlocksMap} from "../../../assets/js/statifier_blocks_map.js"
@@ -41,14 +45,18 @@ ELK.prototype.layout = function (...args) {
 
 // The drawing's block groups, read off the markup, each with a classList
 // whose toggles are kept on the canvas: a new drawing starts unmarked.
+// Every assignment to the canvas's markup is counted as a write, the same
+// markup again included, since a browser builds it again.
 function canvas() {
   let html = ""
   let marked = new Set()
+  let writes = 0
   return {
     dataset: {},
     get innerHTML() { return html },
-    set innerHTML(value) { html = value; marked = new Set() },
+    set innerHTML(value) { html = value; marked = new Set(); writes += 1 },
     get marked() { return [...marked] },
+    get writes() { return writes },
     querySelectorAll(selector) {
       if (selector !== "[data-map-kind=block]") throw new Error(`unexpected selector ${selector}`)
       return [...html.matchAll(/data-map-node="([^"]*)" data-map-kind="block"/g)].map(([, id]) => ({
@@ -95,7 +103,7 @@ hook.pushEvent = (event, payload) => pushes.push({event, payload})
 
 await hook.mounted()
 const kindOf = () => (drawing.innerHTML.includes("data-map-error") ? "error" : drawing.innerHTML === "" ? "none" : "map")
-const steps = [{step: "mounted", layouts, marked: drawing.marked, drawn: kindOf()}]
+const steps = [{step: "mounted", layouts, writes: drawing.writes, marked: drawing.marked, drawn: kindOf()}]
 
 for (const step of scenario.steps) {
   if (step.select !== undefined) {
@@ -105,12 +113,15 @@ for (const step of scenario.steps) {
   } else if (step.graph !== undefined) {
     hook.el.dataset.graph = JSON.stringify(step.graph)
     await hook.updated()
+  } else if (step.raw !== undefined) {
+    hook.el.dataset.graph = step.raw
+    await hook.updated()
   } else if (step.click !== undefined) {
     for (const {type, listener} of listeners) {
       if (type === "click") listener({target: clickTarget(step.click, step.on)})
     }
   }
-  steps.push({step, layouts, marked: drawing.marked, drawn: kindOf()})
+  steps.push({step, layouts, writes: drawing.writes, marked: drawing.marked, drawn: kindOf()})
 }
 
 process.stdout.write(JSON.stringify({layouts, steps, pushes}))
