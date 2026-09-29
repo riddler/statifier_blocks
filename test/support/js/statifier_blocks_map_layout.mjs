@@ -24,13 +24,22 @@
 // `childGestures`, the same
 // asked of a click on each of that element's children (the rect, text,
 // circle or path a real click lands on), which reach the element by walking
-// up exactly as a browser's `closest` does.
+// up exactly as a browser's `closest` does - and `layouts`, the number of
+// elkjs layouts the drawing took.
 import {readFileSync} from "node:fs"
+import ELK from "../../../assets/vendor/elk.bundled.js"
 import {boxes, drawMap, edgesOf, interruptsOf, mapGesture, timersOf} from "../../../assets/js/statifier_blocks_map.js"
 
 // The list event names the host stamps on the map's element. These are
 // the reference host's; the hook has none of its own.
 const events = {select: "select-row", insert: "insert-open"}
+
+let layouts = 0
+const realLayout = ELK.prototype.layout
+ELK.prototype.layout = function (...args) {
+  layouts += 1
+  return realLayout.apply(this, args)
+}
 
 const graph = JSON.parse(readFileSync(process.argv[2], "utf8"))
 const editable = process.argv[3] === "editable"
@@ -250,4 +259,4 @@ for (const [, id, rest] of html.matchAll(/data-map-node="([^"]*)" data-map-kind=
     .map((m) => unescape(m[1]))
 }
 
-process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges}))
+process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges, layouts}))
