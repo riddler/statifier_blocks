@@ -285,3 +285,27 @@ reads the view model alone, reads no chart either.
   version of this package carries the Map; that is the host's own work.
 - **The bundle cost is visible to a host before it pays it**, in the
   README section that shows how to mount the Map.
+
+## Note (2026-09-28): statifier-ui's elkjs renderer is decided, not built
+
+A dated note, not an amendment: it changes no decision in this record.
+
+The section "What this record does not decide" above names statifier-ui's
+viewer renderer as one "which also lays out with elkjs", and spells its cite
+in a shape that reads like a tracker id. That sentence stays as written; this
+Note says what it refers to.
+
+The record it means is statifier-ui's (the `statifier_ui` package) ADR-0008,
+"Client-side elkjs layout rendering plain SVG", at
+`docs/adr/0008-client-side-elkjs-layout.md` in that repository, which is
+accepted. It decides an elkjs renderer for statifier-ui's diagram; that
+renderer is not yet built. The diagram statifier-ui ships today is Mermaid
+source: its `StatifierUI.Live` moduledoc, in the section "The diagram is
+Mermaid source, and no Mermaid client ships", says so and names ADR-0008's
+renderer as not built yet, and `StatifierUI.Diagram` renders Mermaid
+`stateDiagram-v2` source. Both were read at statifier-ui's commit `e3141f4`.
+
+The point the sentence makes is unchanged: the Map and that renderer stay
+separate, and no merge of the two is decided here.
+
+Filed with `sb-ew7o`.
