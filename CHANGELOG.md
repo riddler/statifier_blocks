@@ -11,6 +11,69 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.40.0] 2026-09-29
+
+0.40.0 lets an author write a block's note in the editor, and shows the
+selected block's description under the editor's canvas. The new edit
+command `{:update_note, id, note}` writes the note with the previous note
+as its inverse, so undo and redo move it, and the inspector's Note field
+issues it; `StatifierBlocks.Edit.t()` gains that member, so a host that
+matches every member of the union by hand has one more to handle. The
+editor draws the Map's description region,
+`StatifierBlocks.Editor.MapRegions.description_region/1`, under its canvas
+with no map beside it, and the region takes new `map` and `label` attrs
+whose defaults render what it rendered before. The changes to existing
+answers are under Changed: the region no longer announces a hover, which
+shows in a hover layer beside it that the Map hook finds by
+`data-info-hover`, and `map_region/1` and `description_region/1` refuse a
+`phrase` that is not a function of one argument with an `ArgumentError`
+naming the attr. Under Fixed, a block kept as a stored Erlang term from
+before blocks had a note encodes and validates, and the npm manifest names
+both licences. 0.40.0 is a minor, because it adds to the public surface,
+a member of the edit union included. The package gains no Hex dependency.
+
+### Added
+
+- The editor draws a description region under its canvas: the selected
+  block's description, its note first, or the document's name, description,
+  what starts it and its counts when nothing is selected. It is the Map's
+  `StatifierBlocks.Editor.MapRegions.description_region/1`, live and showing
+  values only; the editor still draws no map. It is drawn in a read-only
+  mount too, and no `profile` key hides it.
+- `description_region/1` takes a `map` attr, `true` by default, saying
+  whether a map is mounted beside the region; `false` renders no hover
+  layer, no store and no how-to-read paragraph in the idle description. A
+  host that passes nothing gets the region it had.
+
+- The edit command `{:update_note, id, note}` writes a block's author note,
+  with the previous note as its inverse, so undo and redo move it like any
+  other edit; an empty note removes it. `StatifierBlocks.Edit.t()` gains this
+  member, so a host that matches every member of the union by hand has one
+  more to handle.
+- The editor's inspector opens its Config tab on a Note field for the
+  selected block, which writes the note through that command; a read-only
+  mount shows the note as text and does not edit it.
+
+- `StatifierBlocks.Editor.MapRegions.description_region/1` takes a `label`
+  attr, the live region's accessible name, rendered as its `aria-label`;
+  it defaults to `"Description"`, so a host that passes nothing gets the
+  region it had.
+
+### Changed
+
+- `StatifierBlocks.Editor.MapRegions.map_region/1` and `description_region/1` refuse a `phrase` that is neither `nil` nor a function of one argument with an `ArgumentError` naming the attr, where they raised a `FunctionClauseError` from a private function; `nil` and a one-argument function render as before.
+
+- The Map's description region no longer announces a hover: what `description_region/1`'s `aria-live="polite"` region holds changes only when the host renders a new selection, and a hover over the map shows its description in a new hover layer beside the region instead (`aria-hidden`, `hidden` until the `StatifierBlocksMap` hook fills it, left alone by LiveView), which the package stylesheet draws in the region's place. The region now sits with the layer inside a `.sb-map__description-frame` wrapper, and `map_region/1` also stamps the layer's id in `data-info-hover`; a host that set the `--sb-*` palette on `.sb-map__description` alone sets it on `.sb-map__description-frame` so the layer reads it too.
+- The `StatifierBlocksMap` hook now finds its hover layer by `data-info-hover` and no longer reads `data-info-region`, so a host that stamps the hook's ids on its own element and names only the region and the store gets no hover: stamp `data-info-hover` with the id of an `aria-hidden`, `hidden` element beside the region for the hook to fill, or mount `description_region/1` and `map_region/1`, which render and stamp it.
+
+### Fixed
+
+- A document whose blocks were built before blocks had a note, and that a
+  host kept as a stored Erlang term rather than as JSON, now encodes and
+  validates as a note-free document instead of raising `KeyError`.
+
+- The npm package manifest names its licence as `(MIT AND EPL-2.0)`, since it ships the vendored elkjs file under EPL-2.0.
+
 ## [0.39.0] 2026-09-28
 
 0.39.0 ships the Map, a second view of a block document drawn beside the
@@ -3677,6 +3740,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.40.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.40.0
 [0.39.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.39.0
 [0.38.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.38.0
 [0.37.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.37.0
