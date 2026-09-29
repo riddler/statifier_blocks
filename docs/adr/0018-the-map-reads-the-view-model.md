@@ -521,3 +521,34 @@ rendered on the server with the selected or idle content" holds as
 written, and now holds through a hover too.
 
 Filed with `sb-ltup`.
+
+## Note (2026-09-29): the editor's own description region is decided in ADR-0005
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It says where the question this record left open was decided, and
+how three sentences above now read.
+
+Decision (d)'s bullet "The package editor gets the same region later, in a
+request of its own; this record does not put it there", and the first half
+of the bullet "The editor's own description region, and the editor's field
+for writing a note" under "What this record does not decide", are answered
+by `ADR-0005`'s Amendment of 2026-09-29, "the shell arrangement, one
+description region under the canvas", ruled by the operator, 2026-09-29.
+The editor draws `description_region/1` under its canvas from its own
+document, view model, palette and selection, with the attr `map={false}`:
+no hover layer, no store, and no paragraph on how to read the map in the
+idle description. The editor still draws no map, attaches no Map hook and
+lays nothing out, so "the editor draws no map" holds as written. The
+second half of that bullet, the note field, was answered by `ADR-0005`'s
+other Amendment of 2026-09-29, on decision 2's closed set.
+
+Decision (d)'s sentence that the components sit in the guarded
+`StatifierBlocks.Editor.*` namespace "not a sign that they are part of the
+editor" now reads for the map region alone: the editor mounts the
+description region, and never the map region.
+
+This record's Note of 2026-09-29, "selection speaks, hover is silent",
+holds in the editor with nothing to be silent about: a block selected on
+the canvas is a selection, and there is no hover.
+
+Filed with `sb-k8qj`.

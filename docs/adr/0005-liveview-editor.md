@@ -13863,3 +13863,108 @@ gen_update_note/1`).
 - **Nothing else in decisions 2, 3, 9 or 12 changes.** No structural rule,
   no inverse of an existing command, no config gate and no unresolvable-block
   rule is touched.
+
+## Amendment (2026-09-29): the shell arrangement, one description region under the canvas
+
+**Status: proposed (2026-09-29, bead `sb-k8qj`, ruled by the operator,
+2026-09-29).** A decision record merges at proposed and is flipped to
+accepted by a separate request once the code below has shipped in a
+published version of this package. Additive: the Amendment of 2026-08-29,
+"the shell arrangement - three panes and a drawer", every clause of it and
+every section above this line stand as printed. **No text above this line
+is edited by this section**, no line above it is removed, and the head
+`Status:` line at `:3` is not extended.
+
+**Why this is an Amendment and not a Note.** It puts a surface the editor
+did not draw into the shell, and says where it sits and what it shows; a
+note decides nothing.
+
+Code cites below were read at `be60d52` and carry their anchors; re-locate
+by anchor, not by number.
+
+### Context
+
+`ADR-0018` decided the Map, a reader of the view model that a host mounts
+beside its own list, and two function components in
+`StatifierBlocks.Editor.MapRegions` that render it: the map region and the
+description region. It kept both out of the editor ("the editor draws no
+map") and left the editor's own description region to a request of its
+own. The operator ruled for it, 2026-09-29: one description region under
+the editor's canvas, the same component and text as a host's Plan view,
+with no Map in the editor and the inspector still the one place that
+edits.
+
+### The decision
+
+- **Where it sits.** The region is the last child of the canvas column,
+  `.sb-editor__main`, after the run pane that seats the canvas and after
+  the "Save as a step" tray (`lib/statifier_blocks/editor.ex:1207`, the
+  `<MapRegions.description_region` call inside the `sb-editor__description`
+  wrapper). It is part of the canvas column, not a fourth pane: 1A's grid
+  of three columns and a drawer row is unchanged, no grid area is added,
+  and 7A's breakpoints move nothing. In the bounded mode it does not
+  shrink; a long description scrolls inside its own box
+  (`assets/css/statifier_blocks.css:3147`, the `.sb-editor__description`
+  rule).
+- **What it shows.** It is `description_region/1`
+  (`lib/statifier_blocks/editor/map_regions.ex:192`, `def
+  description_region`), read from the editor's own document, view model,
+  palette and selection. With a block selected on the canvas it shows that
+  block's description, the note first, then the title, sentence,
+  explanation, settings and facts, as a host's region does. With nothing
+  selected it shows the document's: its name and description, what starts
+  it, what it listens for, and how many steps and open slots it has. It
+  shows values and never controls; the inspector stays the one place that
+  edits, and 3A is untouched: the region is a reading of the canvas's
+  selection, not an inspector tab and not a drawer panel.
+- **No map, and what that leaves out.** The editor draws no Map: no map
+  region, no `StatifierBlocksMap` hook and no layout. It passes
+  `description_region/1` the attr `map={false}`
+  (`map_regions.ex:181`, `attr(:map, :boolean`), which says no map is
+  mounted beside the region, and with it the component renders neither the
+  hover layer nor the hidden store (`map_regions.ex:210` and `:229`, their
+  `:if={@map}`): both exist only for the Map's hook, and in the editor
+  nothing would ever fill them. The idle description's explanation is how
+  to read the map, so with `map={false}` the idle region leaves that
+  paragraph out (`map_regions.ex:226`, `explanation={@map or @current.kind
+  != :idle}`); a selected block's explanation is the type's and stays. The
+  attr's default, `true`, renders a host's region exactly as it rendered
+  before.
+- **What is announced.** The region keeps `aria-live="polite"`. A block
+  selected on the canvas is a selection, and the selection is what changes
+  what the region announces; with no Map there is no hover, and the rule
+  of `ADR-0018`'s Note of 2026-09-29, "selection speaks, hover is silent",
+  holds with nothing to be silent about.
+- **Drawn wherever the canvas is.** A read-only mount draws it, the note
+  included, because a read-only mount is a reading of the document and the
+  region is a reading too. No `profile` key hides it; a host that needs it
+  hidden is a later request.
+- **One exception, a document the region cannot describe.** The region
+  reads `StatifierBlocks.Describe.outline/3`, which expands every composite
+  to learn its outcomes and raises for a composite whose declaration cannot
+  expand. The editor draws the canvas for such a document and its expand
+  gesture refuses it; so the editor asks first and leaves the region out
+  for that document rather than failing (`editor.ex:3915`, `defp
+  describable?/2`).
+
+The tests. `test/statifier_blocks/editor/description_region_test.exs`
+(at `be60d52`) holds the region's place under the canvas, the idle and
+selected descriptions, the missing how-to-read paragraph, a note written in
+the inspector appearing in the region on the next render, the read-only
+mount, and the absence of any map region, Map hook, store, hover layer or
+control. `test/statifier_blocks/editor/map_regions_test.exs`, describe
+"the map attr", pins that the default leaves a host's region unchanged and
+that `map={false}` drops exactly the paragraph, the layer and the store.
+`test/statifier_blocks/editor/composite_expand_test.exs`, "the canvas is
+drawn and the description region is left out", holds the exception.
+
+### Consequences
+
+- **A host that mounts the editor sees a new surface under the canvas.**
+  The next release's changelog says so (`changelog.d/sb-k8qj.md`).
+- **`description_region/1` gains an attr whose default changes nothing.**
+- **`ADR-0018`'s "a request of its own" is answered here**, with no edit to
+  that record; its dated Note of 2026-09-29 below its selection Note points
+  at this section.
+- **Nothing else in the shell arrangement changes.** No pane, tab, drawer
+  tab, breakpoint or profile key is added or moved.
