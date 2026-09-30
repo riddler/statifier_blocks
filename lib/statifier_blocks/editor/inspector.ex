@@ -132,14 +132,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     Under the tabs the Config tab is two labelled sections rather than a form
     dropped into a pane. **Block** states what the pane's subject IS - its
     type, its id, and the slot it sits in - and **Configuration** holds the
-    form.
+    form. With a block selected, a third section, the **Note**, opens above
+    them; "The note" below says why it is there.
 
     The Block section is the one that has to be there when nothing is
     selected, which is why its three rows render either way and read as a
     dash when they have no value. A section that appears and disappears with
     the selection teaches an author nothing about what the pane will show
     them; three rows that are always in the same place, sometimes empty, say
-    what the inspector is about before they have selected anything.
+    what the inspector is about before they have selected anything. The
+    Note is the one section that does appear and disappear, and it does so
+    on purpose: it holds the selected block's own words rather than saying
+    what the pane is about, so with nothing selected it has nothing to hold,
+    and the two sections under it are still the ones always drawn.
 
     The three rows are deliberately the three an author can act on. `Type` is
     the type's label, the same string the header status reads, so the pane
