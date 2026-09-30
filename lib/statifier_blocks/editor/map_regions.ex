@@ -219,12 +219,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec description_region(map()) :: Phoenix.LiveView.Rendered.t()
     def description_region(assigns) do
       %{document: document, view_model: view_model, palette: palette} = assigns
+      # Read ahead of the outline, so a phrase the attr refuses is refused on
+      # every document, one the outline cannot read included.
+      opts = phrase_opts(assigns.phrase)
+      graph_opts = graph_opts(assigns.selected, assigns.phrase)
 
       {elements, current} =
         case outline(document, palette) do
           {:ok, outline} ->
-            graph = BlockMap.graph(view_model, graph_opts(assigns.selected, assigns.phrase))
-            opts = phrase_opts(assigns.phrase)
+            graph = BlockMap.graph(view_model, graph_opts)
             elements = Info.elements(document, graph, view_model, outline, palette, opts)
             idle = Info.idle(document, graph, view_model, outline)
             {elements, current(elements, assigns.selected, idle)}

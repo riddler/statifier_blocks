@@ -685,6 +685,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert count_of(none, "#map-description-store") == 0
         assert String.trim(LazyHTML.text(one(none, "#map-description"))) == ""
       end
+
+      # The degrade covers a raise out of the outline and nothing else: the
+      # phrase attr's refusal holds on this document as on every other.
+      # Sabotage: moved `phrase_opts/1` and `graph_opts/2` back inside the
+      # outline's `{:ok, _}` branch; red on the assert_raise.
+      test "a phrase the attr refuses is still refused by name" do
+        assert_raise ArgumentError,
+                     ~r/^the phrase attr takes nil or a function of one argument, got: /,
+                     fn -> unexpandable_region_html("duplicate", %{phrase: "loan words"}) end
+      end
     end
 
     defp count_of(html, selector),
