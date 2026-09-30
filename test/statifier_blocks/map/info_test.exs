@@ -586,9 +586,17 @@ defmodule StatifierBlocks.Map.InfoTest do
     @not_marks ["svg", "error", "error-title", "error-reason", "error-hint"]
 
     # The classes the hook builds by interpolation, each with every class it
-    # can build. An interpolated class the hook adds and this table does not
-    # list fails the test, so none escapes the scan.
-    @interpolated %{"${which}-caption" => ["start-caption", "end-caption"]}
+    # can build. A class is read whole, with each `${...}` in it read as
+    # `${}` wherever in the name it stands. An interpolated class the hook
+    # adds and neither this table nor the next lists fails the test, so
+    # none escapes the scan.
+    @interpolated %{"${}-caption" => ["start-caption", "end-caption"]}
+
+    # The classes the hook builds by putting a value from the graph after a
+    # stem it also draws plain, each with the graph key the value is read
+    # from. Every value the graph gives under that key is a word in the
+    # variants table below, so the paragraph names each class these build.
+    @modifiers %{"end--${}" => "outcome", "mark--${}" => "mark", "slot--${}" => "style"}
 
     # Each value the graph gives a mark, a slot or an end, and the words
     # that name that one.
@@ -605,35 +613,59 @@ defmodule StatifierBlocks.Map.InfoTest do
 
     # Sabotage: cut the fork mark from the paragraph; this went red on
     # "fork". Reverted from a copy. Sabotage: added a class the paragraph
-    # does not name to a comment in the hook; this went red. Reverted from
+    # does not name to a template in the hook; this went red. Reverted from
     # a copy. Sabotage: cut "its arrow captioned with what starts it" from
     # the paragraph; this went red on "start-caption". Reverted from a copy.
     # Sabotage: added an interpolated class the table does not list to a
-    # comment in the hook; this went red. Reverted from a copy.
+    # template in the hook; this went red. Reverted from a copy.
+    # Sabotage: added a class interpolated after a stem the paragraph names
+    # to a template in the hook; this went red. Reverted from a copy.
+    # Sabotage: made hook_classes/1 read every interpolation as part of the
+    # name before it; this went red. Reverted from a copy.
     test "names every mark the hook draws" do
       {_graph, _descriptions, idle} = described("library_loan")
-      hook = File.read!(@hook)
+      {plain, built} = @hook |> File.read!() |> hook_classes()
 
-      plain =
-        ~r/sb-map__([a-z][a-z-]*[a-z])/
-        |> Regex.scan(hook, capture: :all_but_first)
-        |> List.flatten()
+      assert Enum.sort(built) == Enum.sort(Map.keys(@interpolated) ++ Map.keys(@modifiers))
 
-      built =
-        ~r/sb-map__(\$\{[^}]*\}[a-z-]*)/
-        |> Regex.scan(hook, capture: :all_but_first)
-        |> List.flatten()
-        |> Enum.uniq()
-
-      assert Enum.sort(built) == Enum.sort(Map.keys(@interpolated))
-
-      drawn = Enum.uniq(plain ++ Enum.flat_map(built, &Map.fetch!(@interpolated, &1)))
+      interpolated = Enum.flat_map(built, &Map.get(@interpolated, &1, []))
+      drawn = Enum.uniq(plain ++ interpolated)
 
       assert Enum.sort(drawn -- @not_marks) == Enum.sort(Map.keys(@named))
 
       for {class, words} <- @named do
         assert idle.explanation =~ words, "the paragraph does not name #{class}"
       end
+    end
+
+    # Sabotage: made mark/1 answer "hourglass" for an await; this went red
+    # on "mark--${}". Reverted from a copy.
+    test "names every value the hook puts after a stem" do
+      for {class, key} <- @modifiers do
+        values =
+          @library
+          |> Enum.flat_map(fn library -> library |> described() |> elem(0) |> values(key) end)
+          |> Enum.uniq()
+
+        assert values != [], "the graph gives no #{key} for #{class}"
+        assert values -- Map.keys(@variants) == [], "#{class} builds a class the paragraph misses"
+      end
+    end
+
+    # A comment in the hook draws nothing, so a class it names is not read.
+    #
+    # Sabotage: made hook_classes/1 read the hook with its comments left
+    # in; this went red. Reverted from a copy.
+    test "reads no class out of a comment" do
+      hook = """
+      // sb-map__commented
+      /* sb-map__blocked
+         sb-map__${blocked} */
+      const SVG_NS = "http://www.w3.org/2000/svg"
+      `<g class="sb-map__fork sb-map__mark--${node.mark}">` // sb-map__trailing
+      """
+
+      assert hook_classes(hook) == {["fork"], ["mark--${}"]}
     end
 
     # Sabotage: made the clock's clause name only a message sent after a
@@ -1018,6 +1050,43 @@ defmodule StatifierBlocks.Map.InfoTest do
     own = [node["mark"], node["style"], node["kind"] == "end" && node["outcome"]]
     inside = node |> Map.get("children", []) |> Enum.flat_map(&graph_values/1)
     Enum.filter(own, &is_binary/1) ++ inside
+  end
+
+  # Every string value the graph's nodes give under `key`, root included.
+  defp values(node, key) do
+    inside = node |> Map.get("children", []) |> Enum.flat_map(&values(&1, key))
+    Enum.filter([node[key]], &is_binary/1) ++ inside
+  end
+
+  # The classes a hook's source names, with its comments cut: the plain
+  # ones, and the interpolated ones with each `${...}` read as `${}`,
+  # wherever in the name it stands. An interpolation whose every string is
+  # empty or opens with a space adds classes rather than extending the
+  # name before it, so it ends that name and the classes inside it are
+  # read on their own.
+  defp hook_classes(text) do
+    code =
+      text
+      |> String.replace(~r{/\*.*?\*/}s, "")
+      |> String.replace(~r{(?<!:)//.*$}m, "")
+      |> String.replace(~r/\$\{([^}]*)\}/, fn interpolation ->
+        [_all, inside] = Regex.run(~r/\$\{([^}]*)\}/, interpolation)
+        if appends?(inside), do: " " <> inside, else: interpolation
+      end)
+
+    names =
+      ~r/sb-map__((?:[a-z-]|\$\{[^}]*\})+)/
+      |> Regex.scan(code, capture: :all_but_first)
+      |> List.flatten()
+      |> Enum.map(&String.replace(&1, ~r/\$\{[^}]*\}/, "${}"))
+
+    {plain, built} = Enum.split_with(names, &(not String.contains?(&1, "${}")))
+    {plain, Enum.uniq(built)}
+  end
+
+  defp appends?(inside) do
+    strings = ~r/"([^"]*)"|'([^']*)'/ |> Regex.scan(inside) |> Enum.map(&List.last/1)
+    strings != [] and Enum.all?(strings, &(&1 == "" or String.starts_with?(&1, " ")))
   end
 
   # Every id the graph draws below its root: nodes, connectors, interrupt
