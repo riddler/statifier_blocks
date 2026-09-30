@@ -20,6 +20,7 @@ defmodule StatifierBlocks.FlowPatternsGuideTest do
   @page "docs/guides/flow-patterns.md"
   @bounded_step "test/fixtures/documents/flow_patterns/bounded_step.json"
   @optional_arms "test/fixtures/documents/flow_patterns/optional_arms.json"
+  @park_with_deadline "test/fixtures/documents/flow_patterns/park_with_deadline.json"
 
   # The core.await block the page offers as the shorter answer, as the page
   # quotes it.
@@ -39,6 +40,16 @@ defmodule StatifierBlocks.FlowPatternsGuideTest do
              "arm_card": [{"id": "blk_CARD", "type": "core.send", "type_version": 2,
                            "config": {"event": "notice.card_requested"}}]}}
   """
+
+  # The core.await the page puts in the hold shelf group's place when the
+  # event does exist, as the page quotes it.
+  @collect_await_json """
+  {"id": "blk_COLLECT", "type": "core.await", "type_version": 1,
+   "config": {"event": "hold.collected", "timeout": "7d"}}
+  """
+
+  # Seven days, as the host is asked to schedule the wait's delayed send.
+  @seven_days_ms 7 * 24 * 60 * 60 * 1000
 
   describe "a step that must finish within a bound: the page and its fixture" do
     # Sabotage: changed the page's `"delay": "1d"` to `"2d"` - red: the
@@ -353,7 +364,262 @@ defmodule StatifierBlocks.FlowPatternsGuideTest do
     end
   end
 
+  describe "park until an interrupt or the deadline: the page and its fixture" do
+    # Sabotage: changed the page's `"duration": "7d"` to `"8d"` - red: the
+    # page no longer quotes the fixture it names (verified).
+    test "the page quotes the fixture document byte for byte, and lists the pattern" do
+      assert page() =~ "```json\n" <> File.read!(@park_with_deadline) <> "```\n"
+
+      assert page() =~
+               "- [Park until an interrupt fires or the deadline expires]" <>
+                 "(#park-until-an-interrupt-fires-or-the-deadline-expires)\n"
+
+      assert page() =~ "\n## Park until an interrupt fires or the deadline expires\n"
+    end
+
+    # Sabotage: in the fixture, the `hold.extended` handler's event renamed
+    # `hold.renewed` - red: the rail names an event the document does not
+    # accept (verified).
+    test "the body is one wait, and the rail names only events the document accepts" do
+      %Document{accepts: accepts, root: %Block{slots: %{"body" => body}}} = park_with_deadline()
+      assert [_ready, %Block{id: "blk_SHELF", slots: shelf}, _clear] = body
+
+      assert [%Block{type: "core.wait", config: %{"duration" => "7d"}}] = shelf["body"]
+
+      assert for(
+               %Block{type: "core.on_event", config: config} <- shelf["interrupts"],
+               do: config["event"]
+             ) == accepts
+    end
+  end
+
+  describe "park until an interrupt or the deadline: the compiled chart" do
+    # Sabotage: in `Wait.emit/2`, gave the delayed send no `id` attribute
+    # - red: the send line and the body's `<cancel>` line both miss
+    # (verified).
+    test "compiles under the core palette with no finding, as the page quotes it" do
+      assert {:ok, compiled} = Compiler.compile(park_with_deadline(), Palette.core())
+      assert compiled.warnings == []
+
+      for line <- [
+            ~s(<send delay="7d" event="statifier_blocks.wait.blk_SHELVED" id="s_blk_SHELVED__send"/>),
+            ~s(<transition event="hold.collected" target="s_blk_COLLECTED__o_done">) <>
+              ~s(<raise event="statifier_blocks.interrupt.abandon.s_blk_SHELF"/></transition>),
+            ~s(<transition event="hold.extended" target="s_blk_EXTENDED__o_done">) <>
+              ~s(<raise event="statifier_blocks.interrupt.resume.s_blk_SHELF"/></transition>),
+            ~s(<transition event="done.state.s_blk_SHELF__body" target="s_blk_SHELF__o_done" type="internal"/>),
+            ~s(<transition event="statifier_blocks.interrupt.abandon.s_blk_SHELF" target="s_blk_SHELF__o_done" type="internal"/>),
+            ~s(<transition event="statifier_blocks.interrupt.resume.s_blk_SHELF" target="s_blk_SHELF__run" type="internal"/>),
+            ~s(<transition event="done.state.s_blk_SHELF" target="s_blk_CLEAR" type="internal"/>),
+            ~s(<onexit><cancel sendid="s_blk_SHELVED__send"/></onexit>)
+          ] do
+        assert compiled.scxml =~ line
+        assert page() =~ line
+      end
+    end
+  end
+
+  describe "park until an interrupt or the deadline: the chart, run" do
+    setup do
+      {:ok, compiled} = Compiler.compile(park_with_deadline(), Palette.core())
+      {:ok, machine} = Statifier.compile(compiled.scxml)
+      {machine_state, effects} = Statifier.initialize(machine)
+
+      %{machine_state: machine_state, initial_effects: effects}
+    end
+
+    # Sabotage: in the fixture, the wait's `duration` set to `"1d"` - red:
+    # the host is asked for a one-day send, not seven (verified).
+    test "the chart parks in the wait, with every handler armed", ctx do
+      assert Statifier.active_leaf_states(ctx.machine_state) == parked()
+      assert sent(ctx.initial_effects) == ["hold.ready"]
+
+      assert delayed(ctx.initial_effects) == [
+               {"statifier_blocks.wait.blk_SHELVED", @seven_days_ms}
+             ]
+    end
+
+    # Sabotage: in `Emit.interruptible/2`, dropped the transition on the
+    # body's `done.state` - red: the deadline finishes the wait and the
+    # group never finishes (verified).
+    test "seven days pass: the wait finishes, and the flow continues", ctx do
+      {:ok, machine_state, effects} =
+        Statifier.send_event(ctx.machine_state, "statifier_blocks.wait.blk_SHELVED")
+
+      assert Statifier.active_leaf_states(machine_state) == MapSet.new(["s_blk_ROOT__o_done"])
+      assert sent(effects) == ["hold.shelf_cleared"]
+      assert page() =~ "- **Seven days pass.**"
+    end
+
+    # Sabotage: in the fixture, the `hold.cancelled` handler's outcome set
+    # to `"resume"` - red: a cancelled hold parks again for seven days
+    # instead of clearing the shelf (verified).
+    test "collected or cancelled: the group is abandoned, the timer cancelled, and the flow continues",
+         ctx do
+      for event <- ["hold.collected", "hold.cancelled"] do
+        {:ok, machine_state, effects} = Statifier.send_event(ctx.machine_state, event)
+
+        assert Statifier.active_leaf_states(machine_state) ==
+                 MapSet.new(["s_blk_ROOT__o_done"])
+
+        assert sent(effects) == ["hold.shelf_cleared"]
+        assert cancelled(effects) == ["s_blk_SHELVED__send"]
+      end
+    end
+
+    # Sabotage: in the fixture, the `hold.extended` handler's outcome set
+    # to `"abandon"` - red: more time clears the shelf instead of parking
+    # again (verified).
+    test "more time asked for: the group resumes, and the deadline starts over in full", ctx do
+      {:ok, machine_state, effects} = Statifier.send_event(ctx.machine_state, "hold.extended")
+
+      assert Statifier.active_leaf_states(machine_state) == parked()
+      assert sent(effects) == []
+      assert cancelled(effects) == ["s_blk_SHELVED__send"]
+      assert delayed(effects) == [{"statifier_blocks.wait.blk_SHELVED", @seven_days_ms}]
+    end
+  end
+
+  describe "park until an interrupt or the deadline: in a resumable group" do
+    # Sabotage: in `Cancels.onexit/2`, emitted no `<cancel>` element - red:
+    # a resumed group leaves its first seven-day timer behind (verified).
+    test "resuming re-enters the wait, which asks for its full duration again" do
+      for history <- ["shallow", "deep"] do
+        document =
+          with_shelf_type(park_with_deadline(), "core.resumable_group", %{"history" => history})
+
+        assert {:ok, compiled} = Compiler.compile(document, Palette.core())
+        assert compiled.warnings == []
+
+        {:ok, machine} = Statifier.compile(compiled.scxml)
+        {machine_state, _effects} = Statifier.initialize(machine)
+
+        {:ok, machine_state, effects} = Statifier.send_event(machine_state, "hold.extended")
+
+        assert Statifier.active_leaf_states(machine_state) == parked()
+        assert cancelled(effects) == ["s_blk_SHELVED__send"]
+        assert delayed(effects) == [{"statifier_blocks.wait.blk_SHELVED", @seven_days_ms}]
+      end
+
+      assert page() =~ "A `core.resumable_group` in the group's place parks the same way."
+    end
+  end
+
+  describe "park until an interrupt or the deadline: what Describe and the Map show" do
+    # Sabotage: in `OnEvent.sentence/1`, wrote the outcome before the
+    # event - red: no handler line reads as the page quotes it (verified).
+    test "the Describe lines and the Map's edges the page quotes" do
+      document = park_with_deadline()
+      lines = Describe.render(Describe.outline(document, Palette.core(), []), [])
+
+      for line <- [
+            "Wait 7d",
+            "When hold.collected, abandon",
+            "When hold.cancelled, abandon",
+            "When hold.extended, resume",
+            "After Run interruptible steps (done), Send hold.shelf_cleared",
+            "Wait 7d (done) ends the group",
+            "On hold.collected, When hold.collected, abandon abandons the group",
+            "On hold.cancelled, When hold.cancelled, abandon abandons the group",
+            "On hold.extended, When hold.extended, resume resumes the group"
+          ] do
+        assert line in lines
+        assert page() =~ line
+      end
+
+      graph = document |> ViewModel.build(Palette.core(), []) |> BlockMap.graph()
+
+      assert BlockMap.interrupts(graph) == [
+               %{"from" => "blk_COLLECTED", "group" => "blk_SHELF", "to" => "exit"},
+               %{"from" => "blk_CANCELLED", "group" => "blk_SHELF", "to" => "exit"},
+               %{"from" => "blk_EXTENDED", "group" => "blk_SHELF", "to" => "body"}
+             ]
+
+      assert BlockMap.timers(graph) == []
+    end
+  end
+
+  describe "park until an interrupt or the deadline: core.await when the event exists" do
+    # Sabotage: in `Await.outcomes/1`, dropped `timed_out` - red: the
+    # Describe line names only `received` (verified).
+    test "the await the page quotes compiles in the group's place and continues either way" do
+      assert page() =~ "```json\n" <> @collect_await_json <> "```\n"
+
+      document = with_step_in_place_of(park_with_deadline(), "blk_SHELF", @collect_await_json)
+
+      assert {:ok, compiled} = Compiler.compile(document, Palette.core())
+      assert compiled.warnings == []
+
+      lines = Describe.render(Describe.outline(document, Palette.core(), []), [])
+
+      line =
+        "After Wait for hold.collected, giving up after 7d (received, timed_out), Send hold.shelf_cleared"
+
+      assert line in lines
+      assert page() =~ line
+
+      {:ok, machine} = Statifier.compile(compiled.scxml)
+      {machine_state, _effects} = Statifier.initialize(machine)
+
+      for event <- ["hold.collected", "statifier_blocks.await.blk_COLLECT"] do
+        {:ok, after_event, effects} = Statifier.send_event(machine_state, event)
+        assert Statifier.active_leaf_states(after_event) == MapSet.new(["s_blk_ROOT__o_done"])
+        assert sent(effects) == ["hold.shelf_cleared"]
+      end
+    end
+  end
+
   defp page, do: File.read!(@page)
+
+  defp park_with_deadline do
+    {:ok, document} = Document.from_json(File.read!(@park_with_deadline))
+    document
+  end
+
+  # Where the hold shelf chart parks: in the wait, with each handler armed.
+  defp parked do
+    MapSet.new([
+      "s_blk_SHELVED__waiting",
+      "s_blk_COLLECTED__armed",
+      "s_blk_CANCELLED__armed",
+      "s_blk_EXTENDED__armed"
+    ])
+  end
+
+  # The document with the hold shelf group's type and config replaced, its
+  # slots kept, re-read through the document decoder.
+  defp with_shelf_type(document, type, config) do
+    document
+    |> document_json()
+    |> update_in(["root", "slots", "body"], fn steps ->
+      Enum.map(steps, fn
+        %{"id" => "blk_SHELF"} = shelf -> Map.merge(shelf, %{"type" => type, "config" => config})
+        step -> step
+      end)
+    end)
+    |> decode_json()
+  end
+
+  # The document with the root's step `id` replaced by the decoded block
+  # JSON, re-read through the document decoder.
+  defp with_step_in_place_of(document, id, json) do
+    step = JSON.decode!(json)
+
+    document
+    |> document_json()
+    |> update_in(["root", "slots", "body"], fn steps ->
+      Enum.map(steps, fn
+        %{"id" => ^id} -> step
+        other -> other
+      end)
+    end)
+    |> decode_json()
+  end
+
+  defp delayed(effects),
+    do: for({:send_delayed, send} <- effects, do: {send.event, send.delay_ms})
+
+  defp cancelled(effects), do: for({:cancel, cancel} <- effects, do: cancel.send_id)
 
   defp bounded_step do
     {:ok, document} = Document.from_json(File.read!(@bounded_step))

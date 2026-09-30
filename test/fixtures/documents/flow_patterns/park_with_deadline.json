@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "id": "bdoc_01JHOLDSHELF",
+  "revision": 1,
+  "metadata": {"name": "Hold shelf, until collected or cancelled"},
+  "accepts": ["hold.collected", "hold.cancelled", "hold.extended"],
+  "root": {
+    "id": "blk_ROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_READY", "type": "core.send", "type_version": 2,
+       "config": {"event": "hold.ready"}},
+      {"id": "blk_SHELF", "type": "core.group", "type_version": 1,
+       "slots": {
+         "body": [
+           {"id": "blk_SHELVED", "type": "core.wait", "type_version": 2,
+            "config": {"duration": "7d"}}
+         ],
+         "interrupts": [
+           {"id": "blk_COLLECTED", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "hold.collected", "outcome": "abandon"}},
+           {"id": "blk_CANCELLED", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "hold.cancelled", "outcome": "abandon"}},
+           {"id": "blk_EXTENDED", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "hold.extended", "outcome": "resume"}}
+         ]
+       }},
+      {"id": "blk_CLEAR", "type": "core.send", "type_version": 2,
+       "config": {"event": "hold.shelf_cleared"}}
+    ]}
+  }
+}

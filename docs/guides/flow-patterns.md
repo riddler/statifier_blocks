@@ -16,6 +16,7 @@ compiles and runs each one on the current release under the core palette
 
 - [A step that must finish within a bound, or the flow continues](#a-step-that-must-finish-within-a-bound-or-the-flow-continues)
 - [A branch whose outcome may be both arms](#a-branch-whose-outcome-may-be-both-arms)
+- [Park until an interrupt fires or the deadline expires](#park-until-an-interrupt-fires-or-the-deadline-expires)
 
 ## A step that must finish within a bound, or the flow continues
 
@@ -364,3 +365,190 @@ message until the card is posted; the parallel starts both lanes together, so
 the message goes out at once. When no optional step waits for anything, the
 branches in a row and the parallel send the same events, and either shape
 does the job.
+
+## Park until an interrupt fires or the deadline expires
+
+Use this when the flow should sit still until something happens to it or a
+length of time runs out, whichever comes first, and there is no one event
+it is waiting for: several things may end the wait, and when none of them
+does, the deadline does.
+
+The example is a library hold shelf. A patron's hold is ready, and the item
+sits on the hold shelf for seven days. The patron may collect it, may cancel
+the hold, or may ask for more time; if seven days pass with none of those,
+the shelf is cleared anyway.
+
+### The shape
+
+Put a `core.group` where the flow should park. Its `body` is one
+`core.wait` whose `duration` is the deadline, and its `interrupts` rail
+carries a `core.on_event` for each event that may really arrive.
+
+The wait is the deadline. It sends its own delayed event when it starts
+and finishes when that event arrives (`StatifierBlocks.Core.Wait.emit/2`),
+so the body completes when the time runs out and the group finishes as
+`done`. Each handler names one of the real events. A handler whose
+`outcome` is `abandon` leaves the group for good, and the group finishes
+as `done` then too (`StatifierBlocks.Core.Emit.interruptible/2`). A
+handler whose `outcome` is `resume` starts the group again from its first
+step (`StatifierBlocks.Core.Group.emit/2`), which is the wait, so the
+deadline starts over at its full length.
+
+Nothing in the document names an event nobody sends. `core.await` would
+need one: its `event` is required (`StatifierBlocks.Core.Await`), and a
+flow with no single event to wait for would have to invent one only for
+the await to hold on.
+
+### The document
+
+```json
+{
+  "schema_version": 1,
+  "id": "bdoc_01JHOLDSHELF",
+  "revision": 1,
+  "metadata": {"name": "Hold shelf, until collected or cancelled"},
+  "accepts": ["hold.collected", "hold.cancelled", "hold.extended"],
+  "root": {
+    "id": "blk_ROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_READY", "type": "core.send", "type_version": 2,
+       "config": {"event": "hold.ready"}},
+      {"id": "blk_SHELF", "type": "core.group", "type_version": 1,
+       "slots": {
+         "body": [
+           {"id": "blk_SHELVED", "type": "core.wait", "type_version": 2,
+            "config": {"duration": "7d"}}
+         ],
+         "interrupts": [
+           {"id": "blk_COLLECTED", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "hold.collected", "outcome": "abandon"}},
+           {"id": "blk_CANCELLED", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "hold.cancelled", "outcome": "abandon"}},
+           {"id": "blk_EXTENDED", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "hold.extended", "outcome": "resume"}}
+         ]
+       }},
+      {"id": "blk_CLEAR", "type": "core.send", "type_version": 2,
+       "config": {"event": "hold.shelf_cleared"}}
+    ]}
+  }
+}
+```
+
+It compiles under the core palette with no finding. These are the lines of
+the compiled chart that carry the pattern. The wait arms the deadline when
+the group starts:
+
+```xml
+<send delay="7d" event="statifier_blocks.wait.blk_SHELVED" id="s_blk_SHELVED__send"/>
+```
+
+A collection raises the group's abandon event, and a request for more time
+raises its resume event:
+
+```xml
+<transition event="hold.collected" target="s_blk_COLLECTED__o_done"><raise event="statifier_blocks.interrupt.abandon.s_blk_SHELF"/></transition>
+<transition event="hold.extended" target="s_blk_EXTENDED__o_done"><raise event="statifier_blocks.interrupt.resume.s_blk_SHELF"/></transition>
+```
+
+The group goes to its own `done` when its body finishes or when it is
+abandoned, and back into its run when it is resumed:
+
+```xml
+<transition event="done.state.s_blk_SHELF__body" target="s_blk_SHELF__o_done" type="internal"/>
+<transition event="statifier_blocks.interrupt.abandon.s_blk_SHELF" target="s_blk_SHELF__o_done" type="internal"/>
+<transition event="statifier_blocks.interrupt.resume.s_blk_SHELF" target="s_blk_SHELF__run" type="internal"/>
+```
+
+The root sequence moves on when the group is done:
+
+```xml
+<transition event="done.state.s_blk_SHELF" target="s_blk_CLEAR" type="internal"/>
+```
+
+The body cancels the wait's timer when it is left, however it is left
+(`StatifierBlocks.Compiler.Cancels`):
+
+```xml
+<onexit><cancel sendid="s_blk_SHELVED__send"/></onexit>
+```
+
+### What Describe and the Map show
+
+The Describe outline (`StatifierBlocks.Describe.render/2`) reads the wait
+and the three handlers as:
+
+```text
+Wait 7d
+When hold.collected, abandon
+When hold.cancelled, abandon
+When hold.extended, resume
+```
+
+and the flow around them as:
+
+```text
+After Run interruptible steps (done), Send hold.shelf_cleared
+Wait 7d (done) ends the group
+On hold.collected, When hold.collected, abandon abandons the group
+On hold.cancelled, When hold.cancelled, abandon abandons the group
+On hold.extended, When hold.extended, resume resumes the group
+```
+
+The Map (`StatifierBlocks.Map.graph/2`) draws an interrupt edge for each
+handler (`StatifierBlocks.Map.interrupts/1`): the two abandons leave the
+group (`"to" => "exit"`) and the resume goes back into its body
+(`"to" => "body"`). It draws no timer edge: that edge joins a delayed
+`core.send` to the rule its event reaches (`StatifierBlocks.Map.timers/1`),
+and here the deadline is the wait's own duration.
+
+### What a host sees
+
+The chart sends `hold.ready`. When the group starts, the chart asks the
+host for a delayed send seven days out, and parks. Then one of these
+happens:
+
+- **The patron collects the item.** The handler abandons the group, the
+  timer is cancelled, and the chart sends `hold.shelf_cleared`.
+- **The patron cancels the hold.** The same: the group is abandoned, the
+  timer is cancelled, and the chart sends `hold.shelf_cleared`.
+- **Seven days pass.** The wait finishes, the group finishes as `done`,
+  and the chart sends `hold.shelf_cleared`.
+- **The patron asks for more time.** The handler resumes the group: the
+  timer is cancelled, a new delayed send seven days out is asked for, and
+  the chart parks again.
+
+None of these raises, refuses or reports a finding. As in the first
+pattern, a `core.group` declares no outcomes of its own, so the step after
+it cannot tell a collection from a cancellation from the deadline: two
+abandoning handlers on one rail are indistinguishable downstream
+(`StatifierBlocks.Core.Await`, "Why this is a type rather than an
+arrangement"). When the flow needs to know, and there is one event to
+tell apart, use the `core.await` below.
+
+A `core.resumable_group` in the group's place parks the same way. Its body
+here is the one wait, so resuming where it left off re-enters the wait,
+and the wait asks for its full seven days again when it is entered.
+
+### When the event does exist: `core.await` with a `timeout`
+
+When the flow is waiting for one event, and not only for whatever may
+interrupt it, that event exists and `core.await` names it. Its optional
+`timeout` is the deadline, and it ends at one of two declared outcomes,
+`received` or `timed_out` (`StatifierBlocks.Core.Await.outcomes/1`), so
+the step after it can tell the two apart. If collecting the item were the
+only thing that could end the hold, this block in the group's place would
+do the job:
+
+```json
+{"id": "blk_COLLECT", "type": "core.await", "type_version": 1,
+ "config": {"event": "hold.collected", "timeout": "7d"}}
+```
+
+```text
+After Wait for hold.collected, giving up after 7d (received, timed_out), Send hold.shelf_cleared
+```
+
+It is the shorter answer the first pattern ends with, for the same
+reason. Reach for the group and the wait when there is no such event, or
+when several events may end the park.
