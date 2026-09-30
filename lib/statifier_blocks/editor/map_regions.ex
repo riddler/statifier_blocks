@@ -89,6 +89,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     the map; the name, the description, what starts it and the counts
     stay. A selected block's description is unchanged. The default,
     `map={true}`, renders the region exactly as a host's page has it.
+
+    ## A document it cannot describe
+
+    Every description is read off `StatifierBlocks.Describe.outline/3`,
+    which expands each composite in the document, so a composite whose
+    declaration cannot expand makes the outline raise. The region degrades
+    rather than raising out of the host's render, as the editor does, which
+    leaves its region out for such a document: it renders no description at
+    all, neither a block's nor the document's idle one, and carries no
+    `data-map-description`. The region itself, its id, `aria-live` and
+    label stay, so the rows that name it still name an element; with
+    `map={true}` the hover layer stays and the store is rendered with no
+    entries, so a hover on the map shows nothing. The
+    rescue is exactly as wide as the editor's own check before it mounts
+    the region: any raise out of the outline.
     """
 
     use Phoenix.Component
@@ -204,18 +219,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @spec description_region(map()) :: Phoenix.LiveView.Rendered.t()
     def description_region(assigns) do
       %{document: document, view_model: view_model, palette: palette} = assigns
-      graph = BlockMap.graph(view_model, graph_opts(assigns.selected, assigns.phrase))
-      outline = Describe.outline(document, palette, [])
 
-      elements =
-        Info.elements(document, graph, view_model, outline, palette, phrase_opts(assigns.phrase))
+      {elements, current} =
+        case outline(document, palette) do
+          {:ok, outline} ->
+            graph = BlockMap.graph(view_model, graph_opts(assigns.selected, assigns.phrase))
+            opts = phrase_opts(assigns.phrase)
+            elements = Info.elements(document, graph, view_model, outline, palette, opts)
+            idle = Info.idle(document, graph, view_model, outline)
+            {elements, current(elements, assigns.selected, idle)}
 
-      idle = Info.idle(document, graph, view_model, outline)
+          :error ->
+            {[], nil}
+        end
 
       assigns =
         assigns
         |> assign(:elements, elements)
-        |> assign(:current, current(elements, assigns.selected, idle))
+        |> assign(:current, current)
 
       ~H"""
       <div class="sb-map__description-frame">
@@ -234,9 +255,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           class={["sb-map__description", @class]}
           aria-live="polite"
           aria-label={@label}
-          data-map-description={@current.kind}
+          data-map-description={@current && @current.kind}
         >
-          <.description description={@current} explanation={@map or @current.kind != :idle} />
+          <.description
+            :if={@current}
+            description={@current}
+            explanation={@map or @current.kind != :idle}
+          />
         </section>
       </div>
       <div :if={@map} id={store_id(@id)} hidden data-map-descriptions="true">
@@ -289,6 +314,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <% end %>
       </dl>
       """
+    end
+
+    # The document's outline, or `:error` when it cannot be read: the outline
+    # expands every composite, and a declaration that cannot expand raises.
+    # The rescue is as wide as the editor's `describable?/2`, which asks the
+    # same question before it mounts this region.
+    @spec outline(Document.t(), Palette.t()) :: {:ok, Describe.t()} | :error
+    defp outline(document, palette) do
+      {:ok, Describe.outline(document, palette, [])}
+    rescue
+      _error -> :error
     end
 
     # What the region says: the selected block's description, or the

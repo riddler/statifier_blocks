@@ -24,6 +24,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias StatifierBlocks.MapFixtures
     alias StatifierBlocks.ViewModel
 
+    defmodule UnexpandableRenewal do
+      @moduledoc false
+      # A composite whose declaration cannot expand, in the shape of
+      # `StatifierBlocks.Editor.CompositeExpandTest`'s `BrokenSubtree`:
+      # `subtree/1` answers two members under one local id for "duplicate",
+      # which `Composite.expand/2` refuses with an `ArgumentError`, and has
+      # no clause for any other value, a `FunctionClauseError`. The view
+      # model draws it as a leaf; only the outline has to expand it.
+
+      use StatifierBlocks.Composite,
+        name: "library.renew_loan",
+        params: [
+          %{key: "break", type: :string, label: "Break", required?: true, default: "duplicate"}
+        ],
+        sentence: "Renew the loan: {break}",
+        palette_entry: %{label: "Renew the loan", group: "Structure"},
+        version: 1
+
+      alias StatifierBlocks.Block
+
+      @impl StatifierBlocks.Composite
+      def subtree(%{"break" => "duplicate"}), do: [renewed(), renewed()]
+
+      defp renewed do
+        Block.new("core.assign",
+          id: "renewed",
+          config: %{"path" => "loan.renewed", "value" => "true"}
+        )
+      end
+    end
+
     defmodule Host do
       @moduledoc false
       # A host at its smallest: the two regions and a list. The list's two
@@ -566,6 +597,93 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                          })
                        end
         end
+      end
+    end
+
+    defp unexpandable_region_html(break, attrs) do
+      palette =
+        Palette.new(Map.put(Palette.core_types(), "library.renew_loan", UnexpandableRenewal))
+
+      document =
+        Document.new(
+          Block.new("core.sequence",
+            id: "blk_ROOT",
+            slots: %{
+              "body" => [
+                Block.new("library.renew_loan", id: "blk_RL", config: %{"break" => break})
+              ]
+            }
+          ),
+          id: "bdoc_RENEW"
+        )
+
+      {document, palette,
+       render_component(
+         &MapRegions.description_region/1,
+         Map.merge(
+           %{
+             id: "map-description",
+             document: document,
+             view_model: ViewModel.build(document, palette, []),
+             palette: palette,
+             selected: nil
+           },
+           attrs
+         )
+       )}
+    end
+
+    describe "a document whose composite declaration cannot expand" do
+      # The outline expands every composite, so it raises on this document,
+      # and the region degrades as the editor does: it renders, with no
+      # description in it, rather than raising out of the host's render.
+      # Sabotage: dropped the `rescue` from `outline/2`; red at both cases
+      # and the one below, the outline's raise out of `render_component/2`,
+      # which is the defect.
+      # Sabotage: narrowed the `rescue` in `outline/2` to `ArgumentError`;
+      # red at the FunctionClauseError case only, on the same raise.
+      # Sabotage: stamped `data-map-description="idle"` on the empty
+      # region; red at both cases on the attribute.
+      # Sabotage: rendered the store only when there is a description; red
+      # at both cases on the store's count.
+      for {break, exception, what} <- [
+            {"duplicate", ArgumentError, "a duplicated local id"},
+            {"no_clause", FunctionClauseError, "a subtree/1 with no clause for the param"}
+          ] do
+        test "#{what}: the region renders empty, its layer and store beside it" do
+          {document, palette, html} = unexpandable_region_html(unquote(break), %{})
+
+          assert_raise unquote(exception), fn -> Describe.outline(document, palette, []) end
+
+          assert count_of(html, "#map-description") == 1
+          region = one(html, "#map-description")
+          assert LazyHTML.attribute(region, "aria-live") == ["polite"]
+          assert LazyHTML.attribute(region, "aria-label") == ["Description"]
+          assert LazyHTML.attribute(region, "data-map-description") == []
+          assert String.trim(LazyHTML.text(region)) == ""
+
+          assert count_of(html, "#map-description-hover") == 1
+          assert count_of(html, "#map-description-store") == 1
+          assert count_of(html, "#map-description-store [data-describes]") == 0
+        end
+      end
+
+      # A selection names a block the map draws, and the region still says
+      # nothing: there is no description of it to show.
+      # Sabotage: rendered the region only when there is a description; red
+      # here and at both cases above on the region's count.
+      test "a selection leaves the region empty, and map={false} drops only the layer and store" do
+        {_document, _palette, selected} =
+          unexpandable_region_html("duplicate", %{selected: "blk_RL"})
+
+        assert count_of(selected, "#map-description") == 1
+        assert String.trim(LazyHTML.text(one(selected, "#map-description"))) == ""
+
+        {_document, _palette, none} = unexpandable_region_html("duplicate", %{map: false})
+        assert count_of(none, "#map-description") == 1
+        assert count_of(none, "#map-description-hover") == 0
+        assert count_of(none, "#map-description-store") == 0
+        assert String.trim(LazyHTML.text(one(none, "#map-description"))) == ""
       end
     end
 
