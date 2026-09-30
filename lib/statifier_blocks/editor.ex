@@ -3927,6 +3927,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # data. Asking `expand/2` of each composite block instead would miss a
     # composite nested inside another's expansion, which the outline also
     # expands.
+    #
+    # The outline this check computes is computed again inside the region,
+    # which rescues the same raise. Handing this one to the region would take
+    # an attr `description_region/1` does not have, so the second computation
+    # is kept, measured and recorded as acceptable. Median of 200 calls after
+    # 20 warm-up calls, test build, Apple M3, Elixir 1.18.3 on OTP 27, core
+    # palette: the library loan document's outline takes about 0.13 ms of a
+    # 1.2 ms editor render (about 11%), the patron registration document's
+    # about 0.15 ms of 1.5 to 1.7 ms (about 9 to 10%).
     @spec describable?(Document.t(), Palette.t()) :: boolean()
     defp describable?(%Document{} = document, %Palette{} = palette) do
       _outline = Describe.outline(document, palette, [])
