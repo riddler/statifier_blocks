@@ -153,7 +153,6 @@ function mount(dataset) {
 }
 
 const hook = mount({
-  infoRegion: "sb-map-info",
   infoHover: "sb-map-info-hover",
   infoStore: "sb-map-info-store",
 })
@@ -240,7 +239,7 @@ StatifierBlocksMap.destroyed.call(hook)
 
 // A hook whose element names no layer and no store: pointing at the
 // drawing changes nothing.
-const bare = mount({infoRegion: "sb-map-info"})
+const bare = mount({})
 await bare.mounted()
 over(first)
 const unnamed = idle() && region.innerHTML === resting
