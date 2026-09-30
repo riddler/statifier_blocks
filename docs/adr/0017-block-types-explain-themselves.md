@@ -273,3 +273,47 @@ decision 2 decides reads as written.
 - Consequences names `ADR-0016`'s Amendment of 2026-09-27 and a dated Note
   on `ADR-0002` pointing here; both are on main. The Amendment is flipped
   to accepted by the same request as this Note.
+
+## Note (2026-09-30): cites that have moved since the flip Note
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. The sentences it reads stay as written, and so do the cites it
+re-locates.
+
+The flip Note above read every decision at `12d3d22`. Several of its cites,
+and the matching cites in the record's body, have moved since. Each cite
+below was read at `d38dfb9` and is written anchor first, line second; the
+lines in brackets are where the flip Note placed it, then, where the body
+cites it at another line, the body's. Each anchor still names the thing the
+record says.
+
+- `lib/statifier_blocks/core/send.ex`: `def sentence` is at `:219` (`:216`;
+  Context `:201`), `@short_form` at `:237` (`:229`) and `def delay_words`
+  at `:257` (`:249`; decision 2 `:246`, as `defp delay_words`).
+- `lib/statifier_blocks/block_type.ex`: `defmacro __using__` is at `:113`
+  (`:112`; `:110`), `optional(:description)` at `:645` (`:633`; `:631`),
+  `@callback explain` at `:869` (`:857`), `@optional_callbacks` at `:871`
+  (`:859`), with `explain: 0` at `:880`, `@presentation_cap` at `:1540`
+  (`:1436`), `def sentence` at `:1770` (`:1666`; `:1645`), `def explain` at
+  `:1807` (`:1703`), `defp call_explain` at `:2204` (`:2100`),
+  `defp description` at `:2216` (`:2112`) and `defp line` at `:2228`
+  (`:2124`).
+- `lib/statifier_blocks/palette.ex`: `def call` is at `:607` (`:606`) and
+  `def declares?` at `:649` (`:648`); the seventeen `core.*` types
+  `core_types/0` lists are at `:222-238` (`:221-237`).
+- `lib/statifier_blocks/describe.ex`: `def outline` is at `:219` (`:153`),
+  `defp timer_edges` at `:534` (`:437`), `defp timer_party` at `:555`
+  (`:456`), `defp timer_edge` at `:565` (`:466`), `defp edge_line`'s timer
+  clause, `%Edge{kind: :timer}`, at `:637` (`:534`) and `defp flat` at
+  `:719` (`:569`).
+
+These have not moved since `12d3d22`: `def duration?` in
+`lib/statifier_blocks/core/duration.ex` (`:81`); `defstruct` and
+`@type kind` in `lib/statifier_blocks/describe/edge.ex` (`:58`, `:38`); and
+`@callback timer` and `@optional_callbacks` in
+`lib/statifier_blocks/describe/phrasing.ex` (`:73`, `:75`).
+
+`delay_words/1` is still `def delay_words` with `@doc false`, as the flip
+Note read it.
+
+Filed with `sb-062y`.

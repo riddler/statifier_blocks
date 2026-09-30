@@ -14282,3 +14282,119 @@ Note states the outcome the sentence is about (`sb-0suc`).
   the note the block held before, and a single redo puts the change back
   (the test "a change applies the command, and undo and redo move the note",
   `note_field_test.exs:66`).
+
+## Note (2026-09-30): cites into the Map hook, the description region and the note command that have moved
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no line above it. It is added at the foot of the file, so
+no line another record cites moves. Every cite below was read at `d38dfb9`
+and is written anchor first, line second; the lines in brackets are where
+the record placed it, at the commit each section names.
+
+It covers the cites of the Amendments of 2026-09-28 on decisions 7 and 1
+and of 2026-09-29 on the note command and the shell's description region,
+the Notes that flip them, and the two Notes on the Map hook below them.
+Cites above the Amendment of 2026-09-28 on decision 7 (`:13418`) are not
+re-read here. Each anchor still names the thing the record says.
+
+### The flip Note of 2026-09-28, decisions 7 and 1 (read at `362a0e9`)
+
+- `assets/js/statifier_blocks_map.js`: `export const StatifierBlocksMap` is
+  at `:801` (`:721`), its one `this.pushEvent` at `:821` (`:741`), still
+  the only `pushEvent` in the file, and `export function mapGesture` at
+  `:620` (`:557`). The import of the vendored file is still at `:34`.
+- `phx-update="ignore"` on the child marked `data-map-canvas`, which
+  `map_region/1` renders, is at
+  `lib/statifier_blocks/editor/map_regions.ex:183` (`:131`).
+- `test/statifier_blocks/assets_test.exs`: the test "the map hook is its own
+  entry point, with its own default export" is at `:427` (`:344`), and "its
+  one import is the vendored layout library" at `:455` (`:372`). The
+  describe at `:44` and the tests at `:48`, `:69` and `:102` have not moved.
+- `test/statifier_blocks/map_layout_test.exs`: "ten selections cause zero
+  layouts, and a new graph causes one" is at `:1116` (`:1003`; the Note of
+  2026-09-29 on what the hook keeps cites the same line at `2469e01`).
+- `README.md`: the section "Working on the Map in this repository" is at
+  `:1801` (`:1773`), and "The hook, and what it costs" at `:1753` (`:1739`).
+- `export default` in `assets/js/statifier_blocks.js` (`:269`) and CI's
+  `actions/setup-node@v4` step (`.github/workflows/ci.yml:51`) have not
+  moved.
+
+### The note command: the Amendment and its flip rows (read at `8c4d61b`)
+
+- `def handle_event("note-change", ...)` is at
+  `lib/statifier_blocks/editor.ex:1850` (printed `:1810`, read at `:1844`
+  by the flip Note).
+- `lib/statifier_blocks/editor/inspector.ex`: `defp note_section/1` is at
+  `:483` (`:478`), its `read_only: true` clause at `:474` (`:469`), and its
+  call, `<.note_section`, at `:403` (`:398`).
+- `lib/statifier_blocks/edit.ex`: the `{:update_note, _id, _note}` clause of
+  `check_config/3` is at `:350` (`:347`); `defp check_compound/1`'s
+  empty-list clause is at `:410` (`:407`), its list clause, which refuses a
+  nested compound, at `:412` (`:409`), and its not-a-list clause at `:420`
+  (`:417`); `defp find_block/2` is at `:484` (`:481`).
+- `test/statifier_blocks/editor/note_field_test.exs`: the describe "a
+  read-only mount" is at `:213` (`:114`).
+- These have not moved: `Edit.t()` and its `:update_note` member
+  (`edit.ex:172-180`, `:179`), `apply/2`'s `:update_note` clause
+  (`edit.ex:254`), `defp maybe_put_note/2`'s `""` clause
+  (`lib/statifier_blocks/canonical_json.ex:143`), `Validation.note/2`
+  (`lib/statifier_blocks/validation.ex:339`), `defp reach` for
+  `:update_note` (`lib/statifier_blocks/recipe.ex:168`),
+  `@read_only_refused` (`editor.ex:776`) and its refusing clause
+  (`editor.ex:1296`), the describes in
+  `test/statifier_blocks/edit/note_test.exs`, "the note textarea"
+  (`note_field_test.exs:44`) and `defp gen_update_note/1`
+  (`test/support/document_generator.ex:136`).
+
+### The shell's description region: the Amendment and its flip rows (read at `8c4d61b`)
+
+- `lib/statifier_blocks/editor/map_regions.ex`: `def description_region` is
+  at `:227` (printed `:192`, read at `:205`); `attr(:map, :boolean` at
+  `:206` (`:181`, `:187`); the hover layer's and the store's `:if={@map}`
+  at `:254` and `:277` (`:210` and `:229`, `:223` and `:242`);
+  `explanation={@map or @current.kind != :idle}` at `:273` (`:226`,
+  `:239`); the region's `aria-live="polite"` at `:266` (`:235`); and
+  `attr(:label, :string`, defaulting to `"Description"`, at `:213`
+  (`:194`).
+- `defp describable?/2` is at `lib/statifier_blocks/editor.ex:3940`
+  (`:3923`, also read at `40d18cf`).
+- `test/statifier_blocks/editor/map_regions_test.exs`: the describe "the
+  map attr" is at `:502` (`:456`).
+- These have not moved: the `<MapRegions.description_region` call
+  (`editor.ex:1207`), the `.sb-editor__description` rule
+  (`assets/css/statifier_blocks.css:3147`), `Composite.expand/2`
+  (`lib/statifier_blocks/composite.ex:626`), the describes in
+  `test/statifier_blocks/editor/description_region_test.exs` (`:55`,
+  `:148`) and the two tests in
+  `test/statifier_blocks/editor/composite_expand_test.exs` (`:468`,
+  `:486`).
+
+### The Note of 2026-09-29 on what the hook keeps (read at `2469e01`)
+
+In `assets/js/statifier_blocks_map.js`: `export const StatifierBlocksMap` is
+at `:801` (`:723`); in `mounted()`, `this.hover` is built at `:805`
+(`:727`), `this.onOver` and `this.onOut` are set at `:809` and `:810`
+(`:731`, `:732`) and the click listener sets `this.revealInsert` at `:820`
+(`:742`); `destroyed()` is at `:839` (`:761`) and removes the two listeners
+at `:842-843` (`:764-765`); in `draw()`, `this.selected` is set at `:880`
+(`:787`), the unchanged graph is re-marked from `:882` (`:790`),
+`this.source` and `this.drawn` are set at `:887` and `:888` (`:794`,
+`:795`) and a layout that lands marks the selection at `:894` (`:801`);
+`export function hover` is at `:740` (`:672`), and the `data-map-hover`
+mark is written on the layer at `:756` (`:688`). In
+`test/statifier_blocks/map_hover_test.exs`, "pushes nothing to the server"
+is at `:149` (`:148`); "a hover fills the layer from the store and never
+writes the region" is still at `:62`.
+
+At `d38dfb9` `draw()` also sets `this.warnedNoCanvas` (`:852`), a flag
+that warns once when the hook's element has no child marked
+`data-map-canvas`; that Note's list does not name it. This Note only records
+that the flag is there; it does not read it against clause 7f.
+
+### The Note of 2026-09-30 on the hover layer (read at `4fdf7f8`)
+
+The test "the stylesheet stacks the shown layer over the region" is at
+`test/statifier_blocks/editor/map_regions_test.exs:409` (`:404`). That
+Note's other cites have not moved.
+
+Filed with `sb-062y`.
