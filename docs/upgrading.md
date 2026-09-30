@@ -1,17 +1,18 @@
-# Upgrading a host from 0.31 to 0.34, and from 0.39 to 0.41
+# Upgrading a host from 0.31 to 0.41
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.34.0, one minor at a time, and from 0.39.0 to 0.41.0. It does not cover
-0.34 to 0.39; the CHANGELOG's sections for those releases say what each one
-changed. A host here is the code that embeds the package:
+0.41.0, one minor at a time. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
 about it, and says **NONE** where the answer is nothing.
 
 Take the minors in order, and move the pin with each one, as the README
-recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`, then
-`"~> 0.34.0"`; from 0.39, to `"~> 0.40.0"`, then `"~> 0.41.0"`.
+recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`,
+`"~> 0.34.0"`, `"~> 0.35.0"`, `"~> 0.36.0"`, `"~> 0.37.0"`, `"~> 0.38.0"`,
+`"~> 0.39.0"`, `"~> 0.40.0"` and `"~> 0.41.0"`. A patch release rides its
+minor's pin, so each section below covers the patches of the minor it moves
+to.
 
 What an **author** changes in a document is a separate page:
 [Migrating a document from 0.27 to 0.34](guides/migrating-documents-0.27-to-0.34.md).
@@ -89,6 +90,95 @@ release below.
 editor mounted without the new `publish_status` assign renders exactly what it
 rendered on 0.33.0. The release's additions are opt-in; the CHANGELOG says
 what they are.
+
+## 0.34 to 0.35
+
+**NONE.** Nothing needs migrating, and the package gains no dependency.
+`StatifierBlocks.Plan.expressible/3` and `Plan.expressible?/3` are new and
+opt-in, so a host that calls neither sees no change from 0.34.0. The 0.35.1
+patch, which the `"~> 0.35.0"` pin takes, changes the shipped stylesheet
+only: a card's title no longer breaks mid-word.
+
+## 0.35 to 0.36
+
+- **If you pin a card line in a test**, or match the words a card shows,
+  read the new words for three core types, each of which now declares
+  `sentence/1` where it showed its label: `core.sequence` reads
+  `Run its steps in order` where it read `Sequence`; `core.group` reads
+  `Run interruptible steps` where it read `Group`; and `core.await` reads
+  `Wait for <event>`, followed by `, giving up after <timeout>` when a
+  deadline is set, where it read `Wait for event`. The same sentences name
+  those blocks in the lines of `StatifierBlocks.Describe`, new in this
+  release.
+
+The rest of 0.36.0 is opt-in: `StatifierBlocks.Describe` and the JSON
+Schema the package now ships, read through `StatifierBlocks.Schema`, change
+nothing for a host that calls neither, and the package gains no runtime
+dependency. The 0.36.1 patch needs nothing from a host: `Describe.outline/3`
+now draws the interrupt edge for an abandon handler that names
+`finish_as`, which 0.36.0 left out.
+
+## 0.36 to 0.37
+
+- **If you pin a delayed `core.send`'s card line**, or a
+  `StatifierBlocks.Describe` line built from it, read the new words: a send
+  with a delay names that delay, `In 7 days, send loan.fines_notice` where
+  it read `Send loan.fines_notice`, the short duration form put in words
+  and any other stored spelling shown as stored. A send with no delay reads
+  exactly as before.
+- **If you match every edge kind `Describe.outline/3` answers**, add
+  `:timer`, the edge from a delayed `core.send` to each `core.on_event` and
+  `core.await` that names its event, and read its delay from
+  `StatifierBlocks.Describe.Edge`'s new `delay` field. `render/2` writes it
+  as `In 24 hours, registration.deadline reaches ...`, and a phrasing
+  module rewords it through the new optional `Phrasing.timer/2` callback.
+  A document with no delayed send describes exactly as before.
+
+Nothing needs migrating and the package gains no dependency. The new
+`explain/0` callback on `StatifierBlocks.BlockType` is optional, so a host
+type that declares none changes nothing.
+
+## 0.37 to 0.38
+
+- **Run the palette pre-flight before you deploy.** A block type's declared
+  field types now bind: a config value its declared field type in
+  `config_schema/1` does not admit (an integer in a `:string` field, a
+  value outside a `{:select, choices}`) is refused before
+  `validate_config/1` runs, at compile, at the edit gate and under the
+  field in the view model, with a finding naming the field's key and its
+  declared type. After taking 0.38 and before deploying it, run
+  `StatifierBlocks.Palette.preflight/1` over your palette and
+  `StatifierBlocks.Palette.preflight/2` over the documents you store, and
+  correct each declaration or stored block they list; an empty list means
+  you are ready. A host type whose documents disagree with its declared
+  field types otherwise sees new `:config` findings. `validate_config/1`
+  still runs and its findings follow; an absent key and a `null` are still
+  the type's own to judge.
+
+`StatifierBlocks.Schema.for_palette/1` is new and opt-in, and the package
+gains no dependency.
+
+## 0.38 to 0.39
+
+- **Finish rolling 0.38 off before a document carries a block `note`.**
+  Decode now admits an optional `note` string on a block, a key 0.38.0 and
+  earlier refuse, so a node still on 0.38, or a rollback to it, refuses a
+  document that carries one. A note that is not a string is refused as
+  `{:malformed_block, id, {:note, :not_a_string}}`.
+- **If you build `%StatifierBlocks.Block{}` structs yourself**, or match
+  them field by field, it gains a `note` field, `""` by default (the absent
+  note), which `Block.new/2` takes as `:note`. Canonical form omits an
+  empty note, so a document with no notes keeps its `content_hash/1`; a
+  note changes the document's hash, not the compiled chart.
+- **If you audit the licenses of your dependencies**, the package metadata
+  lists `EPL-2.0` beside `MIT`: elkjs 0.9.3 ships vendored and unmodified
+  as `assets/vendor/elk.bundled.js`, with its Eclipse Public License 2.0
+  text beside it. Only a bundle that imports the `statifier_blocks/map`
+  entry point loads it; the default export is unchanged.
+
+The Map itself is opt-in: `StatifierBlocks.Map`, `Map.Info` and
+`StatifierBlocks.Editor.MapRegions` change nothing for a host that mounts
+neither region, and the package gains no Hex dependency.
 
 ## 0.39 to 0.40
 
