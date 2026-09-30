@@ -763,3 +763,52 @@ Where it holds:
   line.
 
 Filed with `sb-r3u4`.
+
+## Note (2026-09-30): cites that have moved since the Note of 2026-09-29 on moved cites
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. The sentences it reads stay as written, and so do the cites it
+re-locates.
+
+The Note of 2026-09-29 on the chart-view paragraph re-located this record's
+cites at `9adc029`; several have moved again since, with the changes to what
+the Map draws. Each cite below was read at `d38dfb9` and is written anchor
+first, line second; the line in brackets is where the record last placed
+it. Each anchor still names the thing the record says.
+
+- Context's cite of `StatifierBlocks.Describe.outline/3`: `def outline` is
+  at `lib/statifier_blocks/describe.ex:219` (`:175`, still its line at
+  `9adc029`).
+- `lib/statifier_blocks/map/info.ex`: `def elements` is at `:198` (`:187`),
+  `def idle` at `:220` (`:209`), `defp starts` at `:242` (`:231`),
+  `defp notes` at `:286` (`:273`) and `defp findings` at `:449` (`:436`).
+- `lib/statifier_blocks/editor/map_regions.ex`: `def map_region` is at
+  `:163` (`:143`) and `def description_region` at `:227` (`:205`), the two
+  the Note of 2026-09-29 on a host's description region said would move.
+  The guard is still the file's first line.
+- `assets/js/statifier_blocks_map.js`: `export const StatifierBlocksMap` is
+  at `:801` (`:786`), and its one `this.pushEvent` at `:821` (`:806`),
+  still the only `pushEvent` in the file.
+- `lib/statifier_blocks/editor.ex`: `defp describable?` is at `:3940`
+  (`:3923`, read at `87db41f`).
+
+These have not moved since the commits that last placed them:
+`lib/statifier_blocks/map.ex`'s `def graph` (`:384`), `def caption`
+(`:447`), `defp put_band` (`:565`), `defp put_caption` (`:1019`),
+`defp timer_parties` (`:834`), `@timer_targets` (`:325`) and its aliases
+(`:305-312`); `map/info.ex`'s aliases (`:98-106`); the hook's import of the
+vendored file (`statifier_blocks_map.js:34`); `def build` and
+`defmodule Node` in `lib/statifier_blocks/view_model.ex` (`:519`, `:319`);
+`def explain` in `lib/statifier_blocks/block_type.ex` (`:1807`);
+`def core` in `lib/statifier_blocks/palette.ex` (`:206`); `package()`'s
+`files:` and `licenses:` in `mix.exs` (`:127`, `:115`); CI's
+`actions/setup-node@v4` step (`.github/workflows/ci.yml:51`); and
+`defmodule BrokenSubtree` and the test "the canvas is drawn and the
+description region is left out" in
+`test/statifier_blocks/editor/composite_expand_test.exs` (`:171`, `:468`).
+
+The Note on selection cites `hover/2` and two of its lines at `9a324a2`
+(`:666`, `:686`, `:672`) to say what the hook did before that request; those
+cites describe code that is gone and are not re-located.
+
+Filed with `sb-062y`.
