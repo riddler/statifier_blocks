@@ -71,6 +71,10 @@ how it finished - declared `outcomes`, a handler's `finish_as` and the
 `on_<name>` slots an author fills - see
 [`docs/guides/migrating-documents-0.27-to-0.34.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/guides/migrating-documents-0.27-to-0.34.md).
 
+Shapes a workflow commonly needs, built from the core block types - starting
+with a step that must finish within a bound or the flow continues - are in
+[`docs/guides/flow-patterns.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/guides/flow-patterns.md).
+
 ## A worked example
 
 A card-processing flow: place a hold, and settle it when the account has the
