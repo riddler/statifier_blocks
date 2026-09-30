@@ -263,6 +263,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # Sabotage: dropped `data-info-hover` from the element; this went red.
       # Sabotage: dropped `phx-update="ignore"` from the canvas child; this
       # went red.
+      # Sabotage: stamped `data-info-region={@description}` on the element
+      # again; this went red.
       test "the element carries every attribute the hook reads", %{conn: conn} do
         document = MapFixtures.document!("library_loan")
         {:ok, view, _html} = mount_host(conn, document)
@@ -271,7 +273,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert attribute(map, "phx-hook") == "StatifierBlocksMap"
         assert attribute(map, "data-editable") == "true"
         assert attribute(map, "data-insert-reveal") == "#inserting"
-        assert attribute(map, "data-info-region") == "map-description"
+        assert attribute(map, "data-info-region") == nil
         assert attribute(map, "data-info-hover") == "map-description-hover"
         assert attribute(map, "data-info-store") == "map-description-store"
         assert has_element?(view, "#map-description-store[hidden]")

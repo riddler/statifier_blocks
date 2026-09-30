@@ -37,15 +37,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     The element carries what the hook reads, in the attributes it reads them
     from: the graph `StatifierBlocks.Map.graph/2` answers as JSON in
-    `data-graph`, with the selection marked in it; whether the page can edit
+    `data-graph`, with the selection marked in it, and the selected block's
+    id again in `data-selected`, which the hook falls back on when the graph
+    carries no mark; whether the page can edit
     in `data-editable`; the list's event names in `data-select-event` and
     `data-insert-event`; the element to scroll into view after an insert
     armed from the map in `data-insert-reveal`, when the host names one; and
-    the description region's id, its hover layer's and its store's in
-    `data-info-region`, `data-info-hover` and `data-info-store`, when the
-    host names the region, which is what gives the map its hover. The
-    drawing goes into a child marked `data-map-canvas`, which LiveView
-    leaves alone (`phx-update="ignore"`).
+    the ids of the description region's hover layer and of its store in
+    `data-info-hover` and `data-info-store`, when the host names the region,
+    which is what gives the map its hover. The hook never reads the region
+    itself, so its id is not stamped. The drawing goes into a child marked
+    `data-map-canvas`, which LiveView leaves alone (`phx-update="ignore"`).
 
     ## The description region
 
@@ -175,7 +177,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           data-select-event={@select_event}
           data-insert-event={@insert_event}
           data-insert-reveal={@insert_reveal}
-          data-info-region={@description}
           data-info-hover={@description && hover_id(@description)}
           data-info-store={@description && store_id(@description)}
         >
