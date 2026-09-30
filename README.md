@@ -51,7 +51,7 @@ off a closed built-in vocabulary.
 ```elixir
 def deps do
   [
-    {:statifier_blocks, "~> 0.41.0"}
+    {:statifier_blocks, "~> 0.42.0"}
   ]
 end
 ```

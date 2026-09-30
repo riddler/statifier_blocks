@@ -11,6 +11,33 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.42.0] 2026-09-30
+
+0.42.0 changes three things a host of the editor or the Map can see, and
+fixes what raised or dropped out on documents and classes a host passes.
+The changes to existing answers are under Changed: `map_region/1` no
+longer stamps `data-info-region` on the map's element; the editor stores a
+browser's CRLF note line breaks as LF, while the note command a host issues
+keeps its bytes; and a host's `:phrase` words reword an event name only in
+event position. Under Fixed: a note-free block kept as a stored Erlang term
+no longer raises in the note command, the Map's descriptions or the
+editor's note field; `description_region/1` degrades instead of raising on
+a composite whose declaration cannot expand; and the host's `class` reaches
+the description region's hover layer. 0.42.0 is a minor, because what
+existing functions answer changes. The package gains no Hex dependency.
+
+### Changed
+
+- `StatifierBlocks.Editor.MapRegions.map_region/1` no longer stamps `data-info-region` on the map's element, which the `StatifierBlocksMap` hook has not read since 0.40.0 (it finds its hover layer by `data-info-hover` and its store by `data-info-store`), so the hover is unchanged. A host that stamps the attribute on its own element has nothing to do; a host that read it off the element finds it gone and takes the region's id from the `description` it passes.
+- The editor's note field now stores each CRLF line break a browser posts as LF, so a note written in the editor holds the same bytes as the same note written by a host, and a change of line endings alone is no longer an undo entry; a lone CR is stored as posted, and the `{:update_note, id, note}` command a host issues itself still stores the note as written.
+- A host's `:phrase` words for its event names (`StatifierBlocks.Map.graph/2` and the Map's description region) now reword a name only in event position - after "Send" or a delayed send's "send", after "Wait for", or after a rule's "When" - and leave a known name anywhere else as written, such as a path a step sets, a name after a send or wait word glued to a dotted prefix, or the event a timer edge's line names before "reaches"; a host that relied on a name reading as words elsewhere now sees the name.
+
+### Fixed
+
+- The `class` a host passes to `StatifierBlocks.Editor.MapRegions.description_region/1` now goes on the region's hover layer as well as on the region, so styling the host gives the region through it no longer drops out while a hover is shown.
+- A document whose blocks were built before blocks had a note, and that a host kept as a stored Erlang term rather than as JSON, now also goes through the note edit command `{:update_note, id, note}` (its inverse carrying the empty note), `StatifierBlocks.Map.Info`'s descriptions and the editor's note field as a note-free document, instead of raising `KeyError` or `CaseClauseError`.
+- `StatifierBlocks.Editor.MapRegions.description_region/1` no longer raises when a composite in the document has a declaration that cannot expand: the region renders with no description in it instead of raising out of the host's render, as the editor already survives such a document.
+
 ## [0.41.0] 2026-09-29
 
 0.41.0 changes how the Map draws three things and how Describe names a
@@ -3790,6 +3817,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.42.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.0
 [0.41.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.41.0
 [0.40.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.40.0
 [0.39.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.39.0
