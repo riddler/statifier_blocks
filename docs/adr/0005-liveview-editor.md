@@ -14257,3 +14257,28 @@ clause's "pushes no command and no event of its own" for the hover.
 It edits no line above it, amends no clause of decision 7, and changes no
 code, test or changelog fragment. The flip Note of 2026-09-28 and the Note
 of 2026-09-29 above stand as printed.
+
+## Note (2026-09-30): the outcome of an edit in the Note textarea, stated without its path
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no line above it. It is added at the foot of the file, so
+no line another record cites moves. Every cite into `lib/` and `test/` below
+was read at `4a70851` and is written anchor first, line second.
+
+The Amendment of 2026-09-29 that adds clause `2s` says, under "The editor's
+field", that the editor turns the textarea's `note-change` event into one
+`{:update_note, id, note}` "through the same funnel as every other command"
+(`:13828-13829`). That phrase walks from the event to the command rather
+than stating what the edit produces. The Amendment stands as printed; this
+Note states the outcome the sentence is about (`sb-0suc`).
+
+- **One change is one `{:update_note, id, note}` command.** A change posted
+  from the Note textarea that moves the note commits that one command and
+  nothing beside it (`lib/statifier_blocks/editor.ex:1850`, `def
+  handle_event("note-change", ...)`); a posted note equal to the block's
+  current one commits nothing (the test "a change that moves nothing
+  commits nothing", `test/statifier_blocks/editor/note_field_test.exs:87`).
+- **One change is one undo entry.** A single undo after one change restores
+  the note the block held before, and a single redo puts the change back
+  (the test "a change applies the command, and undo and redo move the note",
+  `note_field_test.exs:66`).
