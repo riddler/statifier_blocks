@@ -14179,3 +14179,81 @@ code, test or changelog fragment. The flip Note and the Amendment it flips
 stand as printed, and each keeps its status.
 
 Filed with `sb-zx8u`.
+
+## Note (2026-09-30): the flip Note's row on clause 7f's drawing, and clause 7f's second permitted write, read against the hover layer
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no line above it. It is added at the foot of the file, so
+no line another record cites moves. Every cite into `assets/`, `lib/` and
+`test/` below was read at `4fdf7f8` and is written anchor first, line second.
+
+### What the row says, and what changed under it
+
+The Note of 2026-09-28 that flips the three Amendments of that date
+(`:13684`) answers clause 7f's "draws what the server computed" with a row
+(`:13706`) whose last clause reads: "`hover` swaps and restores the
+description region's text from the store the server rendered". That was the
+hook as the flip Note read it. ADR-0018's Note of 2026-09-29, "selection
+speaks, hover is silent", records that the hook no longer writes the region:
+a hover is drawn in a separate hover layer. The Note of 2026-09-29 above
+("the Map hook keeps the selection and its hover handlers beside the three
+values the flip Note lists", `:14107`) reads the hover handlers against
+clause 7f's "holds no behaviour" only; it does not say how this row, or the
+clause's second permitted write, reads against the layer. This Note does
+(`sb-4f9n`).
+
+At `4fdf7f8`:
+
+- **The layer is an element the server rendered.** `description_region/1`
+  (`lib/statifier_blocks/editor/map_regions.ex:227`, `def
+  description_region`) renders it beside the region, inside the frame
+  `sb-map__description-frame`, with the region's id and `-hover` after it,
+  `aria-hidden="true"`, `hidden`, and `phx-update="ignore"` (`:259`), so no
+  patch writes it.
+- **The hook writes the layer and never the region.** `hover/2`
+  (`assets/js/statifier_blocks_map.js:740`, `export function hover`)
+  answers a show and a restore. The show copies the store's entry for the
+  hovered element, markup the server rendered, into the layer, marks the
+  layer with `data-map-hover` and unhides it (`:755-757`); the restore
+  hides the layer, empties it and drops the mark (`:744-746`). The test "a
+  hover fills the layer from the store and never writes the region"
+  (`test/statifier_blocks/map_hover_test.exs:62`) records every write made
+  to the region and holds that record empty.
+- **The stylesheet draws the layer in the region's place.** While the layer
+  is shown, the rule headed `.sb-map__description-hover:not([hidden]) +
+  .sb-map__description` (`assets/css/statifier_blocks.css:5036`) makes the
+  region transparent under it; the test "the stylesheet stacks the shown
+  layer over the region"
+  (`test/statifier_blocks/editor/map_regions_test.exs:404`) holds the rules.
+
+### How the row reads
+
+The row's last clause now reads: `hover` shows the store's entry, which the
+server rendered, in the hover layer drawn in the description region's place,
+and hides the layer again when the pointer leaves; the region's own text is
+never written. The row's other claims, the drawing into the child marked
+`data-map-canvas` and `markSelected`'s mark, are not touched by the change
+and are not re-read here. Clause 7g's "swaps the description region's text on
+hover from entries the server rendered" reads the same way.
+
+### How clause 7f's second permitted write reads
+
+Clause 7f allows "a swap of one server-rendered text for another in a region
+the server rendered, put back when the pointer leaves". The hover layer is
+the region the server rendered in which the swap happens, and what is swapped
+is what the reader sees in the description region's place: the region's
+server-rendered text, then the store entry's server-rendered text, then the
+region's again when the layer hides. The layer is left as the server rendered
+it, empty and hidden, when the pointer leaves, and the `data-map-hover` mark
+is written on that same element and dropped by the same restore. So the write
+is the second permitted write, done in an element the server keeps out of
+patching rather than in the patched region itself; it is not a fourth kind of
+write, and the clause holds as written. The test "pushes nothing to the
+server" (`test/statifier_blocks/map_hover_test.exs:149`) still holds the
+clause's "pushes no command and no event of its own" for the hover.
+
+### What this Note does not do
+
+It edits no line above it, amends no clause of decision 7, and changes no
+code, test or changelog fragment. The flip Note of 2026-09-28 and the Note
+of 2026-09-29 above stand as printed.
