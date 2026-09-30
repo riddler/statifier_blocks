@@ -279,11 +279,13 @@ defmodule StatifierBlocks.Map.Info do
     }
   end
 
-  # Every block's note that says something, by block id.
+  # Every block's note that says something, by block id. A `%Block{}` built
+  # before the field existed and kept outside JSON (a stored Erlang term)
+  # has no `:note` key: it reads as the absent note.
   @spec notes(Document.t()) :: %{optional(String.t()) => String.t()}
   defp notes(%Document{} = document) do
     for block <- Document.blocks(document),
-        note = text(block.note),
+        note = text(Map.get(block, :note, "")),
         into: %{},
         do: {block.id, note}
   end
