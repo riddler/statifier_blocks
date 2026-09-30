@@ -3955,7 +3955,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # stored Erlang term) has no `:note` key: it reads as the absent note.
     @spec block_note(Document.t(), Block.id()) :: String.t() | nil
     defp block_note(document, id) do
-      case Enum.find(Document.blocks(document), &(&1.id == id)) do
+      case block_by_id(document, id) do
         %Block{} = block -> Map.get(block, :note, "")
         nil -> nil
       end
