@@ -568,6 +568,56 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the class attr" do
+      # A host styles the region through `class`, and while a hover shows
+      # the region is transparent under the layer, so the layer wears the
+      # host's class too.
+      # Sabotage: rendered the hover layer with its own class alone; this
+      # went red on the layer's class.
+      # Sabotage: dropped `@class` from the region's section; this went red
+      # on the region's class.
+      test "a host's class goes on the region and on its hover layer" do
+        document = MapFixtures.document!("library_loan")
+
+        classed = region_html(document, %{class: "loan-plan"})
+
+        assert LazyHTML.attribute(one(classed, "#map-description"), "class") == [
+                 "sb-map__description loan-plan"
+               ]
+
+        assert LazyHTML.attribute(one(classed, "#map-description-hover"), "class") == [
+                 "sb-map__description-hover loan-plan"
+               ]
+
+        none = region_html(document, %{class: "loan-plan", map: false})
+        assert count_of(none, "#map-description-hover") == 0
+
+        assert LazyHTML.attribute(one(none, "#map-description"), "class") == [
+                 "sb-map__description loan-plan"
+               ]
+      end
+
+      # A host's page passes no `class`, and its region and layer keep the
+      # classes they had, the layer's byte for byte.
+      # Sabotage: rendered the layer's class by interpolation,
+      # `"sb-map__description-hover #{@class}"`; this went red on the
+      # layer's class, which then ends in a space.
+      test "its default adds nothing to the region or the layer" do
+        document = MapFixtures.document!("library_loan")
+
+        default = region_html(document, %{})
+        assert default == region_html(document, %{class: nil})
+
+        assert one(default, "#map-description") |> attribute("class") |> String.split() == [
+                 "sb-map__description"
+               ]
+
+        assert LazyHTML.attribute(one(default, "#map-description-hover"), "class") == [
+                 "sb-map__description-hover"
+               ]
+      end
+    end
+
     describe "the phrase attr" do
       # A host passes nil or a function of one argument, which the tests
       # above render; anything else is refused under the attr's name.
