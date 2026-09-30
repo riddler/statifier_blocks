@@ -793,7 +793,7 @@ function named(doc, id) {
 // `data-insert-reveal` (a selector; none by default) into view, since the
 // insert the list opened may sit below the map. The map is hidden from
 // assistive technology; the list and the panel are the keyboard path to
-// every one of these gestures but the insert into an empty slot.
+// every one of these gestures.
 //
 // A pointer arriving over any element the map draws shows that element's
 // description in the hover layer; one arriving over nothing the map draws,
