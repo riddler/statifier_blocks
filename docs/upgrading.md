@@ -1,7 +1,7 @@
-# Upgrading a host from 0.31 to 0.41
+# Upgrading a host from 0.31 to 0.42
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.41.0, one minor at a time. A host here is the code that embeds the package:
+0.42.0, one minor at a time. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
@@ -10,9 +10,9 @@ about it, and says **NONE** where the answer is nothing.
 Take the minors in order, and move the pin with each one, as the README
 recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`,
 `"~> 0.34.0"`, `"~> 0.35.0"`, `"~> 0.36.0"`, `"~> 0.37.0"`, `"~> 0.38.0"`,
-`"~> 0.39.0"`, `"~> 0.40.0"` and `"~> 0.41.0"`. A patch release rides its
-minor's pin, so each section below covers the patches of the minor it moves
-to.
+`"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"` and `"~> 0.42.0"`. A patch
+release rides its minor's pin, so each section below covers the patches of
+the minor it moves to.
 
 What an **author** changes in a document is a separate page:
 [Migrating a document from 0.27 to 0.34](guides/migrating-documents-0.27-to-0.34.md).
@@ -255,3 +255,50 @@ The Map's other changes need nothing from a host: it draws the happy
 path straight through a group whose body holds a container, the hook
 laying such a document out twice, and it draws the clock mark on a
 timed wait (`core.wait`), which still takes no part in a timer edge.
+
+## 0.41 to 0.42
+
+**NONE** for a host that mounts neither the editor nor the Map
+(`map_region/1` and `description_region/1`) and passes no `:phrase` to
+`StatifierBlocks.Map.graph/2` or `StatifierBlocks.Map.Info.elements/6`:
+nothing needs migrating, and the package gains no dependency. A host that
+does mount them reads the bullets below.
+
+- **If you read `data-info-region` off the element `map_region/1`
+  renders**, take the region's id from the `description` you pass to
+  `map_region/1` instead. The element no longer carries the attribute,
+  which the `StatifierBlocksMap` hook has not read since 0.40.0, so the
+  hover is unchanged. A host that stamps the attribute on its own element,
+  or never read it, changes nothing.
+- **If you pass `phrase` to `map_region/1` or `description_region/1`, or
+  `:phrase` to `StatifierBlocks.Map.graph/2` or
+  `StatifierBlocks.Map.Info.elements/6`, and pin a phrased line in a
+  test**, re-read the lines where a name your function has words for sat
+  outside event position. Words now replace a name only in event
+  position: after `Send` or a delayed send's `send`, after `Wait for`, or
+  after a rule's `When`. A known name anywhere else stays as written, such
+  as a path a step sets, a name after a send or wait word glued to a
+  dotted prefix, or the event a timer edge's line names before `reaches`.
+  A name in event position reads as it did on 0.41.0.
+- **If your page mounts the editor and reads the notes it stores**, a note
+  a browser posts with CRLF line breaks is now stored with LF: each CRLF
+  becomes LF at the editor's note event, before the command, so a change
+  of line endings alone is no longer an undo entry. A lone CR is stored as
+  posted. The `{:update_note, id, note}` command a host issues itself
+  through `StatifierBlocks.Edit.apply/2` still stores the note's bytes as
+  written.
+- **If you pass `class` to `description_region/1`**, it now goes on the
+  region's hover layer as well as on the region, so what your class gives
+  the region still shows while a hover is drawn. A rule of yours on that
+  class now reaches the layer too; the package's stylesheet keeps a hidden
+  layer out whatever display a single class of yours sets.
+- **If you rescued a raise out of `description_region/1`** on a document
+  whose composite declaration cannot expand, you can drop the rescue: the
+  region now renders with no description in it and no
+  `data-map-description` attribute, its id, `aria-live` and label kept,
+  and with `map={true}` its hover layer and an empty store.
+
+The release's fixes need nothing from a host: a block built before blocks
+had a note, in a document kept as a stored Erlang term, now goes through
+the note edit command, `StatifierBlocks.Map.Info`'s descriptions and the
+editor's note field as a note-free block instead of raising.
