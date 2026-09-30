@@ -14600,3 +14600,53 @@ its schema half, are flipped in the same request, with their own dated
 Notes at the foot of that record.
 
 Filed with `sb-ods3`.
+
+## Note (2026-09-29): a typed send is each host's own block type, and no core type writes one
+
+A dated Note rather than an amendment. It records where a decision sits and
+decides nothing this record owns: decision 10's table and every row the
+amendments above add to it stand as written, `core.send`'s row (G2 of the
+2026-08-29 amendment on that row) included, and no core type is added.
+
+A **typed send** here is a sink step: a block that writes a `<send>` with a
+literal `type` and a literal `target`. Ruled by the operator, 2026-09-29: a
+typed send is each host's own block type, registered on the host's own
+palette, and not a type of the core vocabulary. Two reasons.
+
+- **The core vocabulary knows no send types or targets.** Every core type
+  that writes a `<send>` writes `delay`, `event` and `id` and nothing else:
+  `StatifierBlocks.Core.Send.emit/2` (`core/send.ex:369`),
+  `StatifierBlocks.Core.Wait.emit/2` (`core/wait.ex:228`) and
+  `StatifierBlocks.Core.Await`'s `defp deadline/4` (`core/await.ex:336`),
+  read at `8145c8f`. `core.send`'s moduledoc says why it declares no
+  `target` (its paragraph "No `target`.", `core/send.ex:34`, read at
+  `8145c8f`): what a target may name is not this package's decision. What a
+  `type` may name is a processor the host registers, which this package does
+  not know either.
+- **A host's publish-time checks over sends read the host's own step.** A
+  check that refuses a `<send>` for its literal `type` or `target` judges
+  the compiled chart against the host's own registrations, so the step that
+  writes those literals is the host's too. The reference host,
+  `statifier_examples`, runs two such stages after its compile, read at that
+  package's `372a9cc`: `:send_types` over
+  `Statifier.Send.Types.unsupported_sends/2` and `:routes` over
+  `StatifierRouter.Routes.unregistered/2`, listed in
+  `StatifierExamples.Publish`'s moduledoc (`lib/statifier_examples/publish.ex:29-33`,
+  `defp send_types_stage/2` at `:195` and `defp routes_stage/2` at `:204`).
+  No core block writes a literal `type` or `target` for either stage to judge.
+
+**The shape.** The reference host's test-only step is the shape a host
+copies: `StatifierExamples.TypedSendStep` in `statifier_examples`
+(`test/support/typed_send_step.ex:1`, read at `372a9cc`), registered as
+`myapp.typed_send` (`@type_name`, `:35`) on top of that host's palette
+through `palette/0` (`:45`). It declares three required `:string` fields,
+`type`, `target` and `event` (`config_schema/1`, `:54`), and its `emit/2`
+(`:72`) compiles to a compound state whose `<onentry>` carries one `<send>`
+with those three attributes and which then goes final, the shape
+`core.send` compiles to. Its moduledoc's example sends `loan.overdue`.
+Nothing outside that host's tests registers it.
+
+What this Note leaves unchanged: decision 10, `core.send`'s config schema
+and descriptor, `StatifierBlocks.Palette.core_types/0`, and every compiled
+byte. This Note carries no `Status:` line, which is this file's convention
+for a Note. Filed with `sb-juri`.
