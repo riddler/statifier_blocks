@@ -670,3 +670,28 @@ The Amendment's status paragraph says flipping it is "a separate request
 through the same `docs/adr/` gate, after the code that builds it has shipped
 in a published version". This request is that one, and 0.41.0 is that
 version.
+
+## Note (2026-09-30): what `075c7a3` did for item 8's fallbacks
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It corrects one attribution in the Note of
+2026-09-29 above ("the Amendment of 2026-09-29 is flipped to accepted"),
+which says item 8's fallbacks were built "by `075c7a3`". That Note is not
+edited; this one, at the foot of the file, says what the history shows
+(`sb-0o4l`).
+
+`075c7a3` built no fallback. It pinned them with a test, `a hand-built timer
+edge with no readable delay or event reads its delay and its event`
+(`test/statifier_blocks/describe_test.exs:1010`, read at `142a391`), and
+added one comment above the `is_binary(parent)` guard in `defp
+timer_edges/2` (`describe.ex:534`, read at `142a391`), a comment `4fdf7f8`
+has since reworded. It changed no line of `defp edge_line/2`.
+
+The fallback code predates the Amendment of 2026-09-29. The `its delay` and
+`its event` fallbacks in the `:timer` clause of `defp edge_line/2`
+(`describe.ex:638` and `:639`, read at `142a391`) came with the timer edge
+itself, in `40cb469` (2026-09-27), under the Amendment of 2026-09-27, and
+they are already present at `a2e008c`, the commit the Amendment of
+2026-09-29 read its cites at. Item 8 therefore stated wording the code
+already had, and the flip Note's reading of item 8 at `520c6d8` holds as
+written: the clause writes those words, and the test pins them.
