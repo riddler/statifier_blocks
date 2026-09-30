@@ -44,7 +44,7 @@ defmodule StatifierBlocks.Map.PhrasingTest do
     assert line("Wait for email.verified") == "Wait until the email address is verified"
   end
 
-  # Sabotage: made the bare-name rule bracket its words; this went red.
+  # Sabotage: made the When rule bracket its words; this went red.
   # Reverted from a copy.
   test "a rule's event reads as a clause" do
     assert line("When registration.deadline, abandon") ==
@@ -61,7 +61,7 @@ defmodule StatifierBlocks.Map.PhrasingTest do
 
   # A name that only starts or ends like a known one is a different event.
   #
-  # Sabotage: made the bare-name rule trim a trailing full stop from a name;
+  # Sabotage: made the When rule trim a trailing full stop from a name;
   # this went red. Reverted from a copy.
   test "matches a whole event name only" do
     assert line("Send loan.closed_early") == "Send loan.closed_early"
@@ -69,7 +69,33 @@ defmodule StatifierBlocks.Map.PhrasingTest do
     assert line("When loan.closed.") == "When loan.closed."
   end
 
-  # Sabotage: made phrased/3 shape a name it has no words for; this went
+  # Only a name after Send, Wait for or When is an event; a send or wait
+  # word glued to a dotted prefix opens no event position.
+  #
+  # Sabotage: opened the rule's alternatives on a word boundary instead of
+  # refusing a word or dot character before them; this went red. Reverted
+  # from a copy.
+  test "a send or wait word glued to a dotted prefix is left as written" do
+    assert line("loan.Send copy.returned") == "loan.Send copy.returned"
+    assert line("copy.send loan.closed") == "copy.send loan.closed"
+    assert line("loan.Wait for copy.returned") == "loan.Wait for copy.returned"
+    assert line("loan.When copy.returned") == "loan.When copy.returned"
+  end
+
+  # A known name a step sets, or anywhere else outside event position, is
+  # a value rather than an event.
+  #
+  # Sabotage: put a bare-name alternative back at the end of the rule;
+  # this went red. Reverted from a copy.
+  test "a known name outside event position is left as written" do
+    assert line("Set loan.closed") == "Set loan.closed"
+    assert line("Set copy.returned to true") == "Set copy.returned to true"
+
+    assert line("Set loan.closed, then Send loan.closed") ==
+             "Set loan.closed, then Send word that the loan is closed"
+  end
+
+  # Sabotage: made phrased/4 shape a name it has no words for; this went
   # red. Reverted from a copy.
   test "leaves a line with no known event name as it is" do
     assert line("Send payment.settled") == "Send payment.settled"
