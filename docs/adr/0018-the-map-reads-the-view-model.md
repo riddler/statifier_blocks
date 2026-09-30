@@ -720,3 +720,46 @@ and `def map_region` at `:143`, read at `9adc029`; both lines move with
 this request. Re-locate them by those anchors.
 
 Filed with `sb-hmbd`.
+
+## Note (2026-09-29): a host's words read an event name only in event position
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-09-29, where the
+code holds it, and how one reading elsewhere now reads.
+
+The rule: event position only, the Map and the reference host's panel
+alike. A host's words for an event name (the `:phrase` option decisions
+(a) and (d) name) reword a name only where it stands in event position:
+after "Send" or a delayed send's "send", after "Wait for", or after a
+rule's "When". A known name anywhere else is left as written: a path a
+step sets ("Set loan.closed"), a name after a send or wait word glued to a
+dotted prefix ("loan.Send copy.returned"), and the event a timer edge's
+line names before "reaches". The reference host's own panel phrasing
+states the same three places (`StatifierExamplesWeb.EventPhrasing`,
+`@event_position`, in statifier_examples, read at `372a9cc`).
+
+Where it holds:
+
+- `line/2` (`lib/statifier_blocks/map/phrasing.ex`, `def line`) reads a
+  name through the phrase only where `@event_position` (same file) matches.
+  That pattern opens its three shapes on a lookbehind that refuses a word
+  character or a dot before the opening word, so a send or wait word glued
+  to a dotted prefix opens no event position; the reference host's pattern
+  opens on a word boundary, which a dot satisfies. The pattern has no
+  alternative for a bare name, and the module's comment table names the
+  rule's When shape where it named a name "elsewhere".
+- `sentence/2` (same file, `def sentence`) reads a block's sentence through
+  `line/2`, so the Map's box lines and the description region's sentences
+  follow the rule. The description region's timer edge line reads through
+  `line/2` in `timer/2` (`lib/statifier_blocks/map/info.ex`, `defp timer`,
+  read at `c53da70`), so its event before "reaches" is left as written and
+  the rule it reaches reads in words.
+- `test/statifier_blocks/map/phrasing_test.exs` pins the glued send and
+  wait shapes ("a send or wait word glued to a dotted prefix is left as
+  written") and a path left alone ("a known name outside event position is
+  left as written"); "a rule's event reads as a clause" pins the When
+  shape. `test/statifier_blocks/map/info_test.exs`, "the registration's
+  deadline edge says which rule hears it, and when", pins the timer edge
+  line.
+
+Filed with `sb-r3u4`.

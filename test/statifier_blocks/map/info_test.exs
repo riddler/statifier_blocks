@@ -769,8 +769,9 @@ defmodule StatifierBlocks.Map.InfoTest do
   describe "timer edges" do
     # The registration's deadline send arms the rule that abandons the
     # registration: its dotted edge is described in the package's own line
-    # for it, with the event read as words, and names both ends, the event
-    # and the delay.
+    # for it, the event read as words only where it stands in event position
+    # (the rule's When, not the edge's own naming of it), and names both
+    # ends, the event and the delay.
     #
     # Sabotage: made elements/6 leave the graph's timers out; this went
     # red. Reverted from a copy.
@@ -780,7 +781,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert timer.title == "Timer"
 
       assert timer.sentence ==
-               "In 7 days, the registration week is up reaches " <>
+               "In 7 days, registration.deadline reaches " <>
                  "When the registration week is up, abandon"
 
       assert timer.explanation =~ "dotted arrow"
