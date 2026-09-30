@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "bdoc_01JHOLDCONFIRM",
+  "revision": 1,
+  "metadata": {"name": "Hold confirmation, bounded"},
+  "accepts": ["hold.confirmed"],
+  "root": {
+    "id": "blk_ROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_PLACE", "type": "core.send", "type_version": 2,
+       "config": {"event": "hold.placed"}},
+      {"id": "blk_CONFIRM", "type": "core.group", "type_version": 1,
+       "slots": {
+         "body": [
+           {"id": "blk_TIMER", "type": "core.send", "type_version": 2,
+            "config": {"event": "deadline.hold_confirm", "delay": "1d"}},
+           {"id": "blk_WAIT", "type": "core.await", "type_version": 1,
+            "config": {"event": "hold.confirmed"}}
+         ],
+         "interrupts": [
+           {"id": "blk_EXPIRE", "type": "core.on_event", "type_version": 1,
+            "config": {"event": "deadline.hold_confirm", "outcome": "abandon"}}
+         ]
+       }},
+      {"id": "blk_LEND", "type": "core.send", "type_version": 2,
+       "config": {"event": "loan.checked_out"}}
+    ]}
+  }
+}
