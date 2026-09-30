@@ -254,8 +254,11 @@ defmodule StatifierBlocks.Edit do
   def apply(%Document{} = document, {:update_note, id, note}) do
     with {:ok, block} <- find_block(document, id),
          :ok <- Validation.note(id, note) do
-      new_document = replace_at_id(document, id, %{block | note: note})
-      {:ok, new_document, {:update_note, id, block.note}}
+      # A `%Block{}` built before the field existed and kept outside JSON
+      # (a stored Erlang term) has no `:note` key: it reads as the absent
+      # note, and `Map.put/3` writes the key a struct update would need.
+      new_document = replace_at_id(document, id, Map.put(block, :note, note))
+      {:ok, new_document, {:update_note, id, Map.get(block, :note, "")}}
     end
   end
 

@@ -3934,10 +3934,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp selected_note(_document, nil), do: nil
     defp selected_note(document, %ViewModel.Node{block_id: id}), do: block_note(document, id)
 
+    # A `%Block{}` built before the field existed and kept outside JSON (a
+    # stored Erlang term) has no `:note` key: it reads as the absent note.
     @spec block_note(Document.t(), Block.id()) :: String.t() | nil
     defp block_note(document, id) do
       case Enum.find(Document.blocks(document), &(&1.id == id)) do
-        %Block{note: note} -> note
+        %Block{} = block -> Map.get(block, :note, "")
         nil -> nil
       end
     end

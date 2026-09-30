@@ -111,6 +111,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "a block term stored before the note field existed" do
+      # The editor's fixture as a host could have kept it outside JSON before
+      # blocks had a note: every `%Block{}` in it lacks the `:note` key.
+      defp old_shape(%Document{root: root} = document) do
+        %{document | root: strip_note(root)}
+        |> :erlang.term_to_binary()
+        |> :erlang.binary_to_term()
+      end
+
+      defp strip_note(%Block{slots: slots} = block) do
+        block
+        |> Map.delete(:note)
+        |> Map.put(
+          :slots,
+          Map.new(slots, fn {name, children} -> {name, Enum.map(children, &strip_note/1)} end)
+        )
+      end
+
+      # Sabotage: the editor's private `block_note/2` defaulting a missing
+      # note to "x" rather than "" -> the empty change commits -> red.
+      test "selects as a note-free block, and a change writes the note", %{conn: conn} do
+        old = old_shape(EditorFixtures.signup_wizard())
+        refute Map.has_key?(Enum.find(Document.blocks(old), &(&1.id == "blk_email_step")), :note)
+
+        {:ok, view, _html} = mount_editor(conn, document: old)
+        select(view, "blk_email_step")
+
+        assert has_element?(view, ~s(#sb-inspector-note-blk_email_step textarea[name="note"]))
+
+        write_note(view, "blk_email_step", "")
+        refute latest_document()
+
+        write_note(view, "blk_email_step", @note)
+        assert note_of(latest_document(), "blk_email_step") == @note
+
+        view |> element(~s(button[phx-click="undo"])) |> render_click()
+        assert note_of(latest_document(), "blk_email_step") == ""
+      end
+    end
+
     describe "a read-only mount" do
       # Sabotage: the read-only `note_section` clause removed, so the editing
       # clause draws the textarea on a read-only mount too.

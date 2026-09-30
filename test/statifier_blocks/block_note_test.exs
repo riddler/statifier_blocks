@@ -5,7 +5,21 @@ defmodule StatifierBlocks.BlockNoteTest do
   # block, and the compiler and the provenance map never read it.
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Document, DocumentFixtures, Edit, Palette, Schema}
+  alias StatifierBlocks.{
+    Block,
+    Compiler,
+    Describe,
+    Document,
+    DocumentFixtures,
+    Edit,
+    Palette,
+    Schema,
+    ViewModel
+  }
+
+  alias StatifierBlocks.Edit.History
+  alias StatifierBlocks.Map, as: BlockMap
+  alias StatifierBlocks.Map.Info
 
   @note "Sent once the patron submits the form; the desk resends by hand."
 
@@ -199,6 +213,61 @@ defmodule StatifierBlocks.BlockNoteTest do
       refute Map.has_key?(find(old, "blk_PDLN"), :note)
       assert Document.validate(old) == :ok
     end
+
+    # Sabotage: `Edit.apply/2`'s `:update_note` clause defaulting a missing
+    # note to "x" rather than "" -> the inverse carries "x" -> red.
+    test "takes a note, and the inverse carries the empty note back" do
+      document = DocumentFixtures.patron_registration()
+      old = old_shape(document)
+
+      assert {:ok, noted, inverse} = Edit.apply(old, {:update_note, "blk_PDLN", @note})
+      assert find(noted, "blk_PDLN").note == @note
+      assert inverse == {:update_note, "blk_PDLN", ""}
+
+      assert {:ok, undone, {:update_note, "blk_PDLN", @note}} = Edit.apply(noted, inverse)
+      assert find(undone, "blk_PDLN").note == ""
+      assert Document.to_json(undone) == Document.to_json(document)
+    end
+
+    # Sabotage: the clause writing `Map.put(block, :note, "")` whatever the
+    # note -> the committed block has no note -> red.
+    test "undo and redo round-trip a note through Edit.History" do
+      palette = Palette.core()
+      old = old_shape(DocumentFixtures.patron_registration())
+
+      assert {:ok, history, noted} =
+               History.commit(History.new(), palette, old, {:update_note, "blk_PDLN", @note})
+
+      assert find(noted, "blk_PDLN").note == @note
+
+      assert {:ok, history, undone} = History.undo(history, palette, noted)
+      assert find(undone, "blk_PDLN").note == ""
+      assert Document.to_json(undone) == Document.to_json(old)
+
+      assert {:ok, _history, redone} = History.redo(history, palette, undone)
+      assert redone == noted
+    end
+
+    # Sabotage: `Map.Info`'s private `notes/1` defaulting a missing note to
+    # "x" rather than "" -> every old block describes a note -> red.
+    test "describes on the Map as the note-free document" do
+      document = DocumentFixtures.patron_registration()
+      old = old_shape(document)
+
+      refute Map.has_key?(find(old, "blk_PDLN"), :note)
+      assert described(old) == described(document)
+      assert Enum.all?(described(old), &(&1.note == nil))
+    end
+  end
+
+  # The Map's description of every element, as `StatifierBlocks.Map.Info`
+  # answers it for a document.
+  defp described(%Document{} = document) do
+    palette = Palette.core()
+    view_model = ViewModel.build(document, palette, [])
+    graph = BlockMap.graph(view_model, [])
+    outline = Describe.outline(document, palette, [])
+    Info.elements(document, graph, view_model, outline, palette, [])
   end
 
   describe "copy and move" do
