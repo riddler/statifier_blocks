@@ -398,19 +398,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       # The stylesheet draws the layer in the region's place: one grid cell,
       # the region transparent while the layer is shown, and the layer with
-      # no display of its own, so `hidden` keeps it out.
+      # no display of its own, so `hidden` keeps it out. The region's rule
+      # under a shown layer is read whole: transparent and nothing else, so
+      # the region stays in the accessibility tree.
       # Sabotage: dropped the rule that makes the region transparent under a
       # shown layer; this went red.
+      # Sabotage: added `visibility: hidden` to that rule; this went red.
+      # Sabotage: added a second rule selecting the region under a shown
+      # layer with `display: none`; this went red.
       test "the stylesheet stacks the shown layer over the region" do
         css = File.read!(Path.expand("../../../assets/css/statifier_blocks.css", __DIR__))
+        rules = Regex.scan(~r/([^{}]+)\{([^}]*)\}/, css, capture: :all_but_first)
 
-        assert css =~
-                 ~r/\.sb-map__description-hover:not\(\[hidden\]\)\s*\+\s*\.sb-map__description\s*\{\s*opacity:\s*0;/
+        region_rules =
+          for [selectors, body] <- rules,
+              selector <- String.split(selectors, ","),
+              selector = String.trim(selector),
+              selector =~ ~r/\.sb-map__description-hover:not\(\[hidden\]\)/,
+              String.ends_with?(selector, ".sb-map__description"),
+              do: body |> String.split() |> Enum.join(" ")
+
+        assert region_rules == ["opacity: 0;"]
 
         assert css =~ ~r/\.sb-map__description-frame\s*\{\s*display:\s*grid;/
 
         layer_rules =
-          for [_all, selectors, body] <- Regex.scan(~r/([^{}]+)\{([^}]*)\}/, css),
+          for [selectors, body] <- rules,
               selector <- String.split(selectors, ","),
               String.ends_with?(String.trim(selector), ".sb-map__description-hover"),
               do: body
