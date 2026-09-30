@@ -15,6 +15,7 @@ compiles and runs each one on the current release under the core palette
 ## Patterns
 
 - [A step that must finish within a bound, or the flow continues](#a-step-that-must-finish-within-a-bound-or-the-flow-continues)
+- [A branch whose outcome may be both arms](#a-branch-whose-outcome-may-be-both-arms)
 
 ## A step that must finish within a bound, or the flow continues
 
@@ -199,3 +200,167 @@ deadline's timer cannot outlive the await").
 Reach for the group and the deadline recipe instead when the bounded step is
 more than one wait: several steps in a row, a step that does work rather than
 waits, or a body that other interrupt rules also guard.
+
+## A branch whose outcome may be both arms
+
+Use this when a flow has two or more optional steps and any of them, all of
+them or none of them may apply: do this, and also that, each when it is
+asked for.
+
+The example is a parcel delivery notice. Before the parcel goes out for
+delivery, the recipient is told by message, by a posted card, by both or by
+neither, as they asked. The card lane waits until the card is posted; the
+message lane does not wait for it.
+
+### The shape
+
+Put a `core.parallel` where the choice would go, with one lane per optional
+step, and leave its `complete` at `"all"`, the default. Inside each lane put
+a `core.branch` with one arm: the arm's condition is that lane's guard, the
+arm holds the step, and `otherwise` stays empty.
+
+Each lane then decides for itself. A lane whose guard holds runs its step. A
+lane whose guard does not hold takes the empty `otherwise`, which finishes
+the branch at once (`StatifierBlocks.Core.Branch.emit/2`), so the lane is
+done without doing anything. With `complete` at `"all"` the parallel is done
+when every lane is done (`StatifierBlocks.Core.Parallel`, "`complete`: when
+the block is done"), and the step after it runs then.
+
+### The document
+
+```json
+{
+  "schema_version": 1,
+  "id": "bdoc_01JPARCELNOTICE",
+  "revision": 1,
+  "metadata": {"name": "Delivery notice, by message and by card"},
+  "accepts": ["notice.card_posted"],
+  "datamodel": [
+    {"id": "wants_message", "description": "The recipient asked for a message."},
+    {"id": "wants_card", "description": "The recipient asked for a posted card."}
+  ],
+  "root": {
+    "id": "blk_ROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_NOTICE", "type": "core.parallel", "type_version": 1,
+       "config": {"lanes": ["message", "card"], "complete": "all"},
+       "slots": {
+         "lane_message": [
+           {"id": "blk_IF_MESSAGE", "type": "core.branch", "type_version": 1,
+            "config": {"arms": [{"slot": "arm_asked", "cond": "wants_message"}]},
+            "slots": {"arm_asked": [
+              {"id": "blk_MESSAGE", "type": "core.send", "type_version": 2,
+               "config": {"event": "notice.message_sent"}}
+            ]}}
+         ],
+         "lane_card": [
+           {"id": "blk_IF_CARD", "type": "core.branch", "type_version": 1,
+            "config": {"arms": [{"slot": "arm_asked", "cond": "wants_card"}]},
+            "slots": {"arm_asked": [
+              {"id": "blk_CARD", "type": "core.send", "type_version": 2,
+               "config": {"event": "notice.card_requested"}},
+              {"id": "blk_POSTED", "type": "core.await", "type_version": 1,
+               "config": {"event": "notice.card_posted"}}
+            ]}}
+         ]
+       }},
+      {"id": "blk_DELIVER", "type": "core.send", "type_version": 2,
+       "config": {"event": "parcel.out_for_delivery"}}
+    ]}
+  }
+}
+```
+
+The two conditions read the recipient's answers, `wants_message` and
+`wants_card`, which the document declares in its `datamodel` and a host
+supplies when the execution starts. It compiles under the core palette with
+no finding. These are the lines of the compiled chart that carry the
+pattern. Each lane's branch tests its guard, and when the guard does not hold
+goes straight to its own `done`:
+
+```xml
+<transition cond="wants_message" target="s_blk_MESSAGE"/><transition target="s_blk_IF_MESSAGE__o_done"/>
+```
+
+A lane is done when its branch is:
+
+```xml
+<transition event="done.state.s_blk_IF_CARD" target="s_blk_NOTICE__done_lane_card" type="internal"/>
+```
+
+The parallel is done when every lane is, and the root sequence moves on when
+the parallel is done:
+
+```xml
+<transition event="done.state.s_blk_NOTICE__run" target="s_blk_NOTICE__o_done" type="internal"/>
+<transition event="done.state.s_blk_NOTICE" target="s_blk_DELIVER" type="internal"/>
+```
+
+### What Describe and the Map show
+
+The Describe outline (`StatifierBlocks.Describe.render/2`) reads the parallel
+and each lane's branch as:
+
+```text
+Run 2 lanes at the same time (all of)
+Decide: When "asked", otherwise (one of)
+```
+
+and the flow around them as:
+
+```text
+After Run 2 lanes at the same time (done), Send parcel.out_for_delivery
+The branch: when wants_message, Send notice.message_sent
+The branch: when wants_card, Send notice.card_requested
+The branch: otherwise, the end of the branch
+```
+
+The Map (`StatifierBlocks.Map.graph/2`) draws the parallel as one block
+holding a slot per lane, titled `message` and `card`, and inside each lane
+the branch with its `When "asked"` arm, its empty `Otherwise` and its empty
+`Cannot be decided`.
+
+### What a host sees
+
+The host starts the execution with the recipient's two answers in the
+datamodel. What it sees next depends on them:
+
+- **Both asked.** The chart sends `notice.message_sent` and
+  `notice.card_requested` and waits for `notice.card_posted`. When the card
+  is posted it sends `parcel.out_for_delivery`.
+- **Only the message.** The chart sends `notice.message_sent` and then
+  `parcel.out_for_delivery`, with nothing to wait for.
+- **Only the card.** The chart sends `notice.card_requested`, waits for
+  `notice.card_posted`, and then sends `parcel.out_for_delivery`.
+- **Neither.** The chart sends `parcel.out_for_delivery` and nothing else.
+
+### How this differs from one branch
+
+A `core.branch` takes one arm. Its arms are tried in order and the first
+whose condition holds is the one that runs, as the palette entry says: "Takes
+the first arm whose condition holds, or otherwise."
+(`StatifierBlocks.Core.Branch.palette_entry/0`). So a branch with
+a message arm and a card arm sends only the message to a recipient who asked
+for both. Put this block where the parallel was to see it:
+
+```json
+{"id": "blk_NOTICE", "type": "core.branch", "type_version": 1,
+ "config": {"arms": [{"slot": "arm_message", "cond": "wants_message"},
+                     {"slot": "arm_card", "cond": "wants_card"}]},
+ "slots": {"arm_message": [{"id": "blk_MESSAGE", "type": "core.send", "type_version": 2,
+                            "config": {"event": "notice.message_sent"}}],
+           "arm_card": [{"id": "blk_CARD", "type": "core.send", "type_version": 2,
+                         "config": {"event": "notice.card_requested"}}]}}
+```
+
+With both answers `true` the chart sends `notice.message_sent` and then
+`parcel.out_for_delivery`, and no card is requested.
+
+A branch with one arm is the right block for a single optional step: it is
+exactly one lane of this pattern on its own. Two one-arm branches in a row
+also take both steps, but the second starts only when the first is done. Put
+the card's branch first and a recipient who asked for both hears nothing by
+message until the card is posted; the parallel starts both lanes together, so
+the message goes out at once. When no optional step waits for anything, the
+branches in a row and the parallel send the same events, and either shape
+does the job.

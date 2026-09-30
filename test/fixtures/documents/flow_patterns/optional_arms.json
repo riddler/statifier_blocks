@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "id": "bdoc_01JPARCELNOTICE",
+  "revision": 1,
+  "metadata": {"name": "Delivery notice, by message and by card"},
+  "accepts": ["notice.card_posted"],
+  "datamodel": [
+    {"id": "wants_message", "description": "The recipient asked for a message."},
+    {"id": "wants_card", "description": "The recipient asked for a posted card."}
+  ],
+  "root": {
+    "id": "blk_ROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_NOTICE", "type": "core.parallel", "type_version": 1,
+       "config": {"lanes": ["message", "card"], "complete": "all"},
+       "slots": {
+         "lane_message": [
+           {"id": "blk_IF_MESSAGE", "type": "core.branch", "type_version": 1,
+            "config": {"arms": [{"slot": "arm_asked", "cond": "wants_message"}]},
+            "slots": {"arm_asked": [
+              {"id": "blk_MESSAGE", "type": "core.send", "type_version": 2,
+               "config": {"event": "notice.message_sent"}}
+            ]}}
+         ],
+         "lane_card": [
+           {"id": "blk_IF_CARD", "type": "core.branch", "type_version": 1,
+            "config": {"arms": [{"slot": "arm_asked", "cond": "wants_card"}]},
+            "slots": {"arm_asked": [
+              {"id": "blk_CARD", "type": "core.send", "type_version": 2,
+               "config": {"event": "notice.card_requested"}},
+              {"id": "blk_POSTED", "type": "core.await", "type_version": 1,
+               "config": {"event": "notice.card_posted"}}
+            ]}}
+         ]
+       }},
+      {"id": "blk_DELIVER", "type": "core.send", "type_version": 2,
+       "config": {"event": "parcel.out_for_delivery"}}
+    ]}
+  }
+}
