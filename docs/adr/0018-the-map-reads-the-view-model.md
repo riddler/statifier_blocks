@@ -666,3 +666,57 @@ The cites that have not moved since the commits they name are left
 unlisted.
 
 Filed with `sb-24rp`.
+
+## Note (2026-09-29): a host's description region degrades on a document it cannot describe
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-09-29, where the
+code holds it, and how one sentence above now reads.
+
+The region's descriptions are read off `StatifierBlocks.Describe.outline/3`
+(`lib/statifier_blocks/describe.ex:219`, `def outline`, read at
+`87db41f`), which expands every composite in the document, so a composite
+whose declaration cannot expand makes it raise. The editor already
+survived such a document: it asks first, through its private
+`describable?/2` (`lib/statifier_blocks/editor.ex:3923`,
+`defp describable?`, read at `87db41f`), which rescues any raise out of
+the outline, and leaves its region out when the answer is `false`. A host
+that mounted `description_region/1` beside the Map had no such check, and
+the raise came out of its render.
+
+The rule: `description_region/1` degrades as the editor does. For a
+document whose outline raises, it renders no description, neither a
+block's nor the document's idle one, and carries no
+`data-map-description`; the region keeps its id, its `aria-live` and its
+label, and with `map={true}` its hover layer and a store with no entries.
+The rescue is exactly as wide as the editor's: any raise out of the
+outline. `StatifierBlocks.Map.Info.elements/6` and `idle/4` are not called
+on that path.
+
+Where it holds:
+
+- `outline/2` (`lib/statifier_blocks/editor/map_regions.ex`,
+  `defp outline`) answers `:error` for a raise out of the outline, and
+  `description_region/1` (`def description_region`, same file) renders the
+  empty region on it. The moduledoc's section "A document it cannot
+  describe" says so.
+- `test/statifier_blocks/editor/map_regions_test.exs`, describe "a document
+  whose composite declaration cannot expand", pins it on a test-local
+  composite whose `subtree/1` answers a duplicated local id (an
+  `ArgumentError`) or has no clause for its param (a
+  `FunctionClauseError`), the shapes of the `BrokenSubtree` fixture in
+  `test/statifier_blocks/editor/composite_expand_test.exs`
+  (`defmodule BrokenSubtree`, `:171`, read at `87db41f`).
+- The editor keeps its own check and still leaves its region out
+  ("the canvas is drawn and the description region is left out",
+  `composite_expand_test.exs:468`, read at `87db41f`).
+
+How one sentence above now reads: decision (d)'s bullet that the
+description region "is rendered on the server with the selected or idle
+content" holds for every document the outline can read; for one it cannot,
+the region renders empty, as this Note says. The Note of 2026-09-29 on
+moved cites places `def description_region` at `editor/map_regions.ex:205`
+and `def map_region` at `:143`, read at `9adc029`; both lines move with
+this request. Re-locate them by those anchors.
+
+Filed with `sb-hmbd`.
