@@ -1841,8 +1841,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # note}` through the same funnel as every other command, so it is one
     # undo entry; a note equal to the one the block holds commits nothing,
     # so a change event that moved nothing leaves no entry to step through.
-    def handle_event("note-change", %{"block-id" => id, "note" => note}, socket)
-        when is_binary(id) and is_binary(note) do
+    # A browser may post the textarea's line breaks as CRLF: each CRLF
+    # becomes LF here, at the event, before the equality check and before
+    # the command, so a note written in the editor holds the same bytes as
+    # the same note written by a host, and a line-ending-only change is no
+    # undo entry. A lone CR is left as posted. The command itself stores a
+    # note as written, so a host that issues it keeps its own bytes.
+    def handle_event("note-change", %{"block-id" => id, "note" => posted}, socket)
+        when is_binary(id) and is_binary(posted) do
+      note = String.replace(posted, "\r\n", "\n")
+
       if block_note(socket.assigns.document, id) == note do
         {:noreply, socket}
       else

@@ -111,6 +111,65 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "line breaks a browser posts" do
+      @lf_note "Hold the loan until the patron collects it.\nThen close the step."
+      @crlf_note "Hold the loan until the patron collects it.\r\nThen close the step."
+
+      # Sabotage: the handler's `String.replace(posted, "\r\n", "\n")`
+      # replaced by `posted` - the CRLF bytes are stored as posted and the
+      # equality with the LF note goes red.
+      test "a CRLF note is stored with LF line breaks", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        select(view, "blk_email_step")
+
+        write_note(view, "blk_email_step", @crlf_note)
+        assert %Document{} = document = latest_document()
+
+        assert note_of(document, "blk_email_step") == @lf_note
+        refute note_of(document, "blk_email_step") =~ "\r"
+      end
+
+      # Sabotage: the handler comparing the stored note to `posted` rather
+      # than to the normalised note - the CRLF repost of the stored LF note
+      # commits, the host is handed a document and the refutation goes red.
+      test "a CRLF repost of the stored LF note commits nothing", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        select(view, "blk_email_step")
+
+        write_note(view, "blk_email_step", @lf_note)
+        assert note_of(latest_document(), "blk_email_step") == @lf_note
+
+        write_note(view, "blk_email_step", @crlf_note)
+        refute latest_document()
+
+        view |> element(~s(button[phx-click="undo"])) |> render_click()
+        assert note_of(latest_document(), "blk_email_step") == ""
+      end
+
+      # Sabotage: the handler also turning a lone CR into LF
+      # (`String.replace(posted, ~r/\r\n?/, "\n")`) - the lone CR is
+      # stored as LF and the equality goes red.
+      test "a lone CR is stored as posted", %{conn: conn} do
+        {:ok, view, _html} = mount_editor(conn)
+        select(view, "blk_email_step")
+
+        write_note(view, "blk_email_step", "Parcel held.\rCall the patron.")
+
+        assert note_of(latest_document(), "blk_email_step") ==
+                 "Parcel held.\rCall the patron."
+      end
+
+      # Sabotage: the normalisation moved into `Edit.apply/2`'s
+      # `:update_note` clause - the host's own CRLF note is stored as LF and
+      # the equality goes red.
+      test "the command a host issues itself keeps the note's bytes" do
+        {:ok, document, _inverse} =
+          Edit.apply(EditorFixtures.signup_wizard(), {:update_note, "blk_email_step", @crlf_note})
+
+        assert note_of(document, "blk_email_step") == @crlf_note
+      end
+    end
+
     describe "a block term stored before the note field existed" do
       # The editor's fixture as a host could have kept it outside JSON before
       # blocks had a note: every `%Block{}` in it lacks the `:note` key.
