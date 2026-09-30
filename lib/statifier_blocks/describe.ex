@@ -540,7 +540,8 @@ defmodule StatifierBlocks.Describe do
           event = config_event(config),
           do: {id, event}
 
-    # A send at the document root has no parent to carry as the edge's container.
+    # Only a send that is the document's root block itself has no parent to
+    # carry as the edge's container; a top-level send's parent is the root.
     for {id, parent, Send, config} when is_binary(parent) <- blocks,
         delayed?(Map.get(config, "delay")),
         event = config_event(config),
