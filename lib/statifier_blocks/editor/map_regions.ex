@@ -77,7 +77,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     frame, `sb-map__description-frame`, and while the layer is shown the
     stylesheet stacks it over the region and makes the region transparent,
     so the visible text is the hovered element's while the region's own
-    content, and its `aria-live`, stay as the server wrote them.
+    content, and its `aria-live`, stay as the server wrote them. A class
+    the host passes in `class` goes on the layer as well as on the region,
+    so styling the host gives the region through it still shows while the
+    layer is drawn in the region's place.
 
     ## In the editor
 
@@ -213,7 +216,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           "a host passes its own words for it, in its own language"
     )
 
-    attr(:class, :string, default: nil, doc: "a class of the host's, added to the region's own")
+    attr(:class, :string,
+      default: nil,
+      doc: "a class of the host's, added to the region's own and to its hover layer's"
+    )
 
     @doc "The Map's description region, its hover layer and its hidden store; see the moduledoc."
     @spec description_region(map()) :: Phoenix.LiveView.Rendered.t()
@@ -246,7 +252,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <div
           :if={@map}
           id={hover_id(@id)}
-          class="sb-map__description-hover"
+          class={["sb-map__description-hover" | List.wrap(@class)]}
           aria-hidden="true"
           hidden
           phx-update="ignore"
