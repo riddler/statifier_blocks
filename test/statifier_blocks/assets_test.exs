@@ -152,6 +152,33 @@ defmodule StatifierBlocks.AssetsTest do
       end
     end
 
+    # A name the hook spells is its own when an expression carries it, as
+    # a fallback beside a stamped name, and when an object literal holds it,
+    # even in a file that reads a stamped name elsewhere: the stamped-name
+    # rule is per file, so only the push itself can tell the two apart.
+    # Sabotage: dropping the quoted-name-inside-an-expression clause from
+    # `push_name/2` - the fallback probes read as expressions and pass as
+    # draw-only - and this goes red.
+    # Sabotage: dropping the object-literal clause from `push_name/2` - the
+    # object-held probes read as expressions and pass as draw-only - and
+    # this goes red.
+    test "a name inside an expression or an object is the hook's own" do
+      stamped = ~S|const events = {select: this.el.dataset.selectEvent}; |
+
+      for probe <- [
+            ~S[this.pushEvent(gesture.event || "select-row", {})],
+            ~S|this.pushEventTo(this.el, events.select ?? 'select-row', {})|,
+            ~S|const names = {select: "select-row"}; this.pushEvent(names.select, {})|,
+            ~S|let names = {open: 'x', select: `select-row`}; this.pushEventTo(this.el, names.select, {})|
+          ] do
+        for text <- [probe, stamped <> probe] do
+          assert push_names(text) == [{:literal, "select-row"}], text
+          assert pushes_own_name?(text), text
+          refute kind(text) == :draw, text
+        end
+      end
+    end
+
     # 7f's rule is that a draw-only hook's pushes come from the names the
     # host stamped, so a hook whose pushes are all expressions but that
     # reads no stamped event name is not draw-only.
@@ -964,9 +991,10 @@ defmodule StatifierBlocks.AssetsTest do
 
   # The event name each push in the JavaScript `text` sends: `{:literal,
   # name}` for a name it spells - in double quotes, single quotes or a
-  # template, or through a `const`, `let` or `var` bound to one of those -
-  # and `{:expression, text}` for one it reads from elsewhere.
-  # `pushEventTo`'s first argument is the target and is skipped.
+  # template, through a `const`, `let` or `var` bound to one of those, as a
+  # key of an object literal bound that way, or anywhere inside the
+  # argument's expression - and `{:expression, text}` for one it reads from
+  # elsewhere. `pushEventTo`'s first argument is the target and is skipped.
   defp push_names(text) do
     ~r/\b(?:pushEvent\s*\(|pushEventTo\s*\(\s*(?:#{@quoted}|[^,"'`]+?)\s*,)\s*(#{@quoted}|[^,)]+)/
     |> Regex.scan(text)
@@ -977,6 +1005,8 @@ defmodule StatifierBlocks.AssetsTest do
     cond do
       argument =~ ~r/\A(?:#{@quoted})\z/ -> {:literal, unquote_name(argument)}
       held = held_name(argument, text) -> {:literal, held}
+      keyed = keyed_name(argument, text) -> {:literal, keyed}
+      spelled = Regex.run(~r/#{@quoted}/, argument) -> {:literal, unquote_name(hd(spelled))}
       true -> {:expression, argument}
     end
   end
@@ -992,6 +1022,27 @@ defmodule StatifierBlocks.AssetsTest do
       unquote_name(quoted)
     else
       _no -> nil
+    end
+  end
+
+  # The name `object.key` holds when `text` binds `object`, in any of its
+  # bindings, to an object literal whose `key` is a quoted name.
+  defp keyed_name(argument, text) do
+    case Regex.run(~r/\A([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\z/, argument) do
+      [_all, object, key] ->
+        ~r/\b(?:const|let|var)\s+#{Regex.escape(object)}\s*=\s*\{([^}]*)\}/
+        |> Regex.scan(text, capture: :all_but_first)
+        |> Enum.find_value(fn [body] -> keyed_value(body, key) end)
+
+      nil ->
+        nil
+    end
+  end
+
+  defp keyed_value(body, key) do
+    case Regex.run(~r/(?:\A|[\s,{])#{Regex.escape(key)}\s*:\s*(#{@quoted})/, body) do
+      [_all, quoted] -> unquote_name(quoted)
+      nil -> nil
     end
   end
 
