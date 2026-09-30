@@ -5020,7 +5020,9 @@ button.sb-inspector__group-row:hover {
    transparent under it. The region stays in place and in the
    accessibility tree, so its content and its aria-live never change on a
    hover; the layer is aria-hidden and outside the region. The layer
-   carries no display of its own, so its hidden attribute keeps it out. */
+   wears the host's class too, and a host class may give it a display,
+   which would beat the browser's own rule for hidden; the rule below
+   keeps a hidden layer out whatever display a single host class sets. */
 .sb-map__description-frame {
   display: grid;
 }
@@ -5033,6 +5035,10 @@ button.sb-inspector__group-row:hover {
 
 .sb-map__description-hover:not([hidden]) + .sb-map__description {
   opacity: 0;
+}
+
+.sb-map__description-frame > .sb-map__description-hover[hidden] {
+  display: none;
 }
 
 .sb-map__description-note {

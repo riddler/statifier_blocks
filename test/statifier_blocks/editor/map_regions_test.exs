@@ -616,6 +616,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  "sb-map__description-hover"
                ]
       end
+
+      # A host's class on the layer may set a display, which beats the
+      # browser's own rule for `hidden`; the stylesheet keeps a hidden layer
+      # out with a rule more specific than a single class.
+      # Sabotage: dropped the `[hidden]` rule from the stylesheet; this went
+      # red.
+      test "the stylesheet keeps a hidden layer out whatever display a host's class sets" do
+        css = File.read!(Path.expand("../../../assets/css/statifier_blocks.css", __DIR__))
+
+        assert css =~
+                 ~r/\.sb-map__description-frame\s*>\s*\.sb-map__description-hover\[hidden\]\s*{\s*display:\s*none;\s*}/
+      end
     end
 
     describe "the phrase attr" do
