@@ -473,7 +473,7 @@ version.
 
 ## Amendment (2026-09-29): decision 2's edge lines name a container by a noun
 
-**Status: proposed (2026-09-29, ruled by the operator, 2026-09-29).** It
+**Status: accepted (2026-09-29, ruled by the operator, 2026-09-29).** It
 merges at proposed; flipping this section's status line to accepted is a
 separate request through the same `docs/adr/` gate, after the code that
 builds it has shipped in a published version. The record's own `Status:`
@@ -629,3 +629,44 @@ and 8), whose code lands in requests of their own.
 
 Filed with `sb-7y5r` and `sb-tzkg`, whose request builds items 1 to 6.
 Items 7 and 8 are built under `sb-nzf7` and `sb-gruj`.
+
+## Note (2026-09-29): the Amendment of 2026-09-29 is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's own status line (`:476`), by one word, `proposed` to
+`accepted`. The record's own `Status:` line (`:3`) already reads accepted
+and is not touched. Everything else is this Note, at the foot of the file,
+so no line another record cites moves.
+
+The code the Amendment decides shipped in `statifier_blocks` 0.41.0 (tag
+`v0.41.0`, `520c6d8`), the published version that carries it. Every claim
+below was read at `520c6d8`, which is both the `v0.41.0` tag and `main` when
+this request was written. Items 1 to 6 were built by the request that filed
+the Amendment (`97f22b3`); item 7 by `3990ed9` and item 8's fallbacks by
+`075c7a3`, both before the release.
+
+| Item | Read at `520c6d8` |
+|---|---|
+| 1, a container is named by a noun | `defp edge_line/2` (`describe.ex:612`) writes the `:entry`, `:exit`, `:branch` and `:interrupt` lines with the container's noun where they wrote its sentence, and `defp target/2` (`describe.ex:658`) names a `{:block, id}` endpoint by its sentence, an `{:exit, id}` as `the end of` and the noun, and an entry or body by the noun. Node lines are written by `defp node_line/1` from the sentence, as before. The tests under `a container is named by a noun in the edge lines`, and `the library loan renders the default lines`, pin the lines |
+| 2, the nouns, keyed by the resolved module | `@nouns` (`describe.ex:196`) holds the table's six modules and five nouns; `defp node_noun/2` (`describe.ex:290`) reads a title first, then `@nouns` by `module/1` of the resolved type, then `the` and `defp label/1`'s palette label (`describe.ex:303`, falling back to the type name) in lower case. No block-type callback is read for it. The tests `an untitled core container is named by its module's noun; a leaf and an unresolvable block by none`, `a titled container is named by its title in every line that names it` and `an untitled host container is named by the and its palette label in lower case` pin it |
+| 3, a capital, and the verb | `defp opening/1` (`describe.ex:680`) capitalises a leading `the ` from the text alone; the `:entry` clause of `edge_line/2` takes `start` for a noun in `@plural_nouns` (`describe.ex:207`, `the steps` and `the lanes`). The test `a title beginning with the is capitalised and takes its verb from its text` pins the titles `the intake` and `the steps`; `the library loan renders the default lines` asserts the four library loan lines item 3 quotes, word for word |
+| 4, a field for the noun | `StatifierBlocks.Describe.Node` carries `noun: nil` (`describe/node.ex:39`, `defstruct`) and documents it in its field table; `defp node/4` in `outline/3` fills it through `node_noun/2`, which answers `nil` for a block with no slots and for one the palette cannot resolve; `render/2` reads it through `defp container_name/1` (`describe.ex:686`), which falls back to the sentence (the test `a node that carries no noun is named by its sentence`) |
+| 5, the key the container edges dispatch on | `defp edges/3` (`describe.ex:338`) passes `module/1` of the resolved type to `defp container_edges/4` (`describe.ex:350`), whose clauses match `Sequence`, `Group`, `ResumableGroup` and `Branch`. The tests `a host's own module under core.sequence is described by containment only` and `the package's sequence under a host's name draws a sequence's edges` are in `test/statifier_blocks/describe_test.exs` |
+| 6, a module load is decision 4's one exception | `defp phrase/4` makes the call for the phrasing module (`describe.ex:726`, `Code.ensure_loaded?`), and `StatifierBlocks.Palette.declares?/3` makes it for a block-type module (`palette.ex:651` and `:656`). The test `the compiled modules import nothing that reaches one` allows `Code.ensure_loaded?/1` by name among the imports of the describe's four modules, and the moduledoc's section "Pure, and no model anywhere" states the exception |
+| 7, an embedded delayed send | `defp embedded_name/1` (`describe.ex:698`) sets a `core.send` node's sentence in double quotation marks where it reads as a delayed send, and `render/2` uses it for every sentence an edge line embeds; `node_line/1` writes the node's own line unquoted. The tests under `an embedded delayed send's sentence is set in double quotation marks` pin one line per template, and `a delayed send's node line, an undelayed send and any other step are written as before` pins what stays |
+| 8, the timer edge's line | the `:timer` clause of `edge_line/2` (`describe.ex:636`) writes `In <delay>, <event> reaches <S(to)>`, reading `its delay` and `its event` where the edge carries none, and names no container. The test `a hand-built timer edge with no readable delay or event reads its delay and its event` pins the fallbacks |
+| what it does not change | the Amendment's request changed no line of the edge computation (`edges/3`, `container_edges/4`, `timer_edges/2`); the tests `the library loan produces the note's edges` and `patron registration produces the note's edges` still assert the same edges. `StatifierBlocks.Map.Info` shows one line of `render/2`, a timer edge's, and that line names no container. `docs/block-level-flow-graph.md` has not changed since the Amendment |
+
+The Amendment's cites into code already on `main` were read at `a2e008c`.
+Re-located by anchor at `520c6d8`: `defp container_edges` is at
+`describe.ex:350` (`:280` above), `defp edges` at `describe.ex:338`
+(`:268` above), and the `Code.ensure_loaded?` call in `defp phrase` at
+`describe.ex:726` (`:604` above); the cites into `palette.ex` (`:651` and
+`:656`) have not moved. Items 1 to 4 cited their code by function without a
+line, and the table gives those lines at `520c6d8`.
+
+The Amendment's status paragraph says flipping it is "a separate request
+through the same `docs/adr/` gate, after the code that builds it has shipped
+in a published version". This request is that one, and 0.41.0 is that
+version.
