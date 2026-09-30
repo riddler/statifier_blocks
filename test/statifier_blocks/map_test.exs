@@ -629,7 +629,15 @@ defmodule StatifierBlocks.MapTest do
     # timer edge still runs to the await that hears its event, and nothing
     # runs to the wait.
     #
+    # A wait's schema has no event field, so a wait built from config alone
+    # could never pair with the send even if the map counted it a timer
+    # target. The wait is given the send's event on its form here, so the
+    # edge half bites: a wait that joined the timer targets would hear it.
+    #
     # Sabotage: made mark/1 answer "wait" for core.wait; this went red.
+    # Reverted from a copy.
+    #
+    # Sabotage: added core.wait to @timer_targets; this went red.
     # Reverted from a copy.
     test "a wait carries the clock mark and hears no timer edge" do
       root =
@@ -647,7 +655,23 @@ defmodule StatifierBlocks.MapTest do
           }
         )
 
-      graph = root |> Document.new() |> build() |> BlockMap.graph()
+      view_model = root |> Document.new() |> build()
+      [%{children: [send, wait, await]} = body] = view_model.root.slots
+
+      event = %ViewModel.Field{
+        key: "event",
+        type: :string,
+        label: "Event",
+        required?: false,
+        default: nil,
+        value: "loan.overdue"
+      }
+
+      heard = %{wait | form: %{wait.form | fields: [event | wait.form.fields]}}
+      body = %{body | children: [send, heard, await]}
+      view_model = %{view_model | root: %{view_model.root | slots: [body]}}
+
+      graph = BlockMap.graph(view_model)
 
       assert marks(graph) == %{
                "reminder" => "clock",
