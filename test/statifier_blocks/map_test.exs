@@ -3,7 +3,14 @@ defmodule StatifierBlocks.MapTest do
   The Map's graph, read without laying it out: it is the document, every
   empty slot is marked, the options that keep the model order are where
   the moduledoc says they are, and for the two teaching documents it is
-  what the reference host's map answered before it moved here.
+  the graph checked in under `test/fixtures/map/`.
+
+  Those graphs began as what the reference host's map answered before it
+  moved here; since then a change to what the package's own
+  `StatifierBlocks.Map` answers regenerates them from it. The library
+  loan's graph was regenerated when a timed wait gained the clock mark,
+  and differs from the reference host's by that one mark on its loan
+  period (see `StatifierBlocks.MapFixtures`).
   """
 
   use ExUnit.Case, async: true
