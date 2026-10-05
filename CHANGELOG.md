@@ -11,6 +11,17 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.42.1] 2026-10-05
+
+0.42.1 changes documentation only: no function's behaviour changes, and the
+package gains no Hex dependency.
+
+### Changed
+
+- The hexdocs sidebar groups the guides by the kind of page: the guide to describing a document sits under How-to guides, and the README and the CHANGELOG stay ungrouped at the top. The module groups are unchanged.
+- Three guides read on GitHub take titles that say what they help you do: "How to build common flow patterns", "How to mount the editor for one audience" and "How to theme the editor". No file is renamed, so links to them still resolve.
+- `StatifierBlocks.Editor.Inspector`'s module documentation now places the Note section beside the Config tab's two sections and says why it alone appears only with a block selected.
+
 ## [0.42.0] 2026-09-30
 
 0.42.0 changes three things a host of the editor or the Map can see, and
@@ -3817,6 +3828,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.42.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.1
 [0.42.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.0
 [0.41.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.41.0
 [0.40.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.40.0
