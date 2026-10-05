@@ -1,4 +1,4 @@
-# Flow patterns
+# How to build common flow patterns
 
 This guide shows you how to build shapes a workflow commonly needs out of the
 core block types. Each pattern is a section of its own: the shape, a complete

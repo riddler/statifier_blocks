@@ -68,6 +68,14 @@ defmodule StatifierBlocks.MixProject do
         "docs/describing-a-document.md",
         "CHANGELOG.md"
       ],
+      # The extras are grouped by the kind of page, in the family's order:
+      # Tutorials, How-to guides, Reference, Explanation, Upgrading. A group
+      # appears only when it has a page. The README (the main page) and the
+      # CHANGELOG stay ungrouped at the top. Decision records and planning
+      # notes are for contributors and are not extras.
+      groups_for_extras: [
+        "How-to guides": ["docs/describing-a-document.md"]
+      ],
       # Without this the first hexdocs is one flat list of ~50 modules, which
       # tells a reader nothing about which of them they are meant to call. The
       # groups follow the package's own seams - the document is the source of
