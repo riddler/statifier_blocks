@@ -210,6 +210,7 @@ lands through the same commit, push and merge rows as any other change. Once
 that prep is merged to `origin/main`, the conductor or the session that owns
 the release bead tags the merged commit with the new version and pushes the
 tag; never before the prep is on `origin/main`, and never on any other bead.
-Publishing (`mix hex.publish`, a docs republish included) and the release
-itself stay the operator's, in every campaign and outside every campaign, and
-no consent delegates them.
+An agent or a session never runs `mix hex.publish`, a docs republish
+included: `.github/workflows/release.yml` publishes on that tag push, and a
+failed workflow is re-run from its Actions page, never worked round by a
+local publish.
