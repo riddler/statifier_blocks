@@ -1,4 +1,4 @@
-# Theming the editor
+# How to theme the editor
 
 How to make `StatifierBlocks.Editor` look like your product without forking it.
 

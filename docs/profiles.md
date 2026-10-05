@@ -1,4 +1,4 @@
-# Mounting the editor for one audience
+# How to mount the editor for one audience
 
 This guide shows you how to say which of the editor's surfaces a mount draws,
 and how to mount it read-only.
