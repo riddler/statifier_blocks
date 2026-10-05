@@ -29,6 +29,7 @@
 | [0016 Amendment 2026-09-29](0016-document-describes-itself.md#amendment-2026-09-29-decision-2s-edge-lines-name-a-container-by-a-noun) | Decision 2: an edge line names a container by its title, else a short noun keyed by the module its type resolves to; the container edges dispatch on that module, and a module load is decision 4's one exception | accepted |
 | [0017](0017-block-types-explain-themselves.md) | Block types explain themselves - an optional `explain/0` paragraph, a delayed send that says when, and a `:timer` edge in the describe | accepted |
 | [0018](0018-the-map-reads-the-view-model.md) | The Map is a reader of the view model - a drawn projection beside a host's list, elkjs vendored whole, draw-only hooks, and one struct in | accepted |
+| [0019](0019-a-tag-push-publishes-through-the-release-workflow.md) | A tag push publishes through the release workflow - three checks at the tagged commit, the full gate, then Hex; no agent or session runs the publish | proposed |
 
 New ADRs: next number, same three-section format (Context, Decision,
 Consequences). Pick the number against a freshly fetched remote.
