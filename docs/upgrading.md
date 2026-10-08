@@ -1,7 +1,7 @@
-# Upgrading a host from 0.31 to 0.42
+# Upgrading a host from 0.31 to 0.42.1
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.42.0, one minor at a time. A host here is the code that embeds the package:
+0.42.1, one minor at a time. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
@@ -13,6 +13,14 @@ recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`,
 `"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"` and `"~> 0.42.0"`. A patch
 release rides its minor's pin, so each section below covers the patches of
 the minor it moves to.
+
+One value moves at every release, a patch included, and the sections below
+do not repeat it: the compiler version. `StatifierBlocks.Compiler.compiler_version/0`
+answers the package's version, and the `StatifierBlocks.CompilationRecord` in
+what `StatifierBlocks.Compiler.compile/3` answers carries it as
+`compiler_version`, so a record compiled after the bump carries the new
+version. **If you pin `compiler_version` in a test**, or compare it with a
+record you stored, move the literal with each pin.
 
 What an **author** changes in a document is a separate page:
 [Migrating a document from 0.27 to 0.34](guides/migrating-documents-0.27-to-0.34.md).
@@ -302,3 +310,7 @@ The release's fixes need nothing from a host: a block built before blocks
 had a note, in a document kept as a stored Erlang term, now goes through
 the note edit command, `StatifierBlocks.Map.Info`'s descriptions and the
 editor's note field as a note-free block instead of raising.
+
+The 0.42.1 patch, which the `"~> 0.42.0"` pin takes, changes documentation
+only: **NONE**, beyond the compiler version every release moves (see the
+top of this page).
