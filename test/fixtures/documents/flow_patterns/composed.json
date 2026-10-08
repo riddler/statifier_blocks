@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "id": "bdoc_01JHOLDPICKUP",
+  "revision": 1,
+  "metadata": {"name": "Hold pickup, confirmed and shelved"},
+  "accepts": ["hold.confirmed", "hold.collected", "hold.cancelled"],
+  "datamodel": [
+    {"id": "wants_confirmation", "description": "The desk confirms the hold."},
+    {"id": "held_on_shelf", "description": "The item waits on the hold shelf."}
+  ],
+  "root": {
+    "id": "blk_ROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_PLACE", "type": "core.send", "type_version": 2,
+       "config": {"event": "hold.placed"}},
+      {"id": "blk_PICKUP", "type": "core.parallel", "type_version": 1,
+       "config": {"lanes": ["confirm", "shelf"], "complete": "all"},
+       "slots": {
+         "lane_confirm": [
+           {"id": "blk_IF_CONFIRM", "type": "core.branch", "type_version": 1,
+            "config": {"arms": [{"slot": "arm_asked", "cond": "wants_confirmation"}]},
+            "slots": {"arm_asked": [
+              {"id": "blk_CONFIRM", "type": "core.group", "type_version": 1,
+               "slots": {
+                 "body": [
+                   {"id": "blk_TIMER", "type": "core.send", "type_version": 2,
+                    "config": {"event": "deadline.hold_confirm", "delay": "1d"}},
+                   {"id": "blk_WAIT", "type": "core.await", "type_version": 1,
+                    "config": {"event": "hold.confirmed"}}
+                 ],
+                 "interrupts": [
+                   {"id": "blk_EXPIRE", "type": "core.on_event", "type_version": 1,
+                    "config": {"event": "deadline.hold_confirm", "outcome": "abandon"}}
+                 ]
+               }}
+            ]}}
+         ],
+         "lane_shelf": [
+           {"id": "blk_IF_SHELF", "type": "core.branch", "type_version": 1,
+            "config": {"arms": [{"slot": "arm_asked", "cond": "held_on_shelf"}]},
+            "slots": {"arm_asked": [
+              {"id": "blk_SHELF", "type": "core.group", "type_version": 1,
+               "slots": {
+                 "body": [
+                   {"id": "blk_SHELVED", "type": "core.wait", "type_version": 2,
+                    "config": {"duration": "7d"}}
+                 ],
+                 "interrupts": [
+                   {"id": "blk_COLLECTED", "type": "core.on_event", "type_version": 1,
+                    "config": {"event": "hold.collected", "outcome": "abandon"}},
+                   {"id": "blk_CANCELLED", "type": "core.on_event", "type_version": 1,
+                    "config": {"event": "hold.cancelled", "outcome": "abandon"}}
+                 ]
+               }}
+            ]}}
+         ]
+       }},
+      {"id": "blk_CLOSE", "type": "core.send", "type_version": 2,
+       "config": {"event": "hold.closed"}}
+    ]}
+  }
+}
