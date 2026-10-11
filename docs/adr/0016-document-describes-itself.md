@@ -745,3 +745,54 @@ outcomes and arrangement` (`:159`) asserts the same node's `["received",
 "timed_out"]` (`:168`). In `test/statifier_blocks/core/await_test.exs`,
 `declares both outcomes for every config` (`:65`) asserts the list for a
 config with no `timeout` and for one with a blank `timeout`.
+
+## Note (2026-10-10): how the describe recognises an embedded delayed send
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing new, and edits no clause. It records how item 7 of the Amendment of
+2026-09-29 is read against the code, beside item 5 of that Amendment, which
+reads the container edges' key as the resolved module (`sb-clr2`). Every
+cite below was read at `5307d76`.
+
+What the code reads. Item 7 sets a delayed send's sentence in double
+quotation marks wherever an edge line embeds it. `render/2`
+(`lib/statifier_blocks/describe.ex:255`) holds no palette and no config, and
+`StatifierBlocks.Describe.Node` carries neither the module the palette
+resolved nor the send's delay: its fields are those its `defstruct`
+(`lib/statifier_blocks/describe/node.ex:39`) declares, and its `type` is
+the block's type name as the document stores it (the moduledoc's field
+table, `node.ex:8`). So `defp embedded_name/1` (`describe.ex:709`) reads
+the node alone: its first clause matches the type name `core.send`, and
+`defp delayed_send?/1` (`describe.ex:717`) asks whether the sentence opens
+with `In ` and holds `, send `, the shape `core.send` writes for a delay.
+The moduledoc says the same (`describe.ex:150`). Under `Palette.core/0` the
+type name `core.send` resolves to `StatifierBlocks.Core.Send`, so the
+reading agrees with the module there, as item 5's does.
+
+The two cases where it does not.
+
+| Palette | Block | Edge line embeds |
+|---|---|---|
+| a host's own module registered under `core.send`, whose sentence has a delayed send's shape | `core.send` | its sentence in double quotation marks |
+| `StatifierBlocks.Core.Send` registered under a host's own name | that name, with a `delay` | its sentence as it stands, without the marks |
+
+The first is quoted because the reading sees the type name and the shape,
+not the module; the second is not, because its type name is not
+`core.send`. Item 5 keys the container edges the other way, by the module,
+and keying this reading the same way would need a field on the node that
+`outline/3` fills from the palette, a change to the struct. That was
+considered and not taken; the type-name reading stands as the intended one
+(decided by the conductor under a standing consent, 2026-10-10).
+
+What this changes. Nothing: no line `render/2` answers changes.
+
+The tests that pin it. In `test/statifier_blocks/describe_test.exs`, under
+`an embedded delayed send is recognised by its type name and sentence
+shape`, the test `a host's own module under core.send with a delayed send's
+sentence is quoted` pins the first row and the test `the package's delayed
+send under a host's name is not quoted` pins the second. Both outline a
+document through a palette of their own and render it, as `the package's
+sequence under a host's name draws a sequence's edges` (`:467`) does for
+item 5. The hand-built test `a delayed send's node line, an undelayed send
+and any other step are written as before` (`:787`) already showed a node
+whose type name is not `core.send` written without the marks.
