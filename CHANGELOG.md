@@ -11,6 +11,52 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.43.0] 2026-10-10
+
+0.43.0 changes what the Map draws and says, so that a reader can follow a
+document from its start to its ends. The start dot comes first, at the
+top, marked Start; every end ring is marked End; a legend beside the
+drawing says what each of its marks means; a drafts shelf moves into a
+drawer under the drawing; and a group's caption is its type's whole first
+sentence. The changes to existing answers are under Changed: the graph
+`StatifierBlocks.Map.graph/2` answers gains the start dot at its top
+level, the Start and End labels, a `legend`, a `drafts` field, abandon
+ends deeper in the tail, a rules column caption and indented arm entries;
+the descriptions `StatifierBlocks.Map.Info` answers gain a "Finishes with"
+fact and a "Legend" fact and read new sentences; and a list of datamodel
+paths gets the advisory and the suggestions a single path gets. Under
+Fixed: the Map hook draws the first layout when its second fails, and a
+blank timer or interrupt event reads "its event". 0.43.0 is a minor,
+because what existing functions answer changes. The package gains no Hex
+dependency.
+
+### Changed
+
+- The Map's start edge description reads as two sentences, what starts the document and then the step that runs first: `StatifierBlocks.Map.Info.elements/6` answers the start edge's `sentence` as "Starts when the system is told to. First: Wait 21 days." where it answered "Starts when told to, Wait 21 days". The first step's line closes with one full stop, which a line already ending in one keeps. The edge's facts ("What starts it", "First step") and the caption drawn on the edge are unchanged.
+- The Map draws a drafts shelf in a drawer under the drawing rather than as a box in the path's column, and lays the path out as though the shelf were not there. The drawer is a native disclosure element whose row reads "Drafts: N steps not wired in" ("1 step" for one), holding the shelf's own drawing: closed on a page that cannot edit, opening in place on a click on its row, and drawn open on a page that can edit. The shelf's steps in an open drawer select and arm inserts as the drawing's do. `StatifierBlocks.Map.graph/2` marks the shelf's node with a new `drafts` field, `%{"count" => count, "label" => label}`, and its `legend` gains a last `drafts` entry whose line is that row; the node stays where it was, so `StatifierBlocks.Map.nodes/1` is unchanged. A host drawing the graph itself finds the shelf by that field, and a host that matches the idle description's "Legend" fact reads the new line on a document with a shelf.
+- On a document whose root body holds only a drafts shelf, the graph's start edge now runs into the root's box rather than into the shelf.
+- `StatifierBlocks.Map.graph/2` places the start dot first in reading order: the dot is now the graph's first node, ahead of the document's root box rather than inside it, and its start edge is the graph's own, so the map draws the dot and its caption at the top, above the root box's title and every box label. A host that reads the graph's shape finds the dot and its edge at the graph's top level, beside the root box; the edge still runs into the first step of the document's flow, and the type names stay on the boxes. `StatifierBlocks.Map.Info.elements/6`, which lists elements in the order a walk of the graph meets them, now lists the start dot before the root box and the start edge after the root's own elements and edges.
+- `StatifierBlocks.Map.Info.idle/4`'s `explanation`, the paragraph on how to read the map, opens with "A plain box is a step, drawn inside the step that holds it, with its type's name on top and what it does under it." in place of a sentence that called every box a step. The sentence on shaded boxes no longer names a group's interrupt rules; a new sentence after it says "A column beside a group holds the rules that watch it, or the step that runs when it fails." A host that matches the explanation text reads the new sentences.
+- A timer edge's explanation in `StatifierBlocks.Map.Info.elements/6` now says the delayed event arrives at the interrupt rule or the hourglass step that hears it, the words the Map's key uses for the dotted arrow, where it said the rule or the wait it points at hears it.
+- The Map draws a key of its marks beside the drawing, at its top right: the start dot, the end rings, solid, dashed and dotted arrows, the fork, the join, the hourglass and the clock, each with the drawing's own glyph and one line saying what it means, and only the marks the drawing uses. `StatifierBlocks.Map.graph/2` answers it as a new top-level `legend` list, one `%{"mark" => mark, "line" => line, "lines" => lines}` per mark, which the Map hook draws; the hook widens the SVG to hold it. A host drawing the graph itself finds the key there.
+- `StatifierBlocks.Map.Info.idle/4` answers the key's lines as a new last fact, `{"Legend", lines}`, since the map is hidden from assistive technology, and its `explanation`, the paragraph on how to read the map, is shorter: what each mark means moves to the key, and the paragraph points at it. `StatifierBlocks.Editor.MapRegions.description_region/1` shows the fact with a map beside it and leaves it out with `map={false}`, as it leaves out the paragraph. A host that matches the idle description's facts or its explanation text reads the new values.
+- The Map's key of its marks is titled "Legend", and `StatifierBlocks.Map.Info.idle/4` answers the key's lines as its last fact under the label "Legend" rather than "Key"; `StatifierBlocks.Editor.MapRegions.description_region/1` with `map={false}` leaves that fact out as before. The key's lines and the paragraph on how to read the map are unchanged. A host that matches the idle description's facts by label reads "Legend".
+- The Map hook now holds the SVG wide enough for a timer edge between two steps of one column, the run it draws past their right sides and its delay, when the drawing has no key; before, only a key beside the drawing widened the SVG for it.
+- `StatifierBlocks.Map.caption/1` now answers the whole first sentence of the type's explanation for a branch and the two group types, never cut to one line and ended in "..." as a group's was; a host that drew `caption/1` itself should expect the longer text.
+- A group's rules column in `StatifierBlocks.Map.graph/2` now carries `caption` "Rules: watch the steps while they run" in place of the group's sentence, and a new `explanation_lines` field, that sentence wrapped to a box's line; the Map hook draws the caption under the column's label and the lines under it, and the column grows to hold them.
+- The Map hook draws a resume edge clear of its own rule's box when the middle of the head of the group's body is not well above the rule's top: the edge still leaves the top of the rule and ends on the head's side, but it now goes up a short way, left past the rule's side and down to the head's height before it turns in, where it ran straight down through the rule's box. A resume edge whose head stands well above the rule is drawn as before. Only the hook's drawing moves; `StatifierBlocks.Map.graph/2` answers the same graph.
+- A `{:list, {:path, opts}}` field's rows now get what a `{:path, opts}` field gets: `StatifierBlocks.Datamodel.findings/4` returns the `:info` undeclared-path advisory for each undeclared row, anchored on the list field's key, and the editor binds each row's input to a `<datalist>` of `path_candidates`; `BlockType.datamodel_path?/1` still answers false for a list.
+- `StatifierBlocks.Map.graph/2` sets a wrapped arm entry apart on a branch's header: every line after the entry's first now starts with no-break spaces as wide as the entry's number (`"1. "`, `"10. "`), so the map draws it indented under the arm's label and a wrapped condition no longer reads as an entry of its own. An entry that fits on one line, and every other box's lines, are unchanged. A host that reads a branch node's `lines` finds the indent at the start of each continuation line.
+- The Map's start dot now carries the word Start and every end mark the word End, whichever outcome it ends with; the outcome stays the caption on the arrow into the mark. In `StatifierBlocks.Map.graph/2` the start node and each end node carry the word as their one ELK `labels` entry, with `layoutOptions` asking the layout to place it outside the mark on its right, and the Map hook draws it there; a host drawing the graph itself finds the word in that label. The Map's legend lines name the dot marked Start and the ring marked End.
+- The Map's start caption names who starts the document: `StatifierBlocks.Map.start_text/0` answers "Starts when the system is told to" where it answered "Starts when told to", the same sentence on every document, so the caption on the start edge `StatifierBlocks.Map.graph/2` answers, the "What starts it" fact and the start edge's description sentence `StatifierBlocks.Map.Info` answers ("Starts when the system is told to. First: Wait 21 days.") read it too. A host drawing the graph itself finds the longer caption, and its wider label, on the start edge.
+- The Map draws the dashed abandon end for a group deeper in a document's tail, not only for a group that is the root's last step: a group that is the last step of an arm of the root's last step, or of the body of a group that is, finishes the document when one of its rules abandons it. In `StatifierBlocks.Map.graph/2` such a document gains the `abandon` end node, and an `abandon` edge into it from each group in that position whose rules abandon it, so one abandon end can have several edges into it; the `done` end and its edge are unchanged. `StatifierBlocks.Map.Info.elements/6` describes each new edge as it describes the root-level one.
+- `StatifierBlocks.Map.Info.idle/4` answers a "Finishes with" fact right after "What starts it": the document's ends in the words its end marks and the arrows into them carry, in order (each outcome, and "abandons" for an abandon end), for example `["done", "abandons"]`. A document whose map draws no end, such as one with no step yet, has no such fact.
+
+### Fixed
+
+- The Map hook draws the first layout, its line bent at the group, when the second layout of a graph whose group body holds a container fails, instead of drawing the error pane.
+- `StatifierBlocks.Describe.render/2` reads a timer or interrupt edge whose event is blank as "its event", as it already did for an edge with no event, instead of leaving a gap in the line.
+
 ## [0.42.1] 2026-10-05
 
 0.42.1 changes documentation only: no function's behaviour changes, and the
@@ -3828,6 +3874,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.43.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.0
 [0.42.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.1
 [0.42.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.0
 [0.41.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.41.0
