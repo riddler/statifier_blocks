@@ -576,10 +576,12 @@ defmodule StatifierBlocks.Map.InfoTest do
     end
 
     # The map is hidden from assistive technology, so the key it draws
-    # reaches the region as text: the "Key" fact, last, holding the line
+    # reaches the region as text: the "Legend" fact, last, holding the line
     # of every entry the graph's key carries, in the key's order, and only
     # those.
     #
+    # Sabotage: made key/1 label the fact "Key"; this went red.
+    # Reverted from a copy.
     # Sabotage: made key/1 answer no fact; this went red. Reverted from a
     # copy. Sabotage: made key/1 list the lines in reverse; this went red.
     # Reverted from a copy.
@@ -589,17 +591,17 @@ defmodule StatifierBlocks.Map.InfoTest do
         lines = for %{"line" => line} <- graph["legend"], do: line
 
         assert lines != [], key
-        assert List.last(idle.facts) == {"Key", lines}, key
+        assert List.last(idle.facts) == {"Legend", lines}, key
       end
 
       {loan_graph, _descriptions, loan} = described("library_loan")
       {_graph, _descriptions, patron} = described("patron_registration")
       refute Enum.any?(loan_graph["legend"], &(&1["mark"] == "timer"))
-      assert length(fact(patron, "Key")) > length(fact(loan, "Key"))
+      assert length(fact(patron, "Legend")) > length(fact(loan, "Legend"))
     end
 
     # A graph that carries no key - one built before the graph carried
-    # it, say - has no "Key" fact rather than an empty one.
+    # it, say - has no "Legend" fact rather than an empty one.
     #
     # Sabotage: made key/1 answer the fact with an empty list; this went
     # red. Reverted from a copy.
@@ -610,7 +612,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       graph = view_model |> BlockMap.graph() |> Map.delete("legend")
 
       idle = Info.idle(document, graph, view_model, outline)
-      refute Enum.any?(idle.facts, &match?({"Key", _}, &1))
+      refute Enum.any?(idle.facts, &match?({"Legend", _}, &1))
     end
 
     # How the document finishes, beside what starts it: the words its end

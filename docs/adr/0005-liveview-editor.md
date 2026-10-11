@@ -14551,3 +14551,18 @@ absence. The change and the key itself are recorded in `ADR-0018`'s Note
 of 2026-10-10, "the Map draws a key of its marks".
 
 Filed with `sb-9dwx`.
+
+## Note (2026-10-10): the idle description's key fact is labelled Legend
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It says how one sentence of this record now reads.
+
+This record's Note of 2026-10-10, "`map={false}` also leaves out the idle
+description's key", names the fact that carries the key's lines "Key".
+That fact is now labelled "Legend", ruled by the operator, 2026-10-10,
+and `map={false}` leaves it out as before
+(`lib/statifier_blocks/editor/map_regions.ex`, `defp shown_facts`). The
+change is recorded in `ADR-0018`'s Note of 2026-10-10, "the key is
+titled Legend".
+
+Filed with `sb-c15x`.

@@ -1078,8 +1078,10 @@ defmodule StatifierBlocks.MapLayoutTest do
     # carries, read off the markup on both sides: every mark drawn has an
     # entry, and no entry names a mark that is not drawn. Each entry writes
     # the graph's own line, wrapped as the graph wraps it, under the title
-    # Key.
+    # Legend.
     #
+    # Sabotage: made drawKey title the key "Key"; this went red on the
+    # title. Reverted from a copy.
     # Sabotage: made drawKey skip the last entry; this went red on the
     # library loan's clock. Reverted from a copy.
     # Sabotage: made keyOf read each entry's `line` rather than its
@@ -1092,7 +1094,7 @@ defmodule StatifierBlocks.MapLayoutTest do
         %{"drawn" => "map", "key" => drawn, "drawnMarks" => marks} =
           run(dir, "#{key}-key", graph)
 
-        assert %{"title" => "Key", "entries" => entries} = drawn
+        assert %{"title" => "Legend", "entries" => entries} = drawn
         assert Enum.map(entries, & &1["mark"]) == Enum.map(graph["legend"], & &1["mark"]), key
         assert Enum.sort(marks) == Enum.sort(Enum.map(entries, & &1["mark"])), key
 

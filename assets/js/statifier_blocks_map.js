@@ -710,7 +710,7 @@ function drawKey(key) {
   return `<g class="sb-map__key" data-map-key="true">` +
     `<rect x="${key.x}" y="${key.y}" width="${key.width}" height="${key.height}" rx="6" ` +
     `style="fill: var(--sb-map-block-fill, #ffffff); stroke: var(--sb-map-slot-stroke, #cbd5e1)"/>` +
-    `<text class="sb-map__key-title" x="${key.x + KEY_PAD}" y="${key.y + KEY_PAD + 12}">Key</text>` +
+    `<text class="sb-map__key-title" x="${key.x + KEY_PAD}" y="${key.y + KEY_PAD + 12}">Legend</text>` +
     entries + `</g>`
 }
 
