@@ -1030,6 +1030,61 @@ defmodule StatifierBlocks.DescribeTest do
     end
   end
 
+  describe "a blank event reads its event" do
+    # `outline/3` never answers an edge whose event is blank (a blank config
+    # event is no event), so only an edge built by hand reaches these lines.
+
+    # Sabotage: in `Describe.edge_line/2`'s timer clause, test the event for
+    # nil only (`if edge.event, do: flat(edge.event)`) -> the lines read
+    # `In 7 days,  reaches ...` and `In 7 days,    reaches ...`, red.
+    test "a hand-built timer edge with a blank event reads its event" do
+      described =
+        by_hand(
+          [
+            hand_node("due", "core.send", "Send loan.due"),
+            hand_node("rule", "core.on_event", "When loan.due, abandon")
+          ],
+          [
+            edge(:timer, "root", {:block, "due"}, {:block, "rule"}, event: "", delay: "7d"),
+            edge(:timer, "root", {:block, "due"}, {:block, "rule"}, event: "  ", delay: "7d")
+          ]
+        )
+
+      assert Describe.render(described, []) |> Enum.take(-2) == [
+               "In 7 days, its event reaches When loan.due, abandon",
+               "In 7 days, its event reaches When loan.due, abandon"
+             ]
+    end
+
+    # Sabotage: in `Describe.edge_line/2`'s interrupt clause, test the event
+    # for nil only (`if edge.event, do: "On #{flat(edge.event)}"`) -> the
+    # lines read `On , ...` and `On   , ...`, red.
+    test "a hand-built interrupt edge with a blank event reads its event" do
+      group = %Node{
+        id: "g",
+        type: "core.group",
+        depth: 0,
+        kind: :step,
+        sentence: "Loan",
+        noun: "the group"
+      }
+
+      described =
+        by_hand(
+          [group, hand_node("h", "core.on_event", "When an event, abandon")],
+          [
+            edge(:interrupt, "g", {:block, "h"}, {:exit, "g"}, event: ""),
+            edge(:interrupt, "g", {:block, "h"}, {:exit, "g"}, event: "  ")
+          ]
+        )
+
+      assert Describe.render(described, []) |> Enum.take(-2) == [
+               "On its event, When an event, abandon abandons the group",
+               "On its event, When an event, abandon abandons the group"
+             ]
+    end
+  end
+
   describe "the phrasing seam for a timer edge" do
     defmodule TimerHost do
       @behaviour StatifierBlocks.Describe.Phrasing
