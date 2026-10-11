@@ -678,7 +678,7 @@ defmodule StatifierBlocks.Map.InfoTest do
     # Named in the paragraph: the boxes, what is drawn on them, and the key
     # itself, which the paragraph points at.
     @in_paragraph %{
-      "block" => "Every box on the map is a step",
+      "block" => "A plain box is a step",
       "block--container" => "drawn inside the step that holds it",
       "title" => "its type's name on top",
       "sentence" => "what it does under it",
@@ -745,8 +745,8 @@ defmodule StatifierBlocks.Map.InfoTest do
       "wait" => {"wait", "An hourglass"},
       "clock" => {"clock", "A clock marks a timed wait or a message sent after a delay"},
       "arm" => {:paragraph, "a branch's arms"},
-      "body" => {:paragraph, "a group's body as a pane"},
-      "rail" => {:paragraph, "its interrupt rules in a column beside it"},
+      "body" => {:paragraph, "A shaded box inside a step is a place it holds steps"},
+      "rail" => {:paragraph, "A column beside a group holds the rules that watch it"},
       "tray" => {:paragraph, "a shelf of drafts"},
       "done" => {"end", "solid ring"},
       "abandon" => {"end-abandon", "A dashed ring"}
@@ -872,6 +872,29 @@ defmodule StatifierBlocks.Map.InfoTest do
 
       sentences = String.split(text, ~r/(?<=[.;])\s+/, trim: true)
       assert sentences == Enum.uniq(sentences)
+    end
+
+    # Which boxes are steps, and what the column beside a group holds: its
+    # interrupt rules, or the step that runs when it fails. Each is a whole
+    # sentence of the paragraph, in these words, and the sentence on shaded
+    # boxes leaves the column to it.
+    #
+    # Sabotage: made the opening read "Every box on the map is a step";
+    # this went red. Sabotage: cut ", or the step that runs when it fails"
+    # from the column's sentence; this went red. Sabotage: put the group's
+    # interrupt rules back into the sentence on shaded boxes; this went
+    # red. Each reverted from a copy.
+    test "says which boxes are steps and what a group's column holds" do
+      {_graph, _descriptions, idle} = described("library_loan")
+      sentences = String.split(idle.explanation, ~r/(?<=[.;])\s+/, trim: true)
+
+      assert ("A plain box is a step, drawn inside the step that holds it, with its " <>
+                "type's name on top and what it does under it.") in sentences
+
+      assert ("A column beside a group holds the rules that watch it, or the step that " <>
+                "runs when it fails.") in sentences
+
+      refute idle.explanation =~ "its interrupt rules in a column beside it"
     end
 
     # The rejoin in plain words, and the arm's condition said once: in the
