@@ -91,7 +91,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     region. The region then renders without its hover layer and without
     its store, which only the Map's hook reads, and the document's idle
     description leaves out its explanation, the paragraph on how to read
-    the map, and its "Key" fact, the lines of the map's key; the name, the
+    the map, and its "Legend" fact, the lines of the map's key; the name, the
     description, what starts it and the counts stay. A selected block's description is unchanged. The default,
     `map={true}`, renders the region exactly as a host's page has it.
 
@@ -291,7 +291,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # One description, in words: the region draws the current one and the
     # store draws every one. The note leads; values, never controls. The
-    # idle explanation is how to read the map, and its "Key" fact the map's
+    # idle explanation is how to read the map, and its "Legend" fact the map's
     # key, so a region with no map beside it draws the idle description
     # without either.
     defp description(assigns) do
@@ -311,7 +311,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @spec shown_facts(Info.t(), boolean()) :: [Info.fact()]
     defp shown_facts(%Info{facts: facts}, true), do: facts
-    defp shown_facts(%Info{facts: facts}, false), do: List.keydelete(facts, "Key", 0)
+    defp shown_facts(%Info{facts: facts}, false), do: List.keydelete(facts, "Legend", 0)
 
     attr(:heading, :string, default: nil)
     attr(:facts, :list, required: true)

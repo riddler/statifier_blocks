@@ -207,7 +207,7 @@ defmodule StatifierBlocks.Map.Info do
   description, what starts it, how it finishes, what it listens for, how
   to read the map, how many steps and open slots it has, and the key: the
   line for each mark the map's key names, the `legend` of `graph`, as the
-  "Key" fact, since the map itself is hidden from assistive technology.
+  "Legend" fact, since the map itself is hidden from assistive technology.
   """
   @spec idle(Document.t(), BlockMap.t(), ViewModel.t(), Describe.t()) :: t()
   def idle(%Document{} = document, graph, %ViewModel{}, %Describe{nodes: nodes}) do
@@ -233,7 +233,7 @@ defmodule StatifierBlocks.Map.Info do
   defp key(graph) do
     case for(%{"line" => line} <- Map.get(graph, "legend", []), do: line) do
       [] -> []
-      lines -> [{"Key", lines}]
+      lines -> [{"Legend", lines}]
     end
   end
 

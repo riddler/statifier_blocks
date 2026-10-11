@@ -1179,3 +1179,43 @@ How a sentence elsewhere now reads:
   now "Starts when the system is told to", on every document.
 
 Filed with `sb-v3zy`.
+
+## Note (2026-10-10): the key is titled Legend
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a label ruled by the operator, 2026-10-10, where the
+code holds it, and how sentences elsewhere now read.
+
+The rule: the key's drawn title and the idle description's fact that
+carries the key's lines read "Legend" instead of "Key". The key's lines
+and the paragraph's sentence that points at the key stand as written.
+The internal names stay: the graph's `legend`, `keyOf` and `drawKey`.
+
+Where it holds:
+
+- `drawKey` (`assets/js/statifier_blocks_map.js`, `function drawKey`)
+  writes the title "Legend".
+- `key/1` (`lib/statifier_blocks/map/info.ex`, `defp key`) answers the
+  key's lines as the "Legend" fact.
+- `shown_facts/2` (`lib/statifier_blocks/editor/map_regions.ex`,
+  `defp shown_facts`) leaves the "Legend" fact out of a region with no
+  map.
+- `test/statifier_blocks/map_layout_test.exs`, describe "the key, as
+  drawn", pins the drawn title; `test/statifier_blocks/map/info_test.exs`,
+  "the key's lines, as the last fact, for the marks the map draws", pins
+  the fact's label; `test/statifier_blocks/editor/map_regions_test.exs`,
+  describe "the map attr", pins the label in a host's region and its
+  absence with `map={false}`.
+
+How sentences elsewhere now read:
+
+- This record's Note of 2026-10-10, "the Map draws a key of its marks",
+  says `StatifierBlocks.Map.Info.idle/4` answers the key's lines as its
+  last fact, "Key", that `map={false}` leaves the "Key" fact out, that
+  `key/1` answers the "Key" fact, and that `map={false}` now drops the
+  "Key" fact too. Each of those is now the "Legend" fact.
+- This record's Note of 2026-10-10, "the drafts shelf is a drawer under
+  the drawing", says the drawer's key line reaches the description
+  region as text in the "Key" fact. It reaches it in the "Legend" fact.
+
+Filed with `sb-c15x`.

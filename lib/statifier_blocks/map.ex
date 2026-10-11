@@ -335,7 +335,7 @@ defmodule StatifierBlocks.Map do
   pure and the key cannot name a mark the drawing lacks. The map region is
   hidden from assistive technology, so the same lines reach the description
   region as text: `StatifierBlocks.Map.Info.idle/4` carries them as its
-  "Key" fact.
+  "Legend" fact.
 
   ## Order is semantic, so it is forced
 
