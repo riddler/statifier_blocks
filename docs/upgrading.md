@@ -1,7 +1,7 @@
-# Upgrading a host from 0.31 to 0.42.1
+# Upgrading a host from 0.31 to 0.43
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.42.1, one minor at a time. A host here is the code that embeds the package:
+0.43.0, one minor at a time. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
@@ -10,9 +10,9 @@ about it, and says **NONE** where the answer is nothing.
 Take the minors in order, and move the pin with each one, as the README
 recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`,
 `"~> 0.34.0"`, `"~> 0.35.0"`, `"~> 0.36.0"`, `"~> 0.37.0"`, `"~> 0.38.0"`,
-`"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"` and `"~> 0.42.0"`. A patch
-release rides its minor's pin, so each section below covers the patches of
-the minor it moves to.
+`"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"`, `"~> 0.42.0"` and
+`"~> 0.43.0"`. A patch release rides its minor's pin, so each section below
+covers the patches of the minor it moves to.
 
 One value moves at every release, a patch included, and the sections below
 do not repeat it: the compiler version. `StatifierBlocks.Compiler.compiler_version/0`
@@ -315,3 +315,88 @@ a note-free block instead of raising.
 The 0.42.1 patch, which the `"~> 0.42.0"` pin takes, changes documentation
 only: **NONE**, beyond the compiler version every release moves (see the
 top of this page).
+
+## 0.42 to 0.43
+
+**NONE** for a host that mounts neither the editor nor the Map
+(`map_region/1` and `description_region/1`), reads none of the Map's
+answers itself (`StatifierBlocks.Map.graph/2`, `StatifierBlocks.Map.caption/1`,
+`StatifierBlocks.Map.start_text/0` and the descriptions
+`StatifierBlocks.Map.Info` answers) and pins none of the findings
+`StatifierBlocks.Datamodel.findings/4` or `StatifierBlocks.Publish.findings/3`
+answers: nothing needs migrating, and the package gains no dependency. A
+host that mounts the Map gets its new drawing with nothing to pass for it:
+the start dot first, marked Start; every end ring marked End; a legend of
+the marks the drawing uses, beside it at its top right; and a drafts shelf
+in a drawer under the drawing, closed on a page that cannot edit and open on
+one that can. A host that does read those answers reads the bullets below.
+
+- **If you draw the graph `StatifierBlocks.Map.graph/2` answers yourself**,
+  read its new shape. `StatifierBlocks.Map.nodes/1` is unchanged.
+  - The start dot is the graph's first node, at its top level beside the
+    root box rather than inside it, and its start edge is the graph's own.
+    The edge still runs into the first step of the document's flow, or into
+    the root's box on a document whose root body holds only a drafts shelf.
+  - The start node and each end node carry the word Start or End as their
+    one ELK `labels` entry, with `layoutOptions` placing it outside the mark
+    on its right. The start edge's caption reads "Starts when the system is
+    told to", and its label is wider.
+  - A new top-level `legend` list carries the key, one
+    `%{"mark" => mark, "line" => line, "lines" => lines}` per mark the
+    drawing uses.
+  - A drafts shelf's node carries a new `drafts` field,
+    `%{"count" => count, "label" => label}`, and the `legend` gains a last
+    `drafts` entry whose line is that row; the node stays where it was.
+  - A group deeper in the document's tail whose rules abandon it (the last
+    step of an arm of the root's last step, or of the body of a group that
+    is) gains an `abandon` edge into the `abandon` end node, so one abandon
+    end can have several edges into it.
+  - A group's rules column carries `caption` "Rules: watch the steps while
+    they run" in place of the group's sentence, and a new
+    `explanation_lines` field, that sentence wrapped to a box's line.
+  - A branch node's wrapped arm entry starts every line after its first with
+    no-break spaces as wide as the entry's number (`"1. "`, `"10. "`).
+- **If you draw `StatifierBlocks.Map.caption/1` yourself**, expect the
+  whole first sentence of the type's explanation for a branch and the two
+  group types, never cut to one line and ended in "...".
+- **If you match or pin the descriptions `StatifierBlocks.Map.Info`
+  answers**, read the new values.
+  - `idle/4`'s `explanation`, the paragraph on how to read the map, is
+    shorter: it opens with "A plain box is a step, drawn inside the step
+    that holds it, with its type's name on top and what it does under it.",
+    says what a column beside a group holds, and leaves what each mark means
+    to the key.
+  - `idle/4` answers two new facts: "Finishes with", right after "What
+    starts it", the document's ends in order (each outcome, and "abandons"
+    for an abandon end), for example `["done", "abandons"]`, with no such
+    fact on a document whose map draws no end; and a last fact,
+    `{"Legend", lines}`, the key's lines.
+    `StatifierBlocks.Editor.MapRegions.description_region/1` shows the
+    "Legend" fact with a map beside it and leaves it out with `map={false}`,
+    as it leaves out the paragraph.
+  - `StatifierBlocks.Map.start_text/0` answers "Starts when the system is
+    told to" where it answered "Starts when told to", on every document, so
+    the "What starts it" fact reads it too.
+  - `elements/6` lists the start dot before the root box and the start edge
+    after the root's own elements and edges. The start edge's `sentence`
+    reads as two sentences, "Starts when the system is told to. First: Wait
+    21 days." where it read "Starts when told to, Wait 21 days". A timer
+    edge's explanation says the delayed event arrives at the interrupt rule
+    or the hourglass step that hears it. Each new abandon edge is described
+    as the root-level one is.
+- **If you count or pin the findings `StatifierBlocks.Datamodel.findings/4`
+  answers**, or those `StatifierBlocks.Publish.findings/3` answers after
+  them, a `{:list, {:path, opts}}` field's rows now get the `:info`
+  undeclared-path advisory a `{:path, opts}` field gets: one for each
+  undeclared row, a path repeated across rows once, anchored on the list
+  field's key. It is `:info`, so a publish step that refuses on an `:error`
+  refuses nothing new. The editor binds each row's input to a `<datalist>`
+  of `path_candidates`, with nothing to pass for it.
+
+The release's other changes need nothing from a host:
+`StatifierBlocks.Describe.render/2` reads a timer or interrupt edge whose
+event is blank as "its event", as it already did for an edge with no event;
+and the `StatifierBlocksMap` hook draws the first layout where it drew the
+error pane when a second layout fails, draws a resume edge clear of its own
+rule's box, and holds the SVG wide enough for a timer edge between two
+steps of one column.
