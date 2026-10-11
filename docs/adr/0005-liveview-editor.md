@@ -14530,3 +14530,24 @@ renderer", which a row of paths now is. The Note of 2026-09-07 stands as
 printed, with this Note recording the one sentence of it that changed.
 
 Filed with `sb-l9an`.
+
+## Note (2026-10-10): `map={false}` also leaves out the idle description's key
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It says how one sentence of this record now reads.
+
+The Amendment of 2026-09-29, "the shell arrangement, one description
+region under the canvas", says in its tests paragraph that
+`test/statifier_blocks/editor/map_regions_test.exs`, describe "the map
+attr", pins that `map={false}` drops exactly the paragraph, the layer and
+the store. The Map now draws a key of its marks, and the idle
+description carries the key's lines as its last fact, "Key", since the
+map is hidden from assistive technology. With `map={false}`, the editor's
+setting, the region leaves that fact out as it leaves out the paragraph,
+since no map stands beside it (`lib/statifier_blocks/editor/map_regions.ex`,
+`defp shown_facts`). So `map={false}` now drops the paragraph, the "Key"
+fact, the layer and the store, and the same describe pins the fact's
+absence. The change and the key itself are recorded in `ADR-0018`'s Note
+of 2026-10-10, "the Map draws a key of its marks".
+
+Filed with `sb-9dwx`.
