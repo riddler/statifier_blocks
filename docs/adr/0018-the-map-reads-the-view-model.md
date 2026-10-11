@@ -1124,3 +1124,58 @@ How sentences elsewhere now read:
   entry, last, on a document with a shelf.
 
 Filed with `sb-0ykt`.
+
+## Note (2026-10-10): the start caption names who starts the document
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-10-10, where the
+code holds it, and how a sentence elsewhere now reads.
+
+The rule: the start edge's caption is one generic sentence naming who
+starts the document, "Starts when the system is told to", on every
+document. It names no event: the events a document accepts are what an
+execution of it listens for while it runs, not what starts it, and the
+description region already says them under "Listens for". No Map option,
+attr or graph field is added for it.
+
+What is drawn now: the caption on the start edge reads "Starts when the
+system is told to", whether the document declares the events it accepts
+or declares none, and its label is as wide as that text. The description
+region reads the same words: the idle description's "What starts it"
+fact, the start dot's sentence, and the start edge's sentence, which
+reads, for a document whose first step waits 21 days, "Starts when the
+system is told to. First: Wait 21 days."
+
+Where it holds:
+
+- `start_text/0` (`lib/statifier_blocks/map.ex`, `def start_text`) is
+  the one place the sentence is written; `start_edge/2`
+  (`defp start_edge`) captions the edge with it, and the moduledoc's "The
+  start" section quotes it.
+- `StatifierBlocks.Map.Info` (`lib/statifier_blocks/map/info.ex`) reads
+  it for the idle description's "What starts it" fact (`defp starts`),
+  the start dot's sentence (`defp describe`, its `"start"` clause) and
+  the start edge's sentence and facts (`defp edge`, its `"start"`
+  clause).
+- `test/statifier_blocks/map_test.exs`, "every fixture starts once, with
+  one captioned edge into its first step", pins the sentence and the
+  edge's caption on both teaching documents and on a document that
+  declares no events. `test/statifier_blocks/map_layout_test.exs`, "every
+  fixture captions its start edge with the one sentence" and "both library
+  fixtures draw the start dot and its caption above every box label", lays
+  both teaching documents out through the vendored elkjs and pins the
+  caption as drawn, the longer text included, above, or left of, every
+  label a box carries. `test/statifier_blocks/map/info_test.exs`, "the
+  start dot and its edge are described" and "the start edge reads as two
+  sentences, with one full stop", pins the fact and the edge's sentence.
+  Both graphs under `test/fixtures/map/` are regenerated from the
+  package's own `StatifierBlocks.Map`.
+
+How a sentence elsewhere now reads:
+
+- This record's Note of 2026-10-10, "the start dot and every end mark
+  carry their words", says the caption "still reads `start_text/0`,
+  "Starts when told to", on every document". It reads `start_text/0`,
+  now "Starts when the system is told to", on every document.
+
+Filed with `sb-v3zy`.

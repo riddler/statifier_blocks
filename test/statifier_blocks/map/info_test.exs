@@ -484,14 +484,14 @@ defmodule StatifierBlocks.Map.InfoTest do
     test "the start dot and its edge are described" do
       loan = by_id("library_loan")
 
-      assert %Info{kind: :start, title: "Start", sentence: "Starts when told to"} =
+      assert %Info{kind: :start, title: "Start", sentence: "Starts when the system is told to"} =
                loan["blk_ll_root/start"]
 
       edge = loan["blk_ll_root/start->blk_ll_on_loan"]
       assert %Info{kind: :start, title: "Start"} = edge
-      assert fact(edge, "What starts it") == "Starts when told to"
+      assert fact(edge, "What starts it") == "Starts when the system is told to"
       assert fact(edge, "First step") == "Run interruptible steps"
-      assert edge.sentence == "Starts when told to. First: Run interruptible steps."
+      assert edge.sentence == "Starts when the system is told to. First: Run interruptible steps."
       refute edge.sentence =~ "copy.returned"
     end
 
@@ -507,14 +507,14 @@ defmodule StatifierBlocks.Map.InfoTest do
       root = Block.new("core.sequence", id: "root", slots: %{"body" => [wait]})
 
       assert %{"root/start->loan_period" => edge} = describe_root(root)
-      assert edge.sentence == "Starts when told to. First: Wait 21 days."
+      assert edge.sentence == "Starts when the system is told to. First: Wait 21 days."
 
       stamp = Block.new("library.card_stamp", id: "stamp")
       root = Block.new("core.sequence", id: "root", slots: %{"body" => [stamp]})
       palette = Palette.new(Map.put(Palette.core_types(), "library.card_stamp", CardStamp))
 
       assert %{"root/start->stamp" => edge} = describe_root(root, palette)
-      assert edge.sentence == "Starts when told to. First: Stamp the patron's card."
+      assert edge.sentence == "Starts when the system is told to. First: Stamp the patron's card."
     end
 
     # The two shapes no fixture has: a document with no step yet, whose
@@ -533,7 +533,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert fact(edge, "First step") == "no step yet (#{BlockMap.empty_text()})"
 
       assert edge.sentence ==
-               "Starts when told to. First: no step yet (#{BlockMap.empty_text()})."
+               "Starts when the system is told to. First: no step yet (#{BlockMap.empty_text()})."
 
       group =
         Block.new("core.group",
@@ -564,7 +564,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert loan.explanation =~ BlockMap.empty_text()
       assert loan.explanation =~ "The key beside the drawing"
       assert loan.explanation =~ "or point at the map"
-      assert fact(loan, "What starts it") == "Starts when told to"
+      assert fact(loan, "What starts it") == "Starts when the system is told to"
       assert fact(loan, "Listens for") == ["copy.returned", "copy.reported_lost"]
       assert fact(loan, "Steps") == "9"
       assert fact(loan, "Open slots") == "1"

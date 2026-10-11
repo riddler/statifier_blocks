@@ -442,8 +442,8 @@
         {
           "height": 16,
           "id": "blk_pr_root/start/caption",
-          "text": "Starts when told to",
-          "width": 157
+          "text": "Starts when the system is told to",
+          "width": 255
         }
       ],
       "sources": [

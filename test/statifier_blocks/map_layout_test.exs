@@ -593,11 +593,13 @@ defmodule StatifierBlocks.MapLayoutTest do
         assert_in_delta edge["end"]["y"], step["y"], 0.5, key
         assert edge["end"]["x"] >= step["x"] and edge["end"]["x"] <= step["x"] + step["width"]
 
-        assert [%{"text" => "Starts when told to", "x" => x, "y" => y}] = captions[id]
+        assert [%{"text" => "Starts when the system is told to", "x" => x, "y" => y}] =
+                 captions[id]
+
         assert [%{"width" => width, "height" => height} = label] = edge["labels"]
         assert y > dot["y"] + dot["height"] and y < step["y"], "#{key}: caption at #{y}"
         assert label["y"] >= dot["y"] + dot["height"] and label["y"] + height <= step["y"]
-        assert width >= text_width(["Starts when told to"])
+        assert width >= text_width(["Starts when the system is told to"])
         assert_in_delta x, label["x"], 0.5, key
 
         # Beside the edge, not across it: the caption's box ends within a
@@ -688,7 +690,7 @@ defmodule StatifierBlocks.MapLayoutTest do
           run(dir, key, graph)
 
         assert [%{"id" => id}] = Enum.filter(edges, &(&1["kind"] == "start"))
-        assert [%{"text" => "Starts when told to"}] = captions[id]
+        assert [%{"text" => "Starts when the system is told to"}] = captions[id]
       end
     end
 
@@ -741,7 +743,7 @@ defmodule StatifierBlocks.MapLayoutTest do
         assert_in_delta edge["end"]["y"], step["y"], 0.5, name
         assert edge["end"]["x"] >= step["x"] and edge["end"]["x"] <= step["x"] + step["width"]
 
-        assert [%{"text" => "Starts when told to", "y" => y}] = captions[id]
+        assert [%{"text" => "Starts when the system is told to", "y" => y}] = captions[id]
         assert y > dot["y"] + dot["height"] and y < step["y"], "#{name}: caption at #{y}"
 
         {dot_at, _length} = :binary.match(html, ~s(data-map-start="#{start}"))

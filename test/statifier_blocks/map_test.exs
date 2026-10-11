@@ -10,9 +10,10 @@ defmodule StatifierBlocks.MapTest do
   `StatifierBlocks.Map` answers regenerates them from it. The library
   loan's graph was regenerated when a timed wait gained the clock mark,
   both graphs when the start dot moved ahead of the root's box, both
-  again when the start dot and the end marks gained their words, and the
+  again when the start dot and the end marks gained their words, the
   library loan's again when a wrapped arm entry's later lines gained
-  their indent (see `StatifierBlocks.MapFixtures`).
+  their indent, and both again when the start edge's caption came to
+  name who starts the document (see `StatifierBlocks.MapFixtures`).
   """
 
   use ExUnit.Case, async: true
@@ -41,8 +42,9 @@ defmodule StatifierBlocks.MapTest do
     # JSON value the reference host's map module answered at the commit the
     # fixtures were copied from, less what the package has changed since:
     # the clock mark on the library loan's timed wait, the start dot ahead
-    # of the root's box, the words Start and End on the marks, and the
-    # indent under the library loan's wrapped renew arm (see MapFixtures).
+    # of the root's box, the words Start and End on the marks, the indent
+    # under the library loan's wrapped renew arm, and the start edge's
+    # caption naming who starts the document (see MapFixtures).
     #
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
     test "each teaching document's graph equals its checked-in regenerated fixture" do
@@ -1158,7 +1160,7 @@ defmodule StatifierBlocks.MapTest do
     # Sabotage: made put_start/2 put the dot first among the root's
     # children again; this went red. Reverted from a copy.
     test "every fixture starts once, with one captioned edge into its first step" do
-      assert BlockMap.start_text() == "Starts when told to"
+      assert BlockMap.start_text() == "Starts when the system is told to"
 
       documents = [{"no accepts", no_accepts_document()} | documents()]
       accepts = for {_key, document} <- documents, do: document.accepts != []
@@ -1187,7 +1189,7 @@ defmodule StatifierBlocks.MapTest do
                  %{
                    "sources" => [^start],
                    "targets" => [^first],
-                   "labels" => [%{"text" => "Starts when told to"}]
+                   "labels" => [%{"text" => "Starts when the system is told to"}]
                  }
                ] = Enum.filter(edges, &(&1["kind"] == "start"))
 
