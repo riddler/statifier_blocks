@@ -14468,3 +14468,65 @@ code, test or changelog fragment. The flag stays in the hook. The Note of
 hook keeps stand as printed.
 
 Filed with `sb-bwoo`.
+
+## Note (2026-10-10): a `{:path, opts}` inside a `{:list, t}` is a list of paths, with the candidates and the advisory on each row
+
+A dated Note rather than an amendment: it carries no `Status:` line, edits no
+line above it, and decides nothing a clause of this record states. It is added
+at the foot of the file, so no line another record cites moves. Every cite into
+`lib/` below that names `3ed17bb` was read at that commit, on main; the code
+this Note describes lands in the same change and is cited by anchor alone.
+
+### The sentence this supersedes
+
+The Note of 2026-09-07 on decision 9's `{:path, opts}` row (`:7645`) lists,
+among the reasoning it leaves to `StatifierBlocks.Editor.Field`'s moduledoc,
+"that a `{:path, opts}` inside a `{:list, t}` renders as the row fallback
+input" (`:7675-7676`). That was true when it was written, and at `3ed17bb`:
+the moduledoc's "The `{:path, opts}` control" section said so
+(`lib/statifier_blocks/editor/field.ex:352-354`), `control/1`'s `{:list,
+inner}` clause handed a row no candidate list (`:1075`), and the row fell to
+`row_control/1`'s fallback text input (`:1284`). On the datamodel side,
+`block_findings/5` read only the declarations `BlockType.datamodel_path?/1`
+answers true for (`lib/statifier_blocks/datamodel.ex:815`, the filter at
+`:819`), and that predicate answers false for a list, so no row was checked.
+
+The sentence no longer holds, and this Note is where that is recorded. Extending
+the list rather than recording why it stays plain was decided by the conductor
+under a standing consent, 2026-10-10.
+
+### What a list of paths gets now
+
+- **The candidates.** In `StatifierBlocks.Editor.Field`, `control/1`'s `{:list,
+  inner}` clause draws one `<datalist>` of `path_candidates` for the field when
+  `inner` is `{:path, opts}` and the list is non-empty, and `row_control/1`'s
+  `{:path, opts}` clause binds each row's text input to it. It suggests and does
+  not constrain, on the single control's terms, and no candidates draws no list.
+  A row of any other type is offered nothing, as before.
+- **The advisory.** In `StatifierBlocks.Datamodel`, `field_findings/5`, which
+  `block_findings/5` now calls for each declaration, reads a `{:list, {:path,
+  opts}}` field's value row by row and checks each row as a `{:path, opts}`
+  field's value is checked. An undeclared row produces clause 11e's `:info`
+  finding (`:1747`) with source `:lint`, anchored `{:config, block_id, key}` on
+  the list field's `key`, which 11e names as the field's identity per decision
+  7. A path repeated across rows is reported once. Clause 11f's "No datamodel,
+  nothing produced" holds for the rows as for every other path.
+- **What does not move.** `BlockType.datamodel_path?/1` answers as it did, false
+  for a list. `StatifierBlocks.Environment` reads a location through that
+  predicate (`lib/statifier_blocks/environment.ex:937` and `:1217` at
+  `3ed17bb`), and a list of paths names no single location, so what the
+  environment reads is unchanged.
+
+`StatifierBlocks.Editor.Field`'s moduledoc section now says the same, and the
+tests in `test/statifier_blocks/datamodel_test.exs` (the describe "a {:list,
+{:path, opts}} field's rows reach the advisory") and
+`test/statifier_blocks/editor/list_path_field_test.exs` hold both halves.
+
+### What this Note does not do
+
+It edits no line above it and amends no clause of decision 9 or decision 11.
+Decision 9's table already reads `{:list, t}` as "repeatable rows of `t`'s
+renderer", which a row of paths now is. The Note of 2026-09-07 stands as
+printed, with this Note recording the one sentence of it that changed.
+
+Filed with `sb-l9an`.

@@ -253,6 +253,88 @@ defmodule StatifierBlocks.DatamodelTest do
     end
   end
 
+  defmodule OverdueNotice do
+    @moduledoc false
+    # A library-loan host type whose `copy_to` field is a list of datamodel
+    # paths: each row names where an overdue notice is copied. No core type
+    # declares a `{:list, {:path, opts}}` field, so the shape is a host's.
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def config_schema(_config) do
+      [
+        %{key: "subject", type: :string, label: "Subject", required?: false, default: ""},
+        %{
+          key: "copy_to",
+          type: {:list, {:path, %{}}},
+          label: "Copy to",
+          required?: false,
+          default: []
+        }
+      ]
+    end
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:error, {:not_implemented, id}}
+  end
+
+  describe "a {:list, {:path, opts}} field's rows reach the advisory" do
+    defp notice_palette,
+      do: Palette.new(Map.put(Palette.core_types(), "library.overdue_notice", OverdueNotice))
+
+    defp notice(copy_to) do
+      Block.new("library.overdue_notice",
+        id: "blk_overdue",
+        config: %{"subject" => "loan.title", "copy_to" => copy_to}
+      )
+    end
+
+    # sabotage: dropped `field_findings/5`'s `{:list, {:path, _opts}}`
+    # clause -> the list field falls to the `datamodel_path?/1` clause, which
+    # answers false for it, no finding is produced and this goes red.
+    test "an undeclared row gets the :info advisory, anchored on the field's key" do
+      document = document([notice(["patron.email", "branch.desk_email"])])
+
+      assert [%Finding{} = finding] =
+               Datamodel.findings(document, notice_palette(), ["patron.email"])
+
+      assert finding.anchor == {:config, "blk_overdue", "copy_to"}
+      assert finding.severity == :info
+      assert finding.source == :lint
+      assert finding.message == "branch.desk_email is not declared in the datamodel"
+    end
+
+    # sabotage: the same dropped clause - this test stays green while the
+    # one above goes red: an advisory that never fires looks exactly like
+    # rows that were all declared.
+    test "rows that are all declared produce nothing, and the string field is not a path" do
+      document = document([notice(["patron.email", "branch.desk_email"])])
+
+      assert Datamodel.findings(document, notice_palette(), ["patron.email", "branch.desk_email"]) ==
+               []
+    end
+
+    # sabotage: dropped `Enum.uniq/1` from the list clause -> the repeated
+    # row is reported twice and the single-finding match goes red.
+    test "a path repeated across rows is reported once" do
+      document = document([notice(["branch.desk_email", "branch.desk_email"])])
+
+      assert [%Finding{message: "branch.desk_email is not declared in the datamodel"}] =
+               Datamodel.findings(document, notice_palette(), [])
+    end
+
+    # The rows reach the advisory here and nowhere else: the predicate the
+    # environment reads a location through still says a list of paths is
+    # not one.
+    test "blank, non-string and absent rows produce nothing, and datamodel_path?/1 is unchanged" do
+      assert Datamodel.findings(document([notice(["", 7, nil])]), notice_palette(), []) == []
+      assert Datamodel.findings(document([notice("not a list")]), notice_palette(), []) == []
+
+      [_subject, copy_to] = OverdueNotice.config_schema(%{})
+      refute StatifierBlocks.BlockType.datamodel_path?(copy_to)
+    end
+  end
+
   describe "no datamodel (11f): absence is not unknown-ness" do
     # sabotage: `findings/3`'s `nil` arm falling through to
     # `undeclared_findings/3` with an empty set - every annotated path in a

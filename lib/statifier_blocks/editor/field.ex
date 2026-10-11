@@ -349,9 +349,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     `StatifierBlocks.Assignability` as a finding on this field's own key.
     They are not claims about the bytes this control edits, so the control
     is the same one either way and an author sees the difference in the
-    findings beneath it. A `{:path, opts}` inside a `{:list, t}` renders as
-    the row fallback text input, since a list row draws no suggestion
-    markup for any type.
+    findings beneath it. A `{:path, opts}` inside a `{:list, t}` is a list
+    of paths: each row is a text input bound to one `<datalist>` of the
+    same candidates, drawn once for the field, and each row's value is
+    checked for the same `:info` advisory, anchored on the list field's
+    `key`. A row of any other type draws no suggestion markup.
 
     ## The `invoke_type` suggestion list
 
@@ -432,9 +434,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       default: [],
       doc: """
       The declared datamodel paths, from `StatifierBlocks.Datamodel.candidates/3`.
-      Suggestions on an `:expression` field and on a `{:path, opts}` one, and
-      passed to `expression_component` as `:candidates`; empty renders the
-      plain input.
+      Suggestions on an `:expression` field, on a `{:path, opts}` one and on
+      each row of a `{:list, {:path, opts}}` one, and passed to
+      `expression_component` as `:candidates`; empty renders the plain input.
       """
     )
 
@@ -1072,11 +1074,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    # A `{:list, {:path, opts}}` field's rows share one `<datalist>` of the
+    # declared paths, drawn once beside the rows and bound to each row's
+    # input, on the terms the single `{:path, opts}` control's datalist is
+    # under: it suggests and never constrains, and no candidates draws no
+    # list. Every other row type is offered nothing, as before.
     defp control(%{field: %ViewModel.Field{type: {:list, inner}}} = assigns) do
+      row_paths = row_path_candidates(inner, assigns.path_candidates)
+
       assigns =
         assigns
         |> assign(:inner, inner)
         |> assign(:rows, List.wrap(assigns.field.value))
+        |> assign(:row_paths, row_paths)
+        |> assign(:row_list_id, if(row_paths != [], do: input_id(assigns.field) <> "-paths"))
 
       ~H"""
       <div class="sb-field__list">
@@ -1086,6 +1097,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             value={value}
             id={input_id(@field) <> "-#{index}"}
             name={input_name(@field) <> "[]"}
+            list={@row_list_id}
             debounce={@debounce}
           />
           <button
@@ -1117,6 +1129,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         >
           add
         </button>
+        <datalist :if={@row_paths != []} id={@row_list_id} data-path-candidates={length(@row_paths)}>
+          <option :for={path <- @row_paths} value={path}></option>
+        </datalist>
       </div>
       """
     end
@@ -1240,11 +1255,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    # The candidates a list's rows are offered: the declared paths for a
+    # list of paths, and nothing for a list of anything else.
+    defp row_path_candidates({:path, _opts}, candidates) when is_list(candidates), do: candidates
+    defp row_path_candidates(_inner, _candidates), do: []
+
     attr(:inner, :any, required: true)
     attr(:value, :any, required: true)
     attr(:id, :string, required: true)
     attr(:name, :string, required: true)
+    attr(:list, :string, default: nil)
     attr(:debounce, :any, default: nil)
+
+    defp row_control(%{inner: {:path, _opts}, list: list} = assigns) when is_binary(list) do
+      ~H"""
+      <input
+        class="sb-field__input"
+        type="text"
+        id={@id}
+        name={@name}
+        value={to_text(@value)}
+        list={@list}
+        spellcheck="false"
+        autocomplete="off"
+        phx-debounce={@debounce}
+      />
+      """
+    end
 
     defp row_control(%{inner: :boolean} = assigns) do
       ~H"""
