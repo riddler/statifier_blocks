@@ -1015,7 +1015,8 @@ Where it holds:
   drawn", lays both teaching documents out through the vendored elkjs and
   pins a key of exactly the marks the drawing carries, read off the
   markup on both sides; the key at the drawing's top right, inside the
-  SVG and clear of every box, edge end and caption; each entry's glyph as
+  SVG and clear of every box, edge end and caption, and of a timer edge
+  drawn right of every box; each entry's glyph as
   the drawing's own; and a key a click or a pointer on which asks and
   names nothing.
 - `test/statifier_blocks/map/info_test.exs`, "the key's lines, as the

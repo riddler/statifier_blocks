@@ -614,7 +614,15 @@ export function keyOf(laid) {
   const legend = Array.isArray(laid.legend) ? laid.legend : []
   if (legend.length === 0) return null
 
-  const x = Math.ceil(laid.width) + KEY_GAP
+  // A timer edge between two steps of one column runs out past their
+  // right sides, with its delay beside it, so it can stand right of every
+  // box the layout placed: the key stands clear of that too.
+  const right = timersOf(laid).reduce((widest, timer) => Math.max(
+    widest,
+    ...timer.points.map((p) => p.x),
+    timer.label.x + String(timer.delay).length * CHAR_WIDTH,
+  ), laid.width)
+  const x = Math.ceil(right) + KEY_GAP
   let y = KEY_PAD + LINE_HEIGHT + KEY_ENTRY_GAP
   let widest = 0
   const entries = legend.map(({mark, lines}) => {

@@ -1110,6 +1110,50 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
+    # A timer edge between two steps of one column runs out past their
+    # right sides and back, and its delay is written beside that run, so
+    # it can stand right of every box the layout placed. The key stands
+    # clear of it too: a loan that sends itself a reminder in a thousand days and
+    # waits for it draws the run and the delay right of the drawing's
+    # boxes.
+    #
+    # Sabotage: made keyOf stand the key past the laid-out width alone;
+    # the delay ran under the key and this went red. Reverted from a copy.
+    test "the key stands clear of a timer edge drawn right of every box", %{tmp_dir: dir} do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              Block.new("core.send",
+                id: "remind",
+                config: %{"event" => "loan.overdue", "delay" => "1000d"}
+              ),
+              Block.new("core.await", id: "overdue", config: %{"event" => "loan.overdue"})
+            ]
+          }
+        )
+
+      graph = root |> Document.new() |> ViewModel.build(Palette.core(), []) |> BlockMap.graph()
+
+      %{
+        "drawn" => "map",
+        "key" => %{"box" => box},
+        "timers" => [timer],
+        "captions" => captions,
+        "svg" => svg
+      } =
+        run(dir, "timer-key", graph)
+
+      [%{"text" => "1000d", "x" => x, "y" => y}] = captions["remind->overdue/timer"]
+      delay = %{"x" => x, "y" => y - 12, "width" => text_width(["1000d"]) - 24, "height" => 16}
+      run_x = timer["d"] |> path_points() |> Enum.map(& &1.x) |> Enum.max()
+
+      assert run_x > svg["laidWidth"] or delay["x"] + delay["width"] > svg["laidWidth"]
+      refute overlaps?(box, delay)
+      assert box["x"] > run_x
+    end
+
     # Each entry is drawn with the drawing's own glyph: the dot, the ring
     # (dashed for an abandon end) with its dot, an arrow solid, dashed or
     # dotted in the drawing's own dash and ending in its arrowhead, the
