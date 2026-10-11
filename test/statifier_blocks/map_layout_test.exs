@@ -28,9 +28,11 @@ defmodule StatifierBlocks.MapLayoutTest do
 
   use ExUnit.Case, async: true
 
+  alias StatifierBlocks.Block
   alias StatifierBlocks.Decode
   alias StatifierBlocks.Describe
   alias StatifierBlocks.Describe.Edge
+  alias StatifierBlocks.Document
   alias StatifierBlocks.Map, as: BlockMap
   alias StatifierBlocks.MapFixtures
   alias StatifierBlocks.Palette
@@ -649,6 +651,64 @@ defmodule StatifierBlocks.MapLayoutTest do
 
         assert [%{"id" => id}] = Enum.filter(edges, &(&1["kind"] == "start"))
         assert [%{"text" => "Starts when told to"}] = captions[id]
+      end
+    end
+
+    # The two start shapes neither library fixture has, laid out through
+    # elkjs: a root that is a group, whose flow is drawn in a pane of its
+    # own, so the start edge runs into the group's box; and a document with
+    # no step yet, whose start edge runs into the empty marker. Each draws
+    # the dot first, above the box its edge enters, with the caption
+    # written between the two.
+    #
+    # Sabotage: made start_target/2 answer the root's id for every root;
+    # the empty document's edge ran into the root's box and this went red.
+    # Made put_start/2 put the dot after the root's box in the graph; the
+    # box was drawn before the dot and this went red. Each reverted from a
+    # copy.
+    test "a group root and an empty document draw the start dot and its edge",
+         %{tmp_dir: dir} do
+      hold = Block.new("core.await", id: "wait", config: %{"event" => "hold.collected"})
+
+      group =
+        Block.new("core.group", id: "held", slots: %{"body" => [hold], "interrupts" => []})
+
+      empty = Block.new("core.sequence", id: "root", slots: %{"body" => []})
+
+      for {name, root, first} <- [
+            {"group_root", group, "held"},
+            {"empty", empty, "root/body/empty"}
+          ] do
+        graph =
+          root |> Document.new() |> ViewModel.build(Palette.core(), []) |> BlockMap.graph()
+
+        %{
+          "drawn" => "map",
+          "html" => html,
+          "boxes" => boxes,
+          "edges" => edges,
+          "captions" => captions
+        } = run(dir, name, graph)
+
+        start = "#{root.id}/start"
+        id = "#{start}->#{first}"
+        dot = boxes[start] || flunk("#{name}: no start dot laid out")
+        step = boxes[first] || flunk("#{name}: no box laid out for #{first}")
+
+        assert [%{"id" => ^id, "source" => ^start, "target" => ^first} = edge] =
+                 Enum.filter(edges, &(&1["kind"] == "start"))
+
+        assert dot["y"] + dot["height"] <= step["y"], name
+        assert_in_delta edge["start"]["y"], dot["y"] + dot["height"], 0.5, name
+        assert_in_delta edge["end"]["y"], step["y"], 0.5, name
+        assert edge["end"]["x"] >= step["x"] and edge["end"]["x"] <= step["x"] + step["width"]
+
+        assert [%{"text" => "Starts when told to", "y" => y}] = captions[id]
+        assert y > dot["y"] + dot["height"] and y < step["y"], "#{name}: caption at #{y}"
+
+        {dot_at, _length} = :binary.match(html, ~s(data-map-start="#{start}"))
+        {box_at, _length} = :binary.match(html, ~s(data-map-kind="block"))
+        assert dot_at < box_at, "#{name}: a box is drawn before the start dot"
       end
     end
   end
