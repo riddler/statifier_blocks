@@ -222,8 +222,8 @@ defmodule StatifierBlocks.Map do
 
   ## Timer edges
 
-  A send with a delay arms an event that arrives later, and the interrupt
-  rule or the wait that names that event is what it arms. The graph's root
+  A send with a delay arms an event that arrives later, and what it arms
+  is the interrupt rule or the hourglass step that hears it. The graph's root
   carries those as `timers`, one per delayed send and rule or await naming
   its event, sends in reading order and each send's targets in reading
   order, each with its `event` and its `delay` as the send's config holds

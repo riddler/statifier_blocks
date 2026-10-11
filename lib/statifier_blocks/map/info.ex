@@ -947,8 +947,8 @@ defmodule StatifierBlocks.Map.Info do
       explanation:
         "A dotted arrow: not a step that follows the one before it, but the event a " <>
           "message sent after a delay arms. The step that sends it finishes at once; " <>
-          "when the delay is up the event arrives, and the rule or the wait it points " <>
-          "at hears it.",
+          "when the delay is up the event arrives at the interrupt rule or the " <>
+          "hourglass step that hears it.",
       facts: [
         {"Sent by", sentence_of(from, context)},
         {"Heard by", sentence_of(to, context)},
