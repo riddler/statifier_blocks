@@ -660,7 +660,8 @@ export function keyOf(laid) {
 }
 
 // One mark's glyph in the key, in the 20 by 14 box at (x, y): the
-// drawing's own dot, ring, arrow, fork, join, hourglass or clock.
+// drawing's own dot, ring, arrow, fork, join, hourglass or clock, or the
+// drafts drawer's closed row.
 function keyGlyph(mark, x, y) {
   const mid = y + 7
   const edge = "fill: none; stroke: var(--sb-map-edge, #64748b)"
@@ -679,6 +680,13 @@ function keyGlyph(mark, x, y) {
     case "fork": return forkGlyph({x: x + 3, y})
     case "wait":
     case "clock": return markGlyph(mark, x + 3, y)
+    // The drafts drawer's closed row: a row with the disclosure triangle
+    // its row opens by.
+    case "drafts":
+      return `<rect x="${x}" y="${y}" width="20" height="14" rx="3" ` +
+        `style="fill: var(--sb-map-slot-fill, #f8fafc); stroke: var(--sb-map-slot-stroke, #cbd5e1)"/>` +
+        `<path d="M${x + 7} ${y + 4} L${x + 13} ${mid} L${x + 7} ${y + 10} z" ` +
+        `style="fill: var(--sb-map-mark, #64748b)"/>`
     default: return ""
   }
 }
@@ -707,6 +715,17 @@ function drawKey(key) {
 // `editable` adds the gaps an insert can target; a read-only page draws
 // none.
 export function renderSvg(laid, {editable = false} = {}) {
+  return svgOf(laid, editable, `data-map-svg="true"`, ARROW_DEFS)
+}
+
+// The arrowhead every edge ends in, defined once, in the drawing's SVG: the
+// drafts drawer's drawing ends its edges in the same one.
+const ARROW_DEFS =
+  `<defs><marker id="sb-map-arrow" viewBox="0 0 10 10" refX="10" refY="5" ` +
+  `markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
+  `<path d="M0 0 L10 5 L0 10 z" style="fill: var(--sb-map-edge, #64748b)"/></marker></defs>`
+
+function svgOf(laid, editable, mark, defs) {
   const all = boxes(laid)
   const nodes = all.map(drawNode).join("")
   const gaps = editable ? all.map(drawGap).join("") : ""
@@ -716,14 +735,58 @@ export function renderSvg(laid, {editable = false} = {}) {
   const width = key === null ? Math.ceil(laid.width) : Math.ceil(key.x + key.width)
   const height = Math.ceil(key === null ? laid.height : Math.max(laid.height, key.height))
 
-  return `<svg xmlns="${SVG_NS}" class="sb-map__svg" data-map-svg="true" ` +
+  return `<svg xmlns="${SVG_NS}" class="sb-map__svg" ${mark} ` +
     `width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ` +
     `aria-hidden="true" focusable="false">` +
-    `<defs><marker id="sb-map-arrow" viewBox="0 0 10 10" refX="10" refY="5" ` +
-    `markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
-    `<path d="M0 0 L10 5 L0 10 z" style="fill: var(--sb-map-edge, #64748b)"/></marker></defs>` +
-    nodes + edges + gaps + drawKey(key) +
+    defs + nodes + edges + gaps + drawKey(key) +
     `</svg>`
+}
+
+// ---------------------------------------------------------------- drafts
+//
+// The drafts shelf holds steps not wired into the flow, so the path is
+// laid out and read without it: the shelf's node (the one the server marks
+// `drafts`) is taken out of the graph before the layout, laid out on its
+// own, and drawn in a drawer under the drawing (`StatifierBlocks.Map`'s
+// moduledoc, "The drafts shelf"). The drawer is a native disclosure
+// element: its row reads the server's `label`, and the shelf's own drawing
+// is inside it. A page that cannot edit draws it closed, and a click on the
+// row opens it in place; a page that can edit draws it open. Whether it is
+// open lives in the element, never in the hook. Its row takes no focus,
+// as the drawing takes none: the list is the keyboard path to the shelf.
+
+// A copy of `graph` without the drafts shelf's node, and that node, or
+// null when the graph has none. The shelf has no edge in or out, so
+// nothing else changes.
+export function withoutDrafts(graph) {
+  const copy = structuredClone(graph)
+  let drafts = null
+  const take = (node) => {
+    const children = node.children || []
+    const at = children.findIndex((child) => child.drafts !== undefined && child.drafts !== null)
+    if (at >= 0 && drafts === null) {
+      drafts = children[at]
+      node.children = children.filter((_child, i) => i !== at)
+    }
+    for (const child of node.children || []) take(child)
+  }
+  take(copy)
+  return {graph: copy, drafts}
+}
+
+// The shelf's own graph: the shelf alone, under the drawing's root options.
+export function draftsGraph(graph, drafts) {
+  return {id: `${graph.id}/drafts`, layoutOptions: graph.layoutOptions || {}, children: [drafts], edges: []}
+}
+
+// The drawer: its row, and the shelf `laid` out on its own inside it.
+export function renderDrafts(drafts, laid, {editable = false} = {}) {
+  if (drafts === null || laid === null) return ""
+  return `<details class="sb-map__drafts" data-map-drafts="${escapeText(drafts.id)}"` +
+    `${editable ? " open" : ""}>` +
+    `<summary class="sb-map__drafts-row" tabindex="-1">${escapeText(drafts.drafts.label)}</summary>` +
+    svgOf(laid, editable, `data-map-drafts-svg="true"`, "") +
+    `</details>`
 }
 
 // The pane drawn in place of a map that could not be laid out.
@@ -738,17 +801,23 @@ export function renderError(reason) {
 }
 
 // Lays `graph` out and draws the result, or the error pane, into `target`.
-// Resolves to `{drawn: "map", laid}` with the laid-out graph it drew, or
-// `{drawn: "error", laid: null}`, so a caller can tell which it drew and
-// read the very positions it drew from. `editable` is `renderSvg`'s.
+// Resolves to `{drawn: "map", laid, drafts}` with the laid-out graph it
+// drew and the drafts shelf laid out on its own (null without one), or
+// `{drawn: "error", laid: null, drafts: null}`, so a caller can tell which
+// it drew and read the very positions it drew from. The shelf is laid out
+// apart from the path and drawn in its drawer under it (see "drafts"
+// above). `editable` is `renderSvg`'s, and decides whether the drawer is
+// drawn open.
 export async function drawMap(target, graph, {elk = elkInstance(), editable = false} = {}) {
   try {
-    const laid = await layout(graph, elk)
-    target.innerHTML = renderSvg(laid, {editable})
-    return {drawn: "map", laid}
+    const {graph: path, drafts} = withoutDrafts(graph)
+    const laid = await layout(path, elk)
+    const shelf = drafts === null ? null : await layout(draftsGraph(graph, drafts), elk)
+    target.innerHTML = renderSvg(laid, {editable}) + renderDrafts(drafts, shelf, {editable})
+    return {drawn: "map", laid, drafts: shelf}
   } catch (reason) {
     target.innerHTML = renderError(reason)
-    return {drawn: "error", laid: null}
+    return {drawn: "error", laid: null, drafts: null}
   }
 }
 

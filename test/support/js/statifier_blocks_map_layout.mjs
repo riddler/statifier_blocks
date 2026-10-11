@@ -29,6 +29,7 @@
 // `key`, the key as drawn - its box, and each entry's mark, glyph and
 // lines - with `drawnMarks`, every kind of mark the drawing outside the
 // key carries, and `svg`, the drawing's own width and height, and
+// `drafts`, the drafts drawer as drawn (null without one), and
 // `childGestures`, the same
 // asked of a click on each of that element's children (the rect, text,
 // circle or path a real click lands on), which reach the element by walking
@@ -61,7 +62,7 @@ ELK.prototype.layout = async function (...args) {
 
 const graph = JSON.parse(readFileSync(process.argv[2], "utf8"))
 const target = {innerHTML: ""}
-const {drawn, laid} = await drawMap(target, graph, {editable})
+const {drawn, laid, drafts: laidDrafts} = await drawMap(target, graph, {editable})
 
 const laidOut = {}
 const edges = []
@@ -318,6 +319,7 @@ for (const el of all.filter((e) => !inKey(e))) {
   if (d.mapJoin !== undefined) drawnMarks.add("join")
   if (d.mapFork !== undefined) drawnMarks.add("fork")
   if (d.mapMark !== undefined) drawnMarks.add(d.mapMark)
+  if (d.mapDrafts !== undefined) drawnMarks.add("drafts")
   if (el.tag === "path" && d.mapEdge !== undefined) {
     const kind = d.mapEdgeKind
     if (kind === "interrupt" || (kind === "end" && dashed(el))) drawnMarks.add("interrupt")
@@ -326,7 +328,45 @@ for (const el of all.filter((e) => !inKey(e))) {
   }
 }
 
+// The drafts drawer, read off the markup: the element marked
+// data-map-drafts, whether it is drawn open, its row's text and tabindex,
+// whether it stands after the drawing's own SVG and outside it, whether
+// it holds the shelf's own drawing, every box of the shelf's own layout,
+// absolute in that drawing, and what a click on its row, or on anything
+// clickable inside it, asks.
+const rowText = (el) =>
+  unescape((html.slice(html.indexOf(el.token) + el.token.length).match(/^([^<]*)<\/summary>/) || [])[1] || "")
+const draftsEl = all.find((e) => e.dataset.mapDrafts !== undefined)
+let drafts = null
+if (draftsEl) {
+  const row = draftsEl.children.find((c) => c.tag === "summary")
+  const inDrafts = (el) => {
+    for (let at = el.parent; at; at = at.parent) if (at === draftsEl) return true
+    return false
+  }
+  const draftsBoxes = {}
+  if (laidDrafts) {
+    for (const box of boxes(laidDrafts)) {
+      draftsBoxes[box.id] = {x: box.x, y: box.y, width: box.width, height: box.height}
+    }
+  }
+  drafts = {
+    id: draftsEl.dataset.mapDrafts,
+    tag: draftsEl.tag,
+    open: /\sopen(?=[\s>])/.test(draftsEl.token),
+    row: row ? {tag: row.tag, text: rowText(row), tabindex: (row.token.match(/\stabindex="([^"]*)"/) || [])[1] || null} : null,
+    rowGesture: row ? mapGesture(row, editable, events) : null,
+    afterDrawing: html.indexOf(draftsEl.token) > html.indexOf("</svg>"),
+    inDrawing: draftsEl.closest("[data-map-svg]") !== null,
+    drawing: draftsEl.children.some((c) => c.tag === "svg" && c.dataset.mapDraftsSvg !== undefined),
+    boxes: draftsBoxes,
+    gestures: all.filter((e) => inDrafts(e) && e.tag === "g" &&
+      (e.dataset.mapGap !== undefined || e.dataset.mapKind !== undefined))
+      .map((e) => ({element: keyOf(e), gesture: mapGesture(e, editable, events)})),
+  }
+}
+
 const [, svgWidth, svgHeight] = html.match(/<svg [^>]*width="([\d.]+)" height="([\d.]+)"/) || []
 const svg = svgWidth === undefined ? null : {width: Number(svgWidth), height: Number(svgHeight), laidWidth: laid ? laid.width : null, laidHeight: laid ? laid.height : null}
 
-process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, first, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges, layouts, key, drawnMarks: [...drawnMarks], svg}))
+process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, first, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges, layouts, key, drawnMarks: [...drawnMarks], svg, drafts}))

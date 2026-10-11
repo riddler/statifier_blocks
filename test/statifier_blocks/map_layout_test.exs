@@ -1273,6 +1273,100 @@ defmodule StatifierBlocks.MapLayoutTest do
     end
   end
 
+  describe "the drafts drawer, as drawn" do
+    # On a page that cannot edit, the shelf is a closed drawer: a native
+    # disclosure element after the drawing's SVG and outside it, its row
+    # the server's label, taking no focus and asking nothing when clicked,
+    # holding the shelf's own drawing. The path is laid out without the
+    # shelf: every box of the drawing stands exactly where it stands for
+    # the same document with no shelf, and no box of the shelf is in it.
+    #
+    # Sabotage: made drawMap lay the graph out with the shelf left in; the
+    # shelf's boxes were in the drawing and this went red. Reverted from a
+    # copy.
+    # Sabotage: made renderDrafts draw the drawer open whatever `editable`
+    # said; this went red. Reverted from a copy.
+    test "a read-only map draws the shelf in a closed drawer, the path laid out without it",
+         %{tmp_dir: dir} do
+      graph = BlockMap.graph(shelf_view_model())
+
+      %{"drawn" => "map", "boxes" => boxes, "drafts" => drafts} = run(dir, "drafts", graph)
+      %{"drawn" => "map", "boxes" => plain} = run(dir, "no-drafts", BlockMap.graph(plain_loan()))
+
+      assert %{
+               "id" => "shelf",
+               "tag" => "details",
+               "open" => false,
+               "row" => %{
+                 "tag" => "summary",
+                 "text" => "Drafts: 2 steps not wired in",
+                 "tabindex" => "-1"
+               },
+               "rowGesture" => nil,
+               "afterDrawing" => true,
+               "inDrawing" => false,
+               "drawing" => true
+             } = drafts
+
+      assert boxes == plain
+
+      for id <- ~w(shelf shelf/body second extra) do
+        refute Map.has_key?(boxes, id), "#{id} is in the drawing"
+        assert Map.has_key?(drafts["boxes"], id), "#{id} is not in the drawer"
+      end
+    end
+
+    # On a page that can edit, the drawer is drawn open, in the same place,
+    # and the shelf's steps are reached as the drawing's are: a click on a
+    # box selects it, a "+" arms the insert after it, both under the list's
+    # own event names.
+    #
+    # Sabotage: made renderDrafts draw the drawer closed whatever
+    # `editable` said; this went red. Reverted from a copy.
+    test "an editable map draws the drawer open in the same place, its steps reachable",
+         %{tmp_dir: dir} do
+      graph = BlockMap.graph(shelf_view_model())
+
+      %{"drawn" => "map", "drafts" => drafts} = run(dir, "drafts-edit", graph, "editable")
+
+      assert %{
+               "open" => true,
+               "afterDrawing" => true,
+               "inDrawing" => false,
+               "drawing" => true,
+               "rowGesture" => nil,
+               "row" => %{"text" => "Drafts: 2 steps not wired in", "tabindex" => "-1"},
+               "gestures" => gestures
+             } = drafts
+
+      for id <- ~w(second extra) do
+        assert %{"element" => "block:#{id}", "gesture" => select(id)} in gestures
+        assert %{"element" => "gap:#{id}", "gesture" => insert(id)} in gestures
+      end
+    end
+
+    # The key names the drawer, by its own row and with the closed row's
+    # glyph, and names it only where the drawing has one; the key is still
+    # exactly the marks the drawing carries.
+    #
+    # Sabotage: made keyGlyph draw nothing for the drawer; this went red.
+    # Reverted from a copy.
+    test "the key names the drawer by its row", %{tmp_dir: dir} do
+      graph = BlockMap.graph(shelf_view_model())
+
+      %{"drawn" => "map", "key" => %{"entries" => entries}, "drawnMarks" => marks} =
+        run(dir, "drafts-key", graph)
+
+      assert Enum.map(entries, & &1["mark"]) == Enum.map(graph["legend"], & &1["mark"])
+      assert Enum.sort(marks) == Enum.sort(Enum.map(entries, & &1["mark"]))
+
+      assert %{"mark" => "drafts", "glyph" => [%{"tag" => "rect"}, %{"tag" => "path"}]} =
+               drafts = List.last(entries)
+
+      assert Enum.map(drafts["lines"], & &1["text"]) == ["Drafts: 2 steps not wired in"]
+    end
+  end
+
   describe "the Group, as drawn" do
     # The two library groups, their body's pane and their rules column, the
     # rules in rail order.
@@ -1809,6 +1903,44 @@ defmodule StatifierBlocks.MapLayoutTest do
   # ------------------------------------------------------------------ helpers
 
   defp sample_graph, do: library_graph("patron_registration")
+
+  # A loan's overdue notice and a hold's pickup, then a drafts shelf
+  # holding a second notice and a reminder; `plain_loan/0` is the same
+  # loan with no shelf.
+  defp shelf_view_model do
+    shelf =
+      Block.new("core.drafts",
+        id: "shelf",
+        slots: %{
+          "body" => [
+            Block.new("core.send", id: "second", config: %{"event" => "loan.overdue"}),
+            Block.new("core.send", id: "extra", config: %{"event" => "hold.ready"})
+          ]
+        }
+      )
+
+    loan_view_model([shelf])
+  end
+
+  defp plain_loan, do: loan_view_model([])
+
+  defp loan_view_model(shelf) do
+    Block.new("core.sequence",
+      id: "root",
+      slots: %{
+        "body" =>
+          [
+            Block.new("core.send", id: "notice", config: %{"event" => "loan.overdue"}),
+            Block.new("core.await", id: "pickup", config: %{"event" => "hold.collected"})
+          ] ++ shelf
+      }
+    )
+    |> Document.new()
+    |> ViewModel.build(Palette.core(), [])
+  end
+
+  defp select(id), do: %{"event" => "select-row", "payload" => %{"block-id" => id}}
+  defp insert(id), do: %{"event" => "insert-open", "payload" => %{"block-id" => id}}
 
   defp library_graph(key),
     do: BlockMap.graph(MapFixtures.view_model!(key), phrase: &MapFixtures.phrase/1)

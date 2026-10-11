@@ -5003,6 +5003,30 @@ button.sb-inspector__group-row:hover {
   stroke-width: 2;
 }
 
+/* The drafts drawer: a native disclosure under the drawing, apart from the
+   path, its row the shelf's label and its body the shelf's own drawing.
+   It reads the map's own slot tokens, so it looks like the shelf it
+   holds. */
+.sb-map__drafts {
+  margin-top: var(--sb-space);
+  width: max-content;
+  max-width: 100%;
+}
+
+.sb-map__drafts-row {
+  cursor: pointer;
+  padding: 2px 8px;
+  border: 1px solid var(--sb-map-slot-stroke);
+  border-radius: var(--sb-radius-sm, 3px);
+  background: var(--sb-map-slot-fill);
+  color: var(--sb-fg-muted);
+  font-size: 12px;
+}
+
+.sb-map__drafts[open] > .sb-map__drafts-row {
+  margin-bottom: var(--sb-space);
+}
+
 .sb-map__error {
   color: var(--sb-fg);
   font-size: var(--sb-text-sm);

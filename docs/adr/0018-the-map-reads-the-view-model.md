@@ -1046,3 +1046,81 @@ How sentences elsewhere now read:
   drops the "Key" fact too.
 
 Filed with `sb-9dwx`.
+
+## Note (2026-10-10): the drafts shelf is a drawer under the drawing
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-10-10, where the
+code holds it, and how sentences elsewhere now read.
+
+The rule: when the map is read-only, the drafts shelf is a closed drawer,
+one labelled row under the drawing and outside the path's column, reading
+"Drafts: N steps not wired in", which opens in place on click; when the
+page can edit, the shelf is drawn open in the same place; the path reads
+without it either way; the key names it. The drawer is a native
+disclosure element whose open state lives in that element and not in the
+Map hook, defaulted by the day clock, 2026-10-10, so the hook stays the
+draw-only hook ADR-0005's Amendment of 2026-09-28 on decision 7 (its
+clause 7f) describes.
+
+What is drawn now: the hook takes the shelf's node out of the graph
+before the layout, so the path is laid out exactly as it is for the same
+document with no shelf, and lays the shelf out on its own. The drawing is
+the path's SVG and, under it and outside it, the drawer: its row reads
+the graph's label, and the shelf's own drawing is inside it, its boxes
+selecting and its "+" arming inserts as the drawing's do. N is the number
+of blocks directly on the shelf, and one is read "1 step". The row takes
+no focus, as the drawing takes none: the map region stays hidden from
+assistive technology, and the list stays the keyboard and screen-reader
+path to the shelf. The key's entry for the shelf is the drawer's row,
+drawn with a glyph of the closed row, and like every key line it reaches
+the description region as text in the "Key" fact.
+
+The graph stays the document: the shelf's node keeps its place in the
+graph, where the outline visits it, so `StatifierBlocks.Map.nodes/1`
+answers what it answered. What the graph gains is data, read off the view
+model: the shelf's node carries `drafts`, its count and its label, and
+`legend` gains a last `drafts` entry. On a document whose root body holds
+only a shelf, the start edge runs into the root's box rather than into
+the shelf.
+
+Where it holds:
+
+- `put_drafts/2` and `drafts_label/1` (`lib/statifier_blocks/map.ex`,
+  `defp put_drafts`, `defp drafts_label`) mark the shelf's node;
+  `put_legend/1` (`defp put_legend`) adds its key entry;
+  `unflowed_target/2` (`defp unflowed_target`) sends the start edge of a
+  body holding only a shelf into the root's box; the moduledoc's "The drafts shelf" section
+  says so.
+- `withoutDrafts`, `draftsGraph` and `renderDrafts`
+  (`assets/js/statifier_blocks_map.js`, `export function withoutDrafts`,
+  `export function draftsGraph`, `export function renderDrafts`) take the
+  shelf out, lay it out alone and draw the drawer; `drawMap`
+  (`export async function drawMap`) draws the path and the drawer;
+  `keyGlyph` (`function keyGlyph`) draws the closed row in the key.
+- `test/statifier_blocks/map_layout_test.exs`, describe "the drafts
+  drawer, as drawn", lays a document with a shelf out through the
+  vendored elkjs and pins a closed drawer after the drawing and outside
+  it on a read-only page, its row the label and taking no focus, a click
+  on it asking nothing, and the path's boxes equal to the same document's
+  with no shelf; the drawer drawn open in the same place on a page that
+  can edit, the shelf's steps selected and inserted after as the
+  drawing's are; and the key naming the drawer by its row.
+- `test/statifier_blocks/map_test.exs`, describe "the drafts shelf",
+  pins the shelf's `drafts` for none, one and two steps, the key's last
+  entry, `nodes/1` unchanged, and the start edge of a body holding only a
+  shelf. `test/statifier_blocks/map/info_test.exs`, "names every mark the
+  hook draws, in the paragraph or the key", binds the drawer's classes to
+  the key's line for the shelf.
+
+How sentences elsewhere now read:
+
+- This record's decision (c) says the hook draws the graph "as SVG into
+  an element the server keeps out of LiveView's patching". For a document
+  with a shelf, the drawing in that element is the path's SVG and the
+  drawer under it, which holds a second SVG; the element is the same one.
+- This record's Note of 2026-10-10, "the Map draws a key of its marks",
+  lists the marks the key has a line for. The drawer's row is one more
+  entry, last, on a document with a shelf.
+
+Filed with `sb-0ykt`.

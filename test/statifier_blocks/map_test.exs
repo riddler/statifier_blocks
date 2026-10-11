@@ -1327,6 +1327,69 @@ defmodule StatifierBlocks.MapTest do
     end
   end
 
+  describe "the drafts shelf" do
+    # The shelf's node carries its drawer's row: how many steps sit on the
+    # shelf and the words the row reads, "Drafts: N steps not wired in",
+    # one step read as a step. No other node carries it, and a document
+    # with no shelf has none.
+    #
+    # Sabotage: made put_drafts/2 count every slot as one step; this went
+    # red on the two-step shelf. Reverted from a copy.
+    # Sabotage: made drafts_label/1 read "steps" for one; this went red.
+    # Reverted from a copy.
+    test "the shelf's node carries its drawer's row, counted from the shelf" do
+      for {view_model, count, label} <- [
+            {shelf_view_model(), 1, "Drafts: 1 step not wired in"},
+            {shelf_view_model(2), 2, "Drafts: 2 steps not wired in"},
+            {shelf_view_model(0), 0, "Drafts: 0 steps not wired in"}
+          ] do
+        graph = BlockMap.graph(view_model)
+
+        assert [%{"id" => "shelf", "drafts" => drafts}] =
+                 Enum.filter(walk(graph), &Map.has_key?(&1, "drafts"))
+
+        assert drafts == %{"count" => count, "label" => label}
+      end
+
+      for key <- MapFixtures.keys(),
+          do: refute(Enum.any?(walk(graph(key)), &Map.has_key?(&1, "drafts")), key)
+    end
+
+    # The key names the shelf by its drawer's own row, after every mark,
+    # and only on a document that has one; the shelf stays where the
+    # outline visits it, so the graph is still the document.
+    #
+    # Sabotage: made put_legend/1 leave the shelf's entry out; this went
+    # red. Reverted from a copy.
+    test "the key names the shelf by its row, last" do
+      graph = BlockMap.graph(shelf_view_model(2))
+
+      assert %{"mark" => "drafts", "line" => "Drafts: 2 steps not wired in"} =
+               List.last(graph["legend"])
+
+      assert legend_marks(graph) == ~w(start end arrow drafts)
+      refute "drafts" in legend_marks(graph("library_loan"))
+      assert BlockMap.nodes(graph) == ~w(root notice shelf second extra)
+    end
+
+    # A body holding only a shelf has no first step, and the shelf is
+    # drawn apart from the path: the start edge goes into the root's box.
+    #
+    # Sabotage: made unflowed_target/2 answer the shelf's id; this went
+    # red. Reverted from a copy.
+    test "a body holding only a shelf starts at the root's box" do
+      view_model =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{"body" => [Block.new("core.drafts", id: "shelf")]}
+        )
+        |> Document.new()
+        |> build()
+
+      assert [%{"targets" => ["root"]}] = BlockMap.graph(view_model)["edges"]
+    end
+  end
+
   # ------------------------------------------------------------------ helpers
 
   # The graph's JSON, or the error the encoder raised on a term JSON has no
@@ -1366,21 +1429,25 @@ defmodule StatifierBlocks.MapTest do
     %{view_model | root: %{view_model.root | slots: [titled]}}
   end
 
-  # A loan whose second notice is parked on the drafts shelf.
-  defp shelf_view_model do
+  # A loan whose second notice is parked on the drafts shelf; with a
+  # `count` of two, a reminder to collect a hold beside it, and with none,
+  # an empty shelf.
+  defp shelf_view_model(count \\ 1) do
+    parked =
+      Enum.take(
+        [
+          Block.new("core.send", id: "second", config: %{"event" => "loan.overdue"}),
+          Block.new("core.send", id: "extra", config: %{"event" => "hold.ready"})
+        ],
+        count
+      )
+
     Block.new("core.sequence",
       id: "root",
       slots: %{
         "body" => [
           Block.new("core.send", id: "notice", config: %{"event" => "loan.overdue"}),
-          Block.new("core.drafts",
-            id: "shelf",
-            slots: %{
-              "body" => [
-                Block.new("core.send", id: "second", config: %{"event" => "loan.overdue"})
-              ]
-            }
-          )
+          Block.new("core.drafts", id: "shelf", slots: %{"body" => parked})
         ]
       }
     )
