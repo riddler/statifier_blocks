@@ -627,7 +627,7 @@ defmodule StatifierBlocks.Describe do
     do: "#{opening(noun(s, edge.container))}: #{arm(edge.condition)}, #{target(s, edge.to)}"
 
   defp edge_line(%Edge{kind: :interrupt} = edge, s) do
-    on = if edge.event, do: "On #{flat(edge.event)}", else: "On its event"
+    on = "On #{readable_event(edge.event) || "its event"}"
     does = if match?({:body, _id}, edge.to), do: "resumes", else: "abandons"
     at = if edge.history, do: " at #{edge.history} history", else: ""
 
@@ -636,10 +636,20 @@ defmodule StatifierBlocks.Describe do
 
   defp edge_line(%Edge{kind: :timer} = edge, s) do
     delay = Send.delay_words(edge.delay) || "its delay"
-    event = if edge.event, do: flat(edge.event), else: "its event"
+    event = readable_event(edge.event) || "its event"
 
     "In #{delay}, #{event} reaches #{target(s, edge.to)}"
   end
+
+  # An edge's event as its line reads it, or nil: a missing or blank event
+  # is not a readable event, and the line says `its event` for it
+  # (ADR-0016's amendment of 2026-09-29, item 8).
+  @spec readable_event(String.t() | nil) :: String.t() | nil
+  defp readable_event(event) when is_binary(event) do
+    if String.trim(event) == "", do: nil, else: flat(event)
+  end
+
+  defp readable_event(nil), do: nil
 
   @spec arm(Edge.condition()) :: String.t()
   defp arm(:otherwise), do: "otherwise"
