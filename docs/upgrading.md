@@ -23,13 +23,13 @@ version. **If you pin `compiler_version` in a test**, or compare it with a
 record you stored, move the literal with each pin.
 
 What an **author** changes in a document is a separate page:
-[Migrating a document from 0.27 to 0.34](guides/migrating-documents-0.27-to-0.34.md).
+[Migrating a document from 0.27 to 0.34](https://github.com/riddler/statifier_blocks/blob/main/docs/guides/migrating-documents-0.27-to-0.34.md).
 Nothing on it is required, and no stored document has to be migrated for any
 release below.
 
 ## 0.31 to 0.32
 
-- **If you call `StatifierBlocks.Composite.unraisable_outcomes/4` yourself**,
+- **If you call StatifierBlocks.Composite.unraisable_outcomes/4 yourself**,
   call `unraisable_outcomes/5` instead, passing the config of the block you
   expanded as the new third argument, between the type ref and the expansion
   members:

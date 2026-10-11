@@ -66,6 +66,7 @@ defmodule StatifierBlocks.MixProject do
       extras: [
         "README.md",
         "docs/describing-a-document.md",
+        "docs/upgrading.md",
         "CHANGELOG.md"
       ],
       # The extras are grouped by the kind of page, in the family's order:
@@ -74,7 +75,8 @@ defmodule StatifierBlocks.MixProject do
       # CHANGELOG stay ungrouped at the top. Decision records and planning
       # notes are for contributors and are not extras.
       groups_for_extras: [
-        "How-to guides": ["docs/describing-a-document.md"]
+        "How-to guides": ["docs/describing-a-document.md"],
+        Upgrading: ["docs/upgrading.md"]
       ],
       # Without this the first hexdocs is one flat list of ~50 modules, which
       # tells a reader nothing about which of them they are meant to call. The
