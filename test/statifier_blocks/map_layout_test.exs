@@ -505,6 +505,12 @@ defmodule StatifierBlocks.MapLayoutTest do
       {"patron_registration", "blk_pr_root", "blk_pr_verify"}
     ]
 
+    # Every label a box carries, as drawn: a block's title and the lines
+    # under it, a slot's label, an empty marker's text, and the caption a
+    # branch's band or a group's rules column carries (an edge's caption
+    # carries a second class, so the pattern leaves it out).
+    @box_label ~r/<text class="sb-map__(?:title|sentence|slot-label|empty-text|caption)"[^>]*x="([-\d.]+)" y="([-\d.]+)">([^<]*)</
+
     # One filled dot with no text, one edge from its bottom into the top of
     # the first step, and the caption written between the two where the
     # layout left it room, beside the edge. The loan declares the events it
@@ -560,6 +566,49 @@ defmodule StatifierBlocks.MapLayoutTest do
 
         assert (line >= right and line - right <= 4) or (line <= x and x - line <= 4),
                "#{key}: the caption spans #{x}..#{right}, the edge runs at #{line}"
+      end
+    end
+
+    # The start comes first in reading order: the dot is drawn before any
+    # box, and the dot and its caption both sit above, or left of, every
+    # label a box carries - the root's title and sentence included, which
+    # the dot drawn inside the root's box sat under. A label's top is read
+    # as its baseline less one line.
+    #
+    # Sabotage: made put_start/2 put the dot back first among the root's
+    # children, with its edge; the root's title stood above the dot and
+    # this went red. Made put_start/2 put the dot after the root's box in
+    # the graph; the box was drawn before the dot and this went red. Each
+    # reverted from a copy.
+    test "both library fixtures draw the start dot and its caption above every box label",
+         %{tmp_dir: dir} do
+      for {key, root, first} <- @starts do
+        %{"drawn" => "map", "html" => html, "boxes" => boxes, "edges" => edges} =
+          run(dir, key, library_graph(key))
+
+        start = "#{root}/start"
+        id = "#{start}->#{first}"
+        dot = boxes[start] || flunk("#{key}: no start dot laid out")
+
+        assert [%{"id" => ^id, "labels" => [caption]}] =
+                 Enum.filter(edges, &(&1["kind"] == "start"))
+
+        labels =
+          for [_all, x, y, text] <- Regex.scan(@box_label, html),
+              do: {text, number(x), number(y) - 16}
+
+        assert {"Sequence", _x, _top} = List.keyfind(labels, "Sequence", 0), key
+
+        for {name, box} <- [{"the dot", dot}, {"its caption", caption}],
+            {text, x, top} <- labels do
+          assert box["y"] + box["height"] <= top or box["x"] + box["width"] <= x,
+                 "#{key}: #{name} at #{inspect(box)} is not above or left of " <>
+                   "#{inspect(text)} at (#{x}, #{top})"
+        end
+
+        {dot_at, _length} = :binary.match(html, ~s(data-map-start="#{start}"))
+        {box_at, _length} = :binary.match(html, ~s(data-map-kind="block"))
+        assert dot_at < box_at, "#{key}: a box is drawn before the start dot"
       end
     end
 
@@ -981,7 +1030,7 @@ defmodule StatifierBlocks.MapLayoutTest do
     # empty-layout case below. Reverted from a copy.
     test "a layout that throws draws the error pane and no map", %{tmp_dir: dir} do
       graph =
-        put_in(sample_graph(), ["children", Access.at(0), "edges"], [
+        put_in(sample_graph(), ["children", Access.at(1), "edges"], [
           %{"id" => "dangling", "sources" => ["blk_pr_deadline"], "targets" => ["no_such_block"]}
         ])
 
@@ -996,7 +1045,7 @@ defmodule StatifierBlocks.MapLayoutTest do
     # went red. Reverted from a copy.
     test "a layout that comes back empty draws the error pane, not a blank map",
          %{tmp_dir: dir} do
-      graph = Map.put(sample_graph(), "children", [])
+      graph = Map.merge(sample_graph(), %{"children" => [], "edges" => []})
 
       assert %{"drawn" => "error", "html" => html} = run(dir, "empty", graph)
       assert html =~ "the layout came back empty"
@@ -1269,7 +1318,7 @@ defmodule StatifierBlocks.MapLayoutTest do
   # arrived as a live element and this went red. Reverted from a copy.
   test "a title is escaped into the drawing", %{tmp_dir: dir} do
     graph =
-      update_in(sample_graph(), ["children", Access.at(0), "title"], fn _title ->
+      update_in(sample_graph(), ["children", Access.at(1), "title"], fn _title ->
         ~s|<img src=x onerror="alert(1)">|
       end)
 

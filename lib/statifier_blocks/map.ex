@@ -107,16 +107,18 @@ defmodule StatifierBlocks.Map do
   says where that execution begins the way a state chart does: one filled
   dot, the initial mark, with no text, and one edge from it into the first
   step of the document's own flow. The dot is a node of `kind: "start"`,
-  keyed `<root id>/start`, drawn first inside the root's box; its edge
-  carries `kind: "start"` and one ELK label, `start_text/0`, so the layout
-  leaves the caption its room. The caption reads the same on every
-  document: what the document listens for while it runs is the description
-  region's to say, not the edge's.
+  keyed `<root id>/start`, and the graph's first node, ahead of the root's
+  box rather than inside it: the layout puts it above that box, so the dot
+  and its caption come first in reading order, above the root's title and
+  every box under it. Its edge is the graph's own, carries
+  `kind: "start"` and one ELK label, `start_text/0`, so the layout leaves
+  the caption its room. The caption reads the same on every document: what
+  the document listens for while it runs is the description region's to
+  say, not the edge's.
 
   A root whose flow is not drawn inside it has no first step there, so its
-  dot stands above the root's box and the edge goes into the box itself.
-  Like the end marks, the dot is not a block: it is in no outline, selects
-  nothing and arms no insert.
+  edge goes into the root's box itself. Like the end marks, the dot is not
+  a block: it is in no outline, selects nothing and arms no insert.
 
   ## The end
 
@@ -363,8 +365,9 @@ defmodule StatifierBlocks.Map do
   @type graph_node :: %{required(String.t()) => term()}
 
   @typedoc """
-  The whole graph: the ELK root, with the document's root block as its one
-  child, and `timers`, the timer edges the hook draws after the layout.
+  The whole graph: the ELK root, with the start dot and the document's root
+  block as its two children, the start edge as its one edge, and `timers`,
+  the timer edges the hook draws after the layout.
   """
   @type t :: %{required(String.t()) => term()}
 
@@ -712,34 +715,34 @@ defmodule StatifierBlocks.Map do
   # ------------------------------------------------------------- the start
 
   # The start dot and its edge; see the moduledoc's "The start". The dot
-  # goes first among the root's children, into the first step of the root's
-  # own flow; for a root whose flow is not drawn inside it, first in the
-  # graph, into the root's box.
+  # goes first in the graph, before the root's box, so the layout puts it
+  # above that box and its title; the edge, the graph's own, goes into the
+  # first step of the root's own flow, or into the root's box for a root
+  # whose flow is not drawn inside it.
   @spec put_start(t(), Node.t()) :: t()
   defp put_start(%{"children" => [drawn]} = graph, %Node{block_id: root_id} = root) do
     id = "#{root_id}/start"
 
+    Map.merge(graph, %{
+      "children" => [start_mark(id), drawn],
+      "edges" => [start_edge(id, start_target(drawn, root))]
+    })
+  end
+
+  # Where the start edge goes: the first step of the root's own flow, or the
+  # empty marker standing for it; the root's box when the flow is not drawn
+  # inside it.
+  @spec start_target(graph_node(), Node.t()) :: String.t()
+  defp start_target(drawn, %Node{block_id: root_id} = root) do
     with [%Slot{} = body] <- ViewModel.body_slots(root),
          true <- inline?(root, body),
          [first | _rest] <- drawn["children"] do
-      to =
-        case ViewModel.flow_children(body) do
-          [%Node{block_id: step} | _rest] -> step
-          [] -> first["id"]
-        end
-
-      started =
-        drawn
-        |> Map.update!("children", &[start_mark(id) | &1])
-        |> Map.update!("edges", &[start_edge(id, to) | &1])
-
-      Map.put(graph, "children", [started])
+      case ViewModel.flow_children(body) do
+        [%Node{block_id: step} | _rest] -> step
+        [] -> first["id"]
+      end
     else
-      _not_inline ->
-        Map.merge(graph, %{
-          "children" => [start_mark(id), drawn],
-          "edges" => [start_edge(id, root_id)]
-        })
+      _not_inline -> root_id
     end
   end
 

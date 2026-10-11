@@ -1,13 +1,13 @@
 {
   "children": [
     {
+      "height": 14,
+      "id": "blk_pr_root/start",
+      "kind": "start",
+      "width": 14
+    },
+    {
       "children": [
-        {
-          "height": 14,
-          "id": "blk_pr_root/start",
-          "kind": "start",
-          "width": 14
-        },
         {
           "children": [
             {
@@ -348,24 +348,6 @@
       ],
       "edges": [
         {
-          "id": "blk_pr_root/start->blk_pr_verify",
-          "kind": "start",
-          "labels": [
-            {
-              "height": 16,
-              "id": "blk_pr_root/start/caption",
-              "text": "Starts when told to",
-              "width": 157
-            }
-          ],
-          "sources": [
-            "blk_pr_root/start"
-          ],
-          "targets": [
-            "blk_pr_verify"
-          ]
-        },
-        {
           "id": "blk_pr_verify->blk_pr_root/end/done",
           "kind": "end",
           "labels": [
@@ -419,7 +401,26 @@
       "title": "Sequence"
     }
   ],
-  "edges": [],
+  "edges": [
+    {
+      "id": "blk_pr_root/start->blk_pr_verify",
+      "kind": "start",
+      "labels": [
+        {
+          "height": 16,
+          "id": "blk_pr_root/start/caption",
+          "text": "Starts when told to",
+          "width": 157
+        }
+      ],
+      "sources": [
+        "blk_pr_root/start"
+      ],
+      "targets": [
+        "blk_pr_verify"
+      ]
+    }
+  ],
   "id": "plan-map",
   "layoutOptions": {
     "org.eclipse.elk.algorithm": "layered",

@@ -875,3 +875,41 @@ stays as printed, and the Note of 2026-09-30 still re-locates its cites.
   out of the outline.
 - Anything about the map region or the hover layer on such a document
   beyond what that Note records.
+
+## Note (2026-10-10): the start dot is drawn first, above the root's box
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-10-09, where the
+code holds it.
+
+The rule: the start mark comes first in reading order, and the type names
+stay on the boxes. The way it is met, by placing the dot rather than by
+changing any label, was decided by the conductor under a standing
+consent, 2026-10-10.
+
+What is drawn now: the start dot is the graph's first node, ahead of the
+document's root box rather than inside it, and its start edge is the
+graph's own. The layout puts the dot above the root's box, so the dot
+and the caption on its edge sit above the root's title and its sentence,
+and above every other box label; the edge still runs into the first step
+of the document's own flow, or into the root's box when that flow is not
+drawn inside it, as before. Inside the root's box the dot sat below the
+root's title, which is what the rule moves.
+
+Where it holds:
+
+- `put_start/2` (`lib/statifier_blocks/map.ex`, `defp put_start`) puts
+  the dot and its edge at the graph's top level, and the moduledoc's
+  "The start" section says so.
+- `test/statifier_blocks/map_layout_test.exs`, "both library fixtures
+  draw the start dot and its caption above every box label", lays both
+  teaching documents out through the vendored elkjs and pins the dot as
+  drawn before any box, and the dot and its caption as above, or left
+  of, every label a box carries.
+- `test/statifier_blocks/map_test.exs`, "every fixture starts once, with
+  one captioned edge into its first step", pins the dot as the graph's
+  first node, beside the root's box. Both graphs under
+  `test/fixtures/map/` are regenerated from the package's own
+  `StatifierBlocks.Map`.
+
+Filed with `sb-6nyf`.

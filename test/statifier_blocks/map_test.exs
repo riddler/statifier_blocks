@@ -9,8 +9,8 @@ defmodule StatifierBlocks.MapTest do
   moved here; since then a change to what the package's own
   `StatifierBlocks.Map` answers regenerates them from it. The library
   loan's graph was regenerated when a timed wait gained the clock mark,
-  and differs from the reference host's by that one mark on its loan
-  period (see `StatifierBlocks.MapFixtures`).
+  and both graphs when the start dot moved ahead of the root's box (see
+  `StatifierBlocks.MapFixtures`).
   """
 
   use ExUnit.Case, async: true
@@ -37,7 +37,8 @@ defmodule StatifierBlocks.MapTest do
     # document, the package's graph under the library world's words is the
     # JSON value the reference host's map module answered at the commit the
     # fixtures were copied from, less what the package has changed since:
-    # the clock mark on the library loan's timed wait (see MapFixtures).
+    # the clock mark on the library loan's timed wait, and the start dot
+    # ahead of the root's box (see MapFixtures).
     #
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
     test "each teaching document's graph is the reference host's" do
@@ -896,7 +897,7 @@ defmodule StatifierBlocks.MapTest do
       root = find(graph("library_loan"), "blk_ll_root")
 
       assert Enum.map(root["children"], & &1["id"]) ==
-               ["blk_ll_root/start", "blk_ll_on_loan", "blk_ll_due", "blk_ll_root/end/done"]
+               ["blk_ll_on_loan", "blk_ll_due", "blk_ll_root/end/done"]
 
       assert %{"kind" => "end", "outcome" => "done"} = done = List.last(root["children"])
       refute Map.has_key?(done, "title")
@@ -921,7 +922,6 @@ defmodule StatifierBlocks.MapTest do
 
       assert Enum.map(root["children"], & &1["id"]) ==
                [
-                 "blk_pr_root/start",
                  "blk_pr_verify",
                  "blk_pr_root/end/done",
                  "blk_pr_root/end/abandon"
@@ -1013,14 +1013,17 @@ defmodule StatifierBlocks.MapTest do
   end
 
   describe "the start" do
-    # One start dot per document, first among the root's children, and one
-    # start edge from it into the first step of the root's own flow,
+    # One start dot per document, the graph's first node, ahead of the
+    # root's box rather than inside it, and one start edge from it into the
+    # first step of the root's own flow,
     # captioned with the one sentence - whether the document declares the
     # events it accepts (the library fixtures) or declares none (the
     # document written here). The dot is no block: it is in no outline.
     #
     # Sabotage: made put_start/2 aim the edge at the root instead of the
     # first step; this went red. Reverted from a copy.
+    # Sabotage: made put_start/2 put the dot first among the root's
+    # children again; this went red. Reverted from a copy.
     test "every fixture starts once, with one captioned edge into its first step" do
       assert BlockMap.start_text() == "Starts when told to"
 
@@ -1042,7 +1045,8 @@ defmodule StatifierBlocks.MapTest do
                key
 
         refute Map.has_key?(dot, "title")
-        assert [^dot | _rest] = find(graph, root_id)["children"]
+        assert [^dot, %{"id" => ^root_id}] = graph["children"]
+        refute Enum.any?(find(graph, root_id)["children"], &(&1["kind"] == "start"))
 
         edges = for node <- walk(graph), edge <- Map.get(node, "edges", []), do: edge
 
@@ -1060,7 +1064,7 @@ defmodule StatifierBlocks.MapTest do
 
     # A document with no step yet starts into its root's empty marker.
     #
-    # Sabotage: made put_start/2 fall back to the root, not the first drawn
+    # Sabotage: made start_target/2 fall back to the root, not the first drawn
     # child; this went red. Reverted from a copy.
     test "a document with no step starts into its empty slot" do
       graph =
@@ -1069,18 +1073,18 @@ defmodule StatifierBlocks.MapTest do
         |> build()
         |> BlockMap.graph()
 
-      root = find(graph, "root")
-
-      assert [%{"id" => "root/start"}, %{"id" => "root/body/empty"}] = root["children"]
+      assert [%{"id" => "root/start"}, %{"id" => "root"}] = graph["children"]
+      assert [%{"id" => "root/body/empty"}] = find(graph, "root")["children"]
 
       assert [%{"sources" => ["root/start"], "targets" => ["root/body/empty"]}] =
-               root["edges"]
+               graph["edges"]
     end
 
     # A root whose flow is not drawn inside it - a group, whose body is a
-    # pane of its own - has its dot above its box and its edge into the box.
+    # pane of its own - has its dot above its box, as every root does, and
+    # its edge into the box.
     #
-    # Sabotage: dropped the inline? check from put_start/2; this went red.
+    # Sabotage: dropped the inline? check from start_target/2; this went red.
     # Reverted from a copy.
     test "a root whose flow is not drawn inside it starts above its box" do
       graph =
