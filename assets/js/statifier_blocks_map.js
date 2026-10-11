@@ -599,9 +599,9 @@ function drawInterrupt(edge) {
 }
 
 // A timer edge, dotted where an interrupt edge is dashed: it is not a way
-// out of anything but the event a delayed send arms, drawn to the rule or
-// the wait that hears it, labelled with the delay. Its label carries the
-// edge's id, so pointing at either names the edge.
+// out of anything but the event a delayed send arms, drawn to the interrupt
+// rule or the hourglass step that hears it, labelled with the delay. Its
+// label carries the edge's id, so pointing at either names the edge.
 function drawTimer(edge) {
   const d = edge.points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x} ${p.y}`).join(" ")
   const id = escapeText(edge.id)

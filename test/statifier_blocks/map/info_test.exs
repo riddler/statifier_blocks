@@ -986,6 +986,20 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert fact(timer, "Delay") == "7d"
     end
 
+    # The timer's explanation names what hears it in the key's words, so the
+    # thing at the arrow's end cannot be read as the timed wait the clock
+    # marks.
+    #
+    # Sabotage: put back "and the rule or the wait it points at hears it";
+    # this went red. Reverted from a copy.
+    test "the timer's explanation names the interrupt rule or the hourglass step" do
+      id = "blk_pr_deadline->blk_pr_expired/timer"
+      timer = by_id("patron_registration")[id]
+
+      assert timer.explanation =~ "the interrupt rule or the hourglass step that hears it"
+      refute timer.explanation =~ "the wait it points at"
+    end
+
     # The dotted edge's twin in words, for a reader who selects a row
     # rather than points at the map: the send says what hears it, the rule
     # which send arms it, and a block at neither end of a timer edge says
