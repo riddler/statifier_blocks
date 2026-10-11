@@ -39,14 +39,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     from: the graph `StatifierBlocks.Map.graph/2` answers as JSON in
     `data-graph`, with the selection marked in it, and the selected block's
     id again in `data-selected`, which the hook falls back on when the graph
-    carries no mark; whether the page can edit
-    in `data-editable`; the list's event names in `data-select-event` and
-    `data-insert-event`; the element to scroll into view after an insert
-    armed from the map in `data-insert-reveal`, when the host names one; and
-    the ids of the description region's hover layer and of its store in
-    `data-info-hover` and `data-info-store`, when the host names the region,
-    which is what gives the map its hover. The hook never reads the region
-    itself, so its id is not stamped. The drawing goes into a child marked
+    carries no mark; whether the page can edit in `data-editable`; the
+    list's event names in `data-select-event` and `data-insert-event`; the
+    element to scroll into view after an insert armed from the map in
+    `data-insert-reveal`, when the host names one; and the ids of the
+    description region's hover layer and of its store in `data-info-hover`
+    and `data-info-store`, when the host names the region, which is what
+    gives the map its hover. The hook never reads the region itself, so its
+    id is not stamped. The drawing goes into a child marked
     `data-map-canvas`, which LiveView leaves alone (`phx-update="ignore"`).
 
     ## The description region

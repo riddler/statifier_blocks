@@ -857,13 +857,14 @@ export function entryFor(store, id) {
 }
 
 // The show and the hide, over the hover layer and the store. Both
-// arguments are functions of no arguments, called afresh on every show and
-// every restore, since a patch may replace either element: `layer` answers
-// the hover layer the entry is copied into (the element the host names in
-// `data-info-hover`, never the description region), and `store` answers
-// the hidden store the entry is read from (the one named in
-// `data-info-store`). Either may answer null, and then nothing is shown.
-// Neither touches the region.
+// arguments are functions of no arguments, each called afresh whenever its
+// element is needed and never cached, since a patch may replace either
+// element (`restore()` asks only for the layer, and `show(null)` never asks
+// for the store): `layer` answers the hover layer the entry is copied into
+// (the element the host names in `data-info-hover`, never the description
+// region), and `store` answers the hidden store the entry is read from (the
+// one named in `data-info-store`). Either may answer null, and then nothing
+// is shown. Neither touches the region.
 //
 // `show(id)` puts the entry for `id` into the layer, marks the layer with
 // `data-map-hover` and unhides it. `restore()` hides the layer, empties it
