@@ -801,12 +801,14 @@ defmodule StatifierBlocks.Map.InfoTest do
     end
 
     # Sabotage: made mark/1 answer "hourglass" for an await; this went red
-    # on "mark--${}". Reverted from a copy.
+    # on "mark--${}". Reverted from a copy. Sabotage: renamed the tray
+    # style to "drawer" in the Map's style/2 and slot_options/5 and in
+    # Info's slot/5; this went red on "slot--${}". Reverted from a copy.
     test "names every value the hook puts after a stem" do
       for {class, key} <- @modifiers do
         values =
-          @library
-          |> Enum.flat_map(fn library -> library |> described() |> elem(0) |> values(key) end)
+          drawn_graphs()
+          |> Enum.flat_map(&values(&1, key))
           |> Enum.uniq()
 
         assert values != [], "the graph gives no #{key} for #{class}"
@@ -831,19 +833,17 @@ defmodule StatifierBlocks.Map.InfoTest do
     end
 
     # Sabotage: made the clock's key line name only a message sent after a
-    # delay; this went red on "clock". Reverted from a copy.
+    # delay; this went red on "clock". Reverted from a copy. Sabotage:
+    # renamed the tray style to "drawer" in the Map's style/2 and
+    # slot_options/5 and in Info's slot/5; this went red. Reverted from a
+    # copy.
     test "names every kind of mark, slot and end the graph gives" do
       {_graph, _descriptions, idle} = described("library_loan")
       lines = key_lines()
 
-      given =
-        Enum.flat_map(@library, fn key ->
-          {graph, _descriptions, _idle} = described(key)
-          graph_values(graph)
-        end)
-        |> Enum.uniq()
+      given = drawn_graphs() |> Enum.flat_map(&graph_values/1) |> Enum.uniq()
 
-      assert given -- Map.keys(@variants) == []
+      assert Enum.sort(given) == Enum.sort(Map.keys(@variants))
 
       for {value, {where, words}} <- @variants do
         text = if where == :paragraph, do: idle.explanation, else: Map.fetch!(lines, where)
@@ -1233,12 +1233,19 @@ defmodule StatifierBlocks.Map.InfoTest do
   # Every line the two teaching documents' keys carry, by mark, and the
   # line a loan with a drafts shelf adds for it.
   defp key_lines do
-    shelf = described_document(Document.new(shelf_root()), Palette.core())
-
-    for {graph, _descriptions, _idle} <- Enum.map(@library, &described/1) ++ [shelf],
+    for graph <- drawn_graphs(),
         %{"mark" => mark, "line" => line} <- graph["legend"],
         into: %{},
         do: {mark, line}
+  end
+
+  # The graphs the variants are read off: the two teaching documents and a
+  # loan with a drafts shelf, the one place a tray slot is drawn.
+  defp drawn_graphs do
+    shelf = described_document(Document.new(shelf_root()), Palette.core())
+
+    for {graph, _descriptions, _idle} <- Enum.map(@library, &described/1) ++ [shelf],
+        do: graph
   end
 
   # A loan's overdue notice, with a second notice parked on the drafts
