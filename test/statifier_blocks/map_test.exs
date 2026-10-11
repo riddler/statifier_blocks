@@ -911,10 +911,10 @@ defmodule StatifierBlocks.MapTest do
   describe "the end" do
     # Every end of every fixture's own flow is one of the outline's: a
     # `done` end for the `:exit` edge from the root's last step into the
-    # root's exit, and an `abandon` end where that step is a group one of
-    # whose rules abandons it. `done` is the outline's own outcome for the
-    # root, which is why the map may write it rather than read it. No end
-    # mark is a block.
+    # root's exit, and an `abandon` end, with an edge from each group in
+    # tail position one of whose rules abandons it (`outline_ends/2`).
+    # `done` is the outline's own outcome for the root, which is why the
+    # map may write it rather than read it. No end mark is a block.
     #
     # Sabotage: made put_ends/2 draw no end; this went red. Reverted from a
     # copy.
@@ -925,15 +925,7 @@ defmodule StatifierBlocks.MapTest do
         outline = Describe.outline(document, Palette.core(), [])
         root = view_model.root.block_id
 
-        done =
-          for %Edge{kind: :exit, container: ^root, from: {:block, last}} <- outline.edges,
-              do: {last, "done"}
-
-        abandon =
-          for {last, "done"} <- done,
-              %Edge{kind: :interrupt, container: ^last, to: {:exit, ^last}} <- outline.edges,
-              uniq: true,
-              do: {last, "abandon"}
+        {done, abandon} = outline_ends(outline, root)
 
         drawn =
           for node <- walk(graph),
@@ -1004,6 +996,50 @@ defmodule StatifierBlocks.MapTest do
 
       assert Enum.map(Enum.filter(root["edges"], &Map.has_key?(&1, "outcome")), & &1["sources"]) ==
                [["blk_pr_verify"], ["blk_pr_verify"]]
+    end
+
+    # A group deeper in tail position - the last step of an arm of the
+    # root's last step, or of the body of a group that is - leaves nothing
+    # after it when a rule abandons it, so the document finishes there:
+    # the map draws the abandon end with an edge from that group, one end
+    # however many groups abandon, held equal to the outline's chain of
+    # `:exit` edges on each loan written here.
+    #
+    # Sabotage: made tail/1 answer the step alone, as before; this went
+    # red. Reverted from a copy.
+    # Sabotage: made put_ends/2 draw every abandon edge from the root's
+    # last step; this went red. Reverted from a copy.
+    test "a group deeper in tail position draws its abandon end, as the outline chains it" do
+      for {key, document, last, abandoning} <- MapFixtures.deep_abandons() do
+        graph = document |> build() |> BlockMap.graph()
+        outline = Describe.outline(document, Palette.core(), [])
+        {done, abandon} = outline_ends(outline, "blk_ll_root")
+
+        assert done == [{last, "done"}], key
+        assert abandon == for(group <- abandoning, do: {group, "abandon"}), key
+
+        drawn =
+          for node <- walk(graph),
+              %{"sources" => [from], "outcome" => outcome} <- Map.get(node, "edges", []),
+              do: {from, outcome}
+
+        assert drawn == done ++ abandon, key
+
+        assert ["done", "abandon"] ==
+                 for(%{"kind" => "end", "outcome" => outcome} <- walk(graph), do: outcome),
+               key
+
+        root = find(graph, "blk_ll_root")
+
+        assert Enum.take(Enum.map(root["children"], & &1["id"]), -2) ==
+                 ["blk_ll_root/end/done", "blk_ll_root/end/abandon"],
+               key
+
+        for group <- abandoning do
+          assert %{"kind" => "end", "sources" => [^group]} =
+                   Enum.find(root["edges"], &(&1["id"] == "#{group}->blk_ll_root/end/abandon"))
+        end
+      end
     end
 
     # A group whose rules only resume it is never left by them, so it ends
@@ -1348,6 +1384,37 @@ defmodule StatifierBlocks.MapTest do
       }
     )
     |> Document.new()
+  end
+
+  # The outline's ends for `root`, as `{done, abandon}`: the `:exit` edge
+  # from the root's last step, and every group in tail position with an
+  # interrupt edge to its own exit, in the outline's order. Tail position is
+  # read off the outline alone: the blocks its `:exit` edges chain from,
+  # container by container, into the root's exit.
+  defp outline_ends(%Describe{edges: edges}, root) do
+    done =
+      for %Edge{kind: :exit, container: ^root, from: {:block, last}} <- edges,
+          do: {last, "done"}
+
+    tail = edges |> tail(MapSet.new([root])) |> MapSet.delete(root)
+
+    abandon =
+      for %Edge{kind: :interrupt, container: group, to: {:exit, group}} <- edges,
+          group in tail,
+          uniq: true,
+          do: {group, "abandon"}
+
+    {done, abandon}
+  end
+
+  defp tail(edges, containers) do
+    grown =
+      for %Edge{kind: :exit, container: container, from: {:block, from}} <- edges,
+          container in containers,
+          into: containers,
+          do: from
+
+    if grown == containers, do: grown, else: tail(edges, grown)
   end
 
   defp walk(%{} = node), do: [node | Enum.flat_map(Map.get(node, "children", []), &walk/1)]

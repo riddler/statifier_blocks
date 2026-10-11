@@ -139,7 +139,14 @@ defmodule StatifierBlocks.Map do
   | End | Where it comes from | Mark | Edge into it |
   |---|---|---|---|
   | `done` | the `:exit` edge from the last step of the root's flow into the root's exit | a solid ring | from that step, captioned `done` |
-  | `abandon` | an `abandon` interrupt rule of a group that is that last step, which leaves the group with nothing after it | a dashed ring | from the group, dashed, captioned `abandon` |
+  | `abandon` | an `abandon` interrupt rule of a group in tail position - that last step, or the last step of a flow it runs, and so on down - which leaves the group with nothing after it | a dashed ring | from each such group, dashed, captioned `abandon` |
+
+  The root's last step is in tail position, and so is the last step of the
+  body of a sequence or a group in tail position, or of any arm of a
+  branch in tail position: the steps the outline's `:exit` edges chain
+  from, container by container, into the root's exit. However many such
+  groups abandon, the document has one `abandon` end, and each of them
+  has its own edge into it.
 
   Each mark is a node of `kind: "end"` carrying its `outcome`, keyed
   `<root id>/end/<outcome>`, drawn right after the last step, and carrying
@@ -334,6 +341,7 @@ defmodule StatifierBlocks.Map do
   @mark_room 22
   @group_types ["core.group", "core.resumable_group"]
   @branch_type "core.branch"
+  @sequence_type "core.sequence"
   @captioned_types [@branch_type | @group_types]
   @timer_targets ["core.on_event", "core.await"]
   @band_room 24
@@ -679,9 +687,14 @@ defmodule StatifierBlocks.Map do
          true <- inline?(root, body),
          %Node{block_id: last} = step <- List.last(ViewModel.flow_children(body)) do
       done = if branch?(step), do: "rejoin", else: "end"
-      ends = [{@done, done} | abandons(step)]
-      marks = for {outcome, _kind} <- ends, do: end_mark(root_id, outcome)
-      edges = for {outcome, kind} <- ends, do: end_edge(last, root_id, outcome, kind)
+      abandons = for group <- abandons(step), do: {group, @abandon, "end"}
+      outcomes = if abandons == [], do: [@done], else: [@done, @abandon]
+      marks = for outcome <- outcomes, do: end_mark(root_id, outcome)
+
+      edges =
+        for {from, outcome, kind} <- [{last, @done, done} | abandons],
+            do: end_edge(from, root_id, outcome, kind)
+
       {before, [drawn | rest]} = Enum.split_while(children, &(&1["id"] != last))
 
       graph_node
@@ -694,19 +707,45 @@ defmodule StatifierBlocks.Map do
 
   defp put_ends(graph_node, %Node{}), do: graph_node
 
-  # A group that is the root's last step ends the document when one of its
-  # rules abandons it: nothing runs after the group. One end, however many
-  # rules abandon; a group whose rules only resume has none.
-  @spec abandons(Node.t()) :: [{String.t(), String.t()}]
-  defp abandons(%Node{slots: slots} = node) do
-    abandoned? =
-      group?(node) and
-        Enum.any?(
-          for(%Slot{name: "interrupts"} = slot <- slots, do: ViewModel.flow_children(slot)),
-          fn rules -> Enum.any?(rules, &(leads_to(&1.outcome) == "exit")) end
-        )
+  # The groups in tail position whose rules abandon them, in reading order:
+  # the root's last step, the last step of each flow it runs, and so on
+  # down. Abandoning such a group leaves it with nothing after it in any
+  # flow around it, so the document finishes. One end, however many groups
+  # and rules abandon; a group whose rules only resume has none.
+  @spec abandons(Node.t()) :: [String.t()]
+  defp abandons(%Node{} = step) do
+    for %Node{block_id: id} = node <- tail(step), abandoned?(node), do: id
+  end
 
-    if abandoned?, do: [{@abandon, "end"}], else: []
+  # `step` and every block in tail position under it: the last step of each
+  # flow it runs - a sequence's or a group's body, each of a branch's arms -
+  # and the same under those, the way `StatifierBlocks.Describe.outline/3`
+  # chains `:exit` edges into a container's exit.
+  @spec tail(Node.t()) :: [Node.t()]
+  defp tail(%Node{} = step) do
+    lasts =
+      for %Slot{} = slot <- tail_slots(step),
+          %Node{} = last <- [List.last(ViewModel.flow_children(slot))],
+          do: last
+
+    [step | Enum.flat_map(lasts, &tail/1)]
+  end
+
+  @spec tail_slots(Node.t()) :: [Slot.t()]
+  defp tail_slots(%Node{type: type} = node) when type in [@sequence_type, @branch_type],
+    do: ViewModel.body_slots(node)
+
+  defp tail_slots(%Node{slots: slots} = node) do
+    if group?(node), do: Enum.filter(slots, &(&1.name == "body")), else: []
+  end
+
+  @spec abandoned?(Node.t()) :: boolean()
+  defp abandoned?(%Node{slots: slots} = node) do
+    group?(node) and
+      Enum.any?(
+        for(%Slot{name: "interrupts"} = slot <- slots, do: ViewModel.flow_children(slot)),
+        fn rules -> Enum.any?(rules, &(leads_to(&1.outcome) == "exit")) end
+      )
   end
 
   @spec end_mark(String.t(), String.t()) :: graph_node()
