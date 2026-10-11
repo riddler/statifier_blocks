@@ -528,6 +528,44 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert fact(patron, "Open slots") == "1"
     end
 
+    # How the document finishes, beside what starts it: the words its end
+    # marks and the arrows into them carry, in the outline's exit order -
+    # each outcome, and "abandons" for an abandon end. The loan finishes
+    # when its branch does; the registration's group can also be
+    # abandoned, and so can the loans written here deeper in their tails.
+    #
+    # Sabotage: made finish_word/1 answer "abandon" for an abandon end;
+    # this went red. Reverted from a copy.
+    # Sabotage: put the fact after "Listens for"; this went red. Reverted
+    # from a copy.
+    test "what the document finishes with, beside what starts it" do
+      {_graph, _descriptions, loan} = described("library_loan")
+      {_graph, _descriptions, patron} = described("patron_registration")
+
+      assert [{"What starts it", _}, {"Finishes with", ["done"]}, {"Listens for", _} | _] =
+               loan.facts
+
+      assert [{"What starts it", _}, {"Finishes with", ["done", "abandons"]} | _] = patron.facts
+
+      for {key, document, _last, _abandoning} <- MapFixtures.deep_abandons() do
+        {_graph, _descriptions, idle} = described_document(document, Palette.core())
+        assert fact(idle, "Finishes with") == ["done", "abandons"], key
+      end
+    end
+
+    # A document the map draws no end for - a root with no step yet - has
+    # no fact to say how it finishes, rather than an empty one.
+    #
+    # Sabotage: made finishes_with/1 answer the fact with an empty list;
+    # this went red. Reverted from a copy.
+    test "a document with no step yet says nothing of how it finishes" do
+      document = Document.new(Block.new("core.sequence", id: "blk_ll_root"))
+      {_graph, _descriptions, idle} = described_document(document, Palette.core())
+
+      refute Enum.any?(idle.facts, &match?({"Finishes with", _}, &1))
+      assert [{"What starts it", _}, {"Listens for", "No events"} | _] = idle.facts
+    end
+
     # Sabotage: made starts/1 answer an empty list for a document that
     # accepts nothing; this went red. Reverted from a copy.
     test "a document with no name, description or accepted events" do

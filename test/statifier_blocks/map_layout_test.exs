@@ -773,6 +773,53 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
+    # A group deeper in tail position that a rule abandons draws the one
+    # dashed abandon end, after the root's last step, and a dashed edge
+    # into it from each such group: out of the group's bottom, through the
+    # boxes around it, into the ring's top. The done end stays solid and
+    # stays joined to the root's last step.
+    #
+    # Sabotage: made tail/1 answer the step alone; no abandon end was laid
+    # out and this went red. Reverted from a copy.
+    test "a group deeper in tail position draws a dashed abandon end, joined from the group",
+         %{tmp_dir: dir} do
+      for {key, document, last, abandoning} <- MapFixtures.deep_abandons() do
+        graph =
+          document
+          |> ViewModel.build(Palette.core(), [])
+          |> BlockMap.graph(phrase: &MapFixtures.phrase/1)
+
+        %{
+          "drawn" => "map",
+          "boxes" => boxes,
+          "edges" => edges,
+          "ends" => ends,
+          "endEdges" => end_edges
+        } = run(dir, key, graph)
+
+        assert Enum.map(ends, & &1["ring"]["dashed"]) == [false, true], key
+        mark = boxes["blk_ll_root/end/abandon"] || flunk("#{key}: no abandon end laid out")
+        done = "#{last}->blk_ll_root/end/done"
+        assert Enum.find(end_edges, &(&1["id"] == done))["dashed"] == false, key
+        assert length(end_edges) == 1 + length(abandoning), key
+
+        for group <- abandoning do
+          id = "#{group}->blk_ll_root/end/abandon"
+          box = boxes[group]
+
+          assert %{"dashed" => true, "outcome" => "abandon"} =
+                   Enum.find(end_edges, &(&1["id"] == id)) || flunk("#{key}: #{id} not drawn")
+
+          edge = Enum.find(edges, &(&1["id"] == id)) || flunk("#{key}: #{id} not laid out")
+          assert %{"source" => ^group, "target" => "blk_ll_root/end/abandon"} = edge
+          assert_in_delta edge["start"]["y"], box["y"] + box["height"], 0.5, id
+          assert edge["start"]["x"] >= box["x"] and edge["start"]["x"] <= box["x"] + box["width"]
+          assert_in_delta edge["end"]["y"], mark["y"], 0.5, id
+          assert edge["end"]["x"] >= mark["x"] and edge["end"]["x"] <= mark["x"] + mark["width"]
+        end
+      end
+    end
+
     # A step that is last in a nested flow hands back to the block around
     # it, which goes on, so nothing is drawn after it. Every Send in the two
     # library fixtures is such a step, and no drawn edge from one ends at a

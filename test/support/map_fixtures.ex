@@ -27,7 +27,7 @@ defmodule StatifierBlocks.MapFixtures do
   renew arm.
   """
 
-  alias StatifierBlocks.{Decode, Document, Palette, ViewModel}
+  alias StatifierBlocks.{Block, Decode, Document, Palette, ViewModel}
 
   @documents Path.join([__DIR__, "..", "fixtures", "documents", "statifier_examples_c620756"])
   @graphs Path.join([__DIR__, "..", "fixtures", "map"])
@@ -68,6 +68,86 @@ defmodule StatifierBlocks.MapFixtures do
   @spec host_graph!(String.t()) :: map()
   def host_graph!(key) when key in @keys,
     do: JSON.decode!(File.read!(Path.join(@graphs, "#{key}.graph.json")))
+
+  @doc """
+  Library loans written here whose abandoning groups sit deeper than the
+  root's last step, each as `{key, document, last, abandoning}`: the root's
+  last step and the groups in tail position whose rules abandon them, in
+  reading order.
+
+  - `"lost_while_overdue"`: the teaching loan with the otherwise arm's
+    late-return wait held in a group a loss report abandons, so the group
+    is the last step of an arm of the root's last step, a branch;
+  - `"overdue_inside_loan"`: a loan group whose renewal rule only resumes
+    it, its body ending in an overdue group a loss report abandons;
+  - `"lost_at_either_level"`: the same loan with a return rule that
+    abandons the loan group too, so two groups abandon into one end.
+  """
+  @spec deep_abandons() :: [{String.t(), Document.t(), String.t(), [String.t()]}]
+  def deep_abandons do
+    loan = document!("library_loan")
+
+    lost_while_overdue =
+      update_in(loan.root.slots["body"], fn [on_loan, due] ->
+        [
+          on_loan,
+          update_in(due.slots["otherwise"], fn [notice, late] -> [notice, held(late)] end)
+        ]
+      end)
+
+    [
+      {"lost_while_overdue", lost_while_overdue, "blk_ll_due", ["blk_ll_overdue"]},
+      {"overdue_inside_loan", nested_loan(["resume"]), "blk_ll_on_loan", ["blk_ll_overdue"]},
+      {"lost_at_either_level", nested_loan(["resume", "abandon"]), "blk_ll_on_loan",
+       ["blk_ll_on_loan", "blk_ll_overdue"]}
+    ]
+  end
+
+  # The late return held in a group a loss report abandons.
+  defp held(late) do
+    Block.new("core.group",
+      id: "blk_ll_overdue",
+      slots: %{"body" => [late], "interrupts" => [lost("blk_ll_lost_late")]}
+    )
+  end
+
+  # A loan group whose rules take `outcomes` in turn - a renewal, then a
+  # return - its body the loan period and then an overdue group.
+  defp nested_loan(outcomes) do
+    rules =
+      Enum.zip_with(
+        [{"blk_ll_renewed_rule", "loan.renewed"}, {"blk_ll_returned_early", "copy.returned"}],
+        outcomes,
+        fn {id, event}, outcome ->
+          Block.new("core.on_event", id: id, config: %{"event" => event, "outcome" => outcome})
+        end
+      )
+
+    period = Block.new("core.wait", id: "blk_ll_loan_period", config: %{"duration" => "21d"})
+
+    late =
+      Block.new("core.await",
+        id: "blk_ll_late_return",
+        config: %{"event" => "copy.returned", "timeout" => "14d"}
+      )
+
+    on_loan =
+      Block.new("core.group",
+        id: "blk_ll_on_loan",
+        slots: %{"body" => [period, held(late)], "interrupts" => rules}
+      )
+
+    "core.sequence"
+    |> Block.new(id: "blk_ll_root", slots: %{"body" => [on_loan]})
+    |> Document.new(id: "bdoc_library_loan", accepts: ["copy.returned", "copy.reported_lost"])
+  end
+
+  defp lost(id),
+    do:
+      Block.new("core.on_event",
+        id: id,
+        config: %{"event" => "copy.reported_lost", "outcome" => "abandon"}
+      )
 
   @doc "The library world's words for `event`, or `nil`."
   @spec phrase(String.t()) :: String.t() | nil

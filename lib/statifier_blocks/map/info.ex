@@ -19,6 +19,7 @@ defmodule StatifierBlocks.Map.Info do
   | Fact | Asked of |
   |---|---|
   | which elements there are, and their ids | `StatifierBlocks.Map.graph/2` |
+  | how the document finishes | the end marks `StatifierBlocks.Map.graph/2` draws, which its test holds equal to the outline's ends |
   | a block's title and sentence | `ViewModel.title/1`, and `ViewModel.sentence/1` with its event names read through the host's `:phrase` |
   | a block's note | the block's own `note` field, in the document |
   | a block's settings | `ViewModel.shown_fields/1`: the fields the type's `config_schema/1` declares, with their values |
@@ -67,8 +68,9 @@ defmodule StatifierBlocks.Map.Info do
   slots drawn as boxes of their own, `:body` being a group's body, drawn as
   a pane beside its rules; `:marker` is an empty slot's "Nothing here yet";
   `:end` is a final mark where the document finishes, one per outcome it
-  finishes with (`done`, and `abandon` where an interrupt rule abandons its
-  last step), and the edge into it is an `:edge` that names the outcome;
+  finishes with (`done`, and `abandon` where an interrupt rule abandons a
+  group in tail position, see `StatifierBlocks.Map`'s "The end"), and each
+  edge into it is an `:edge` that names the outcome;
   `:start` is the filled dot the document starts at, and its edge into the
   first step is a `:start` too;
   `:edge` is a connector, a branch's rejoin among them; `:interrupt` is
@@ -214,8 +216,8 @@ defmodule StatifierBlocks.Map.Info do
 
   @doc """
   The document described, for when nothing is selected: its name and
-  description, what starts it, how to read the map, and how many steps
-  and open slots it has.
+  description, what starts it, how it finishes, what it listens for, how
+  to read the map, and how many steps and open slots it has.
   """
   @spec idle(Document.t(), BlockMap.t(), ViewModel.t(), Describe.t()) :: t()
   def idle(%Document{} = document, graph, %ViewModel{}, %Describe{nodes: nodes}) do
@@ -227,7 +229,7 @@ defmodule StatifierBlocks.Map.Info do
       sentence: text(metadata["description"]),
       explanation: @how_to_read,
       facts:
-        starts(document) ++
+        starts(document, graph) ++
           [
             {"Steps", Integer.to_string(max(length(nodes) - 1, 0))},
             {"Open slots", graph |> markers() |> length() |> Integer.to_string()}
@@ -236,19 +238,38 @@ defmodule StatifierBlocks.Map.Info do
   end
 
   # What starts the document, in the words the map's start edge carries
-  # (`StatifierBlocks.Map.start_text/0`, so the wording changes in one place): a
-  # document starts when its host starts an execution of it, and `accepts`
-  # names the events it listens for while it runs.
-  @spec starts(Document.t()) :: [fact()]
-  defp starts(%Document{accepts: accepts}) do
+  # (`StatifierBlocks.Map.start_text/0`, so the wording changes in one place),
+  # how it finishes, and what it listens for: a document starts when its host
+  # starts an execution of it, and `accepts` names the events it listens for
+  # while it runs.
+  @spec starts(Document.t(), BlockMap.t()) :: [fact()]
+  defp starts(%Document{accepts: accepts}, graph) do
     listens =
       case accepts do
         [_first | _rest] -> accepts
         _none -> "No events"
       end
 
-    [{"What starts it", BlockMap.start_text()}, {"Listens for", listens}]
+    [{"What starts it", BlockMap.start_text()}] ++
+      finishes_with(graph) ++ [{"Listens for", listens}]
   end
+
+  # How the document finishes, in the words its end marks and the arrows
+  # into them carry, in the order the graph draws them, which is the
+  # outline's: each mark's outcome, and "abandons" for an abandon end. A
+  # document the map draws no end for - its root's flow empty, or not drawn
+  # inside it - has no such fact.
+  @spec finishes_with(BlockMap.t()) :: [fact()]
+  defp finishes_with(graph) do
+    case for(%{"outcome" => outcome} <- ends(graph), do: finish_word(outcome)) do
+      [] -> []
+      words -> [{"Finishes with", words}]
+    end
+  end
+
+  @spec finish_word(String.t()) :: String.t()
+  defp finish_word("abandon"), do: "abandons"
+  defp finish_word(outcome), do: outcome
 
   # ------------------------------------------------------------------- walk
 
@@ -987,6 +1008,11 @@ defmodule StatifierBlocks.Map.Info do
   @spec markers(map()) :: [map()]
   defp markers(%{"kind" => "empty"} = marker), do: [marker]
   defp markers(%{} = node), do: node |> Map.get("children", []) |> Enum.flat_map(&markers/1)
+
+  # Every end mark in `graph`, in the order a walk of it meets them.
+  @spec ends(map()) :: [map()]
+  defp ends(%{"kind" => "end"} = mark), do: [mark]
+  defp ends(%{} = node), do: node |> Map.get("children", []) |> Enum.flat_map(&ends/1)
 
   @spec sentence_of(String.t(), context()) :: String.t()
   defp sentence_of(id, context),
