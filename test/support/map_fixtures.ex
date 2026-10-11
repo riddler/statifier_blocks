@@ -60,7 +60,7 @@ defmodule StatifierBlocks.MapFixtures do
   @spec view_model!(String.t()) :: ViewModel.t()
   def view_model!(key), do: key |> document!() |> ViewModel.build(Palette.core(), [])
 
-  @doc "The graph the reference host's map module answered for `key`, as regenerated since."
+  @doc "The checked-in graph for `key`, regenerated from the package's own Map."
   @spec host_graph!(String.t()) :: map()
   def host_graph!(key) when key in @keys,
     do: JSON.decode!(File.read!(Path.join(@graphs, "#{key}.graph.json")))
