@@ -510,7 +510,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert loan.sentence =~ "A patron borrows a copy"
       assert loan.explanation =~ BlockMap.empty_text()
       assert loan.explanation =~ "A dashed arrow runs from an interrupt rule"
-      assert loan.explanation =~ "a dot inside a ring where it finishes"
+      assert loan.explanation =~ "a dot inside a ring marked End where it finishes"
       assert loan.explanation =~ "An hourglass marks a step that waits for an event"
       # Sabotage: cut the timed wait from the clock's clause in the
       # how-to-read line; this went red. Reverted from a copy.
@@ -559,9 +559,11 @@ defmodule StatifierBlocks.Map.InfoTest do
       "slot-label" => "a branch's arms or a parallel's lanes",
       "empty" => "A dashed box saying",
       "empty-text" => "is a place no step fills yet",
-      "start" => "The filled dot is where the document starts",
+      "start" => "The filled dot marked Start is where the document starts",
+      "start-word" => "marked Start",
       "start-caption" => "its arrow captioned with what starts it",
-      "end" => "a dot inside a ring where it finishes",
+      "end" => "a dot inside a ring marked End where it finishes",
+      "end-word" => "marked End",
       "end-ring" => "a solid ring when its last step finishes",
       "end-dot" => "a dashed ring, reached by a dashed arrow",
       "edge--end" => "the outcome named on the arrow into it",
@@ -622,6 +624,8 @@ defmodule StatifierBlocks.Map.InfoTest do
     # to a template in the hook; this went red. Reverted from a copy.
     # Sabotage: made hook_classes/1 read every interpolation as part of the
     # name before it; this went red. Reverted from a copy.
+    # Sabotage: cut "marked End" from the paragraph; this went red on
+    # "end-word". Reverted from a copy.
     test "names every mark the hook draws" do
       {_graph, _descriptions, idle} = described("library_loan")
       {plain, built} = @hook |> File.read!() |> hook_classes()

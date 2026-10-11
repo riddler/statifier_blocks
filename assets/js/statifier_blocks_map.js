@@ -416,7 +416,8 @@ function drawNode(node) {
   // Where the document finishes: the state chart's final mark, a dot inside
   // a ring, one per outcome it finishes with - a solid ring for done, a
   // dashed one where an interrupt rule abandons the last step. It carries
-  // no text (the outcome is named on the edge into it). Like the start dot
+  // the word End beside it, whichever way it finishes (the outcome is named
+  // on the edge into it). Like the start dot
   // it is not a block: it carries its id, so the description region can
   // name it, but no data-map-kind, so a click on it selects nothing.
   if (node.kind === "end") {
@@ -431,17 +432,17 @@ function drawNode(node) {
       `${abandon ? "; stroke-dasharray: 3 2" : ""}"/>` +
       `<circle class="sb-map__end-dot" cx="${cx}" cy="${cy}" r="${r / 2}" ` +
       `style="fill: var(--sb-map-edge, #64748b)"/>` +
-      `</g>`
+      drawWord(node, "sb-map__end-word") + `</g>`
   }
 
   // Where the document starts: the state chart's initial mark, a filled
-  // dot with no text. Like the end mark it is not a block, and it carries
-  // no data-map-kind, so a click on it selects nothing.
+  // dot with the word Start beside it. Like the end mark it is not a block,
+  // and it carries no data-map-kind, so a click on it selects nothing.
   if (node.kind === "start") {
     return `<g class="sb-map__start" data-map-start="${id}" data-map-node="${id}">` +
       `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${Math.min(w, h) / 2}" ` +
       `style="fill: var(--sb-map-edge, #64748b)"/>` +
-      `</g>`
+      drawWord(node, "sb-map__start-word") + `</g>`
   }
 
   // A slot's box: an arm, a rail, a tray, or a group's body pane. A group's
@@ -465,6 +466,19 @@ function drawNode(node) {
     `style="fill: var(--sb-map-block-fill, #ffffff); stroke: var(--sb-map-block-stroke, #64748b)"/>` +
     caption + body + drawMark(node) + drawBand(node) +
     `</g>`
+}
+
+// The word a start dot or an end mark carries, written where the layout
+// placed the mark's one label: beside the mark, in the room the layout left
+// it (the server sized the label and asked for it outside the mark). A
+// label's place is relative to its node, so the node's own place is added.
+// Drawn inside the mark's group, so pointing at the word names the mark and
+// a click on it selects nothing, as a click on the mark does.
+function drawWord(node, className) {
+  const [label] = node.labels || []
+  if (!label) return ""
+  return `<text class="${className}" x="${node.x + label.x}" ` +
+    `y="${node.y + label.y + label.height - 4}">${escapeText(label.text)}</text>`
 }
 
 // A timer block's mark, a 14px glyph at the box's top right, level with the

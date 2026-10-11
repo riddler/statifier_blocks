@@ -913,3 +913,52 @@ Where it holds:
   `StatifierBlocks.Map`.
 
 Filed with `sb-6nyf`.
+
+## Note (2026-10-10): the start dot and every end mark carry their words
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-10-09, where the
+code holds it.
+
+The rule: the word Start on the start dot and End on each end ring; the
+outcome word stays on its arrow. The way it is met, by giving each mark
+its word as the mark's one layout label, placed by the layout outside the
+mark on its right, was decided by the conductor under a standing
+consent, 2026-10-10. The same ruling also names who starts a document in
+the start edge's caption; that part is not changed by this Note, and the
+caption still reads `start_text/0`, "Starts when told to", on every
+document.
+
+What is drawn now: the start dot carries the word Start beside it, on its
+right and level with it, and every end mark carries the word End the same
+way, a done end and an abandon end alike. The outcome is still the caption
+on the edge into the mark, not the mark's word. The words are data in the
+graph, as every other text on the map is: the Map stays pure, and the hook
+draws what the graph carries.
+
+Where it holds:
+
+- `word/2` (`lib/statifier_blocks/map.ex`, `defp word`) gives the mark its
+  one ELK label and the layout option that places it outside the mark;
+  `start_mark/1` and `end_mark/2` (`defp start_mark`, `defp end_mark`)
+  carry it, and the moduledoc's "The start" and "The end" sections say so.
+- `drawWord` (`assets/js/statifier_blocks_map.js`, `function drawWord`)
+  writes the word where the layout placed the label, inside the mark's
+  own group, so pointing at the word names the mark and a click on it
+  selects nothing.
+- `test/statifier_blocks/map_test.exs`, "the start dot carries Start and
+  every end mark End, the outcome kept on its edge", pins the graph's
+  words and their placement on both teaching documents and on a document
+  that declares no events.
+- `test/statifier_blocks/map_layout_test.exs`, "both library fixtures
+  draw Start beside the start dot and End beside every end mark", lays
+  both teaching documents out through the vendored elkjs and pins each
+  word as drawn once, beside its mark on its right and level with it,
+  inside the drawing, and clear of every other mark, every leaf box,
+  every label a box carries and every caption on an edge.
+- The map's how-to-read paragraph (`lib/statifier_blocks/map/info.ex`,
+  `@how_to_read`) names the dot marked Start and the ring marked End.
+  Both graphs under `test/fixtures/map/` are regenerated from the
+  package's own `StatifierBlocks.Map`.
+
+Filed with `sb-v3zy`.

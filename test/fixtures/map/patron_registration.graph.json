@@ -4,6 +4,17 @@
       "height": 14,
       "id": "blk_pr_root/start",
       "kind": "start",
+      "labels": [
+        {
+          "height": 16,
+          "id": "blk_pr_root/start/word",
+          "text": "Start",
+          "width": 59
+        }
+      ],
+      "layoutOptions": {
+        "org.eclipse.elk.nodeLabels.placement": "OUTSIDE V_CENTER H_RIGHT"
+      },
       "width": 14
     },
     {
@@ -335,6 +346,17 @@
           "height": 20,
           "id": "blk_pr_root/end/done",
           "kind": "end",
+          "labels": [
+            {
+              "height": 16,
+              "id": "blk_pr_root/end/done/word",
+              "text": "End",
+              "width": 45
+            }
+          ],
+          "layoutOptions": {
+            "org.eclipse.elk.nodeLabels.placement": "OUTSIDE V_CENTER H_RIGHT"
+          },
           "outcome": "done",
           "width": 20
         },
@@ -342,6 +364,17 @@
           "height": 20,
           "id": "blk_pr_root/end/abandon",
           "kind": "end",
+          "labels": [
+            {
+              "height": 16,
+              "id": "blk_pr_root/end/abandon/word",
+              "text": "End",
+              "width": 45
+            }
+          ],
+          "layoutOptions": {
+            "org.eclipse.elk.nodeLabels.placement": "OUTSIDE V_CENTER H_RIGHT"
+          },
           "outcome": "abandon",
           "width": 20
         }

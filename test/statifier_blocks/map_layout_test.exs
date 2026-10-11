@@ -104,7 +104,8 @@ defmodule StatifierBlocks.MapLayoutTest do
         graph = library_graph(key)
         %{"drawn" => "map", "boxes" => boxes} = run(dir, key, graph)
 
-        # The start dot and the end marks carry no text.
+        # The start dot and the end marks carry no title: their word stands
+        # beside them (see "the words on the marks, as drawn").
         for node <- walk(graph), node["id"] != "plan-map", node["kind"] not in ["start", "end"] do
           texts =
             if node["kind"] == "slot",
@@ -511,7 +512,7 @@ defmodule StatifierBlocks.MapLayoutTest do
     # carries a second class, so the pattern leaves it out).
     @box_label ~r/<text class="sb-map__(?:title|sentence|slot-label|empty-text|caption)"[^>]*x="([-\d.]+)" y="([-\d.]+)">([^<]*)</
 
-    # One filled dot with no text, one edge from its bottom into the top of
+    # One filled dot and its word, one edge from its bottom into the top of
     # the first step, and the caption written between the two where the
     # layout left it room, beside the edge. The loan declares the events it
     # accepts and the caption still reads the one sentence: those events are
@@ -542,7 +543,7 @@ defmodule StatifierBlocks.MapLayoutTest do
         assert group =~ ~s(data-map-start="#{start}")
         assert [_circle] = Regex.scan(~r/<circle /, group)
         assert group =~ "fill: var(--sb-map-edge"
-        refute group =~ "<text"
+        assert [[_tag, "Start"]] = Regex.scan(~r/<text [^>]*>([^<]*)<\/text>/, group)
 
         assert [%{"id" => ^id, "source" => ^start, "target" => ^first} = edge] =
                  Enum.filter(edges, &(&1["kind"] == "start"))
@@ -612,9 +613,9 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
-    # A click on the dot, or on the circle a real click lands on, selects
-    # nothing and arms nothing; the dot keeps its id, so the description
-    # region can name it.
+    # A click on the dot, or on the circle or the word a real click lands
+    # on, selects nothing and arms nothing; the dot keeps its id, so the
+    # description region can name it.
     #
     # Sabotage: gave the dot data-map-kind="block"; a click on it selected
     # a block and this went red. Reverted from a copy.
@@ -627,8 +628,8 @@ defmodule StatifierBlocks.MapLayoutTest do
                  %{
                    "id" => ^start,
                    "kind" => nil,
-                   "children" => ["circle"],
-                   "gestures" => [nil, nil]
+                   "children" => ["circle", "text"],
+                   "gestures" => [nil, nil, nil]
                  }
                ] =
                  starts
@@ -715,7 +716,7 @@ defmodule StatifierBlocks.MapLayoutTest do
 
           assert %{
                    "node" => ^id,
-                   "children" => ["circle", "circle"],
+                   "children" => ["circle", "circle", "text"],
                    "ring" => ring,
                    "dot" => %{"filled" => true} = dot
                  } = Enum.find(ends, &(&1["id"] == id))
@@ -802,8 +803,9 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
-    # A click on an end mark, or on either circle a real click lands on,
-    # selects nothing and arms nothing, on a page that can edit or not.
+    # A click on an end mark, or on either circle or the word a real click
+    # lands on, selects nothing and arms nothing, on a page that can edit or
+    # not.
     #
     # Sabotage: gave the end mark data-map-kind="block"; a click on it
     # selected a block and this went red. Reverted from a copy.
@@ -814,10 +816,111 @@ defmodule StatifierBlocks.MapLayoutTest do
         assert length(ends) == length(expected)
 
         for mark <- ends do
-          assert %{"kind" => nil, "gestures" => [nil, nil, nil]} = mark
+          assert %{"kind" => nil, "gestures" => [nil, nil, nil, nil]} = mark
         end
 
         refute Enum.any?(gestures, &String.contains?(&1["element"], "/end"))
+      end
+    end
+  end
+
+  describe "the words on the marks, as drawn" do
+    # Each library fixture's start dot and its end marks.
+    @marks [
+      {"library_loan", "blk_ll_root/start", ["blk_ll_root/end/done"]},
+      {"patron_registration", "blk_pr_root/start",
+       ["blk_pr_root/end/done", "blk_pr_root/end/abandon"]}
+    ]
+
+    # The start dot carries the word Start and every end mark the word End,
+    # whichever way it finishes, each written once, inside the mark's own
+    # group: beside the mark on its right, level with it, in the room the
+    # layout left it, inside the drawing, and clear of every other mark,
+    # every leaf box, every label a box carries and every caption on an
+    # edge - so the word reads, and the outcome stays on the arrow into the
+    # mark, not on the mark.
+    #
+    # Sabotage: made drawWord leave the word out; this went red. Made
+    # drawWord drop the node's own place, writing the word at the label's
+    # place in the node; this went red. Made word/2 ask the layout for no
+    # placement, so the word stood at the mark's own corner; this went red.
+    # Made end_mark/2 carry the outcome as its word; this went red. Each
+    # reverted from a copy.
+    test "both library fixtures draw Start beside the start dot and End beside every end mark",
+         %{tmp_dir: dir} do
+      for {key, start, ends} <- @marks do
+        graph = library_graph(key)
+
+        %{"drawn" => "map", "html" => html, "boxes" => boxes, "edges" => edges} =
+          run(dir, key, graph)
+
+        [width, height] =
+          for n <- tl(Regex.run(~r/<svg [^>]*width="([\d.]+)" height="([\d.]+)"/, html)),
+              do: number(n)
+
+        words =
+          for [_all, _class, id, x, y, text] <-
+                Regex.scan(
+                  ~r/<g class="sb-map__(start|end)[^"]*" data-map-(?:start|end)="([^"]*)"[^>]*>(?:(?!<\/g>).)*?<text class="sb-map__(?:start|end)-word" x="([-\d.]+)" y="([-\d.]+)">([^<]*)<\/text><\/g>/,
+                  html
+                ),
+              do: {id, %{text: text, x: number(x), y: number(y)}}
+
+        assert length(Regex.scan(~r/-word"/, html)) == length(words), key
+        assert Enum.map(words, &elem(&1, 0)) == [start | ends], key
+
+        captions = for edge <- edges, label <- edge["labels"], do: label
+
+        for {id, word} <- words do
+          expected = if id == start, do: "Start", else: "End"
+          assert word.text == expected, "#{key}: #{id} carries #{inspect(word.text)}"
+
+          mark = boxes[id]
+
+          box = %{
+            "x" => word.x,
+            "y" => word.y - 12,
+            "width" => text_width([word.text]) - 24,
+            "height" => 16
+          }
+
+          # Beside the mark, on its right, and level with it.
+          assert box["x"] >= mark["x"] + mark["width"], "#{key}: #{id}'s word overlaps it"
+          assert box["x"] - (mark["x"] + mark["width"]) <= 8, "#{key}: #{id}'s word stands off"
+          centre = mark["y"] + mark["height"] / 2
+          assert centre >= box["y"] and centre <= box["y"] + box["height"], "#{key}: #{id}"
+
+          # Inside the drawing.
+          assert box["x"] >= 0 and box["y"] >= 0
+          assert box["x"] + box["width"] <= width and box["y"] + box["height"] <= height
+
+          # Clear of every node with nothing drawn inside it (every other
+          # mark, every leaf box, every empty marker), of every label a box
+          # carries, and of every caption on an edge. A container's box holds
+          # the marks and their words by design, so only its labels count.
+          leaves =
+            for node <- walk(graph),
+                node["id"] not in ["plan-map", id],
+                Map.get(node, "children", []) == [],
+                do: {node["id"], boxes[node["id"]]}
+
+          labels =
+            for [_all, x, y, text] <- Regex.scan(@box_label, html),
+                do:
+                  {text,
+                   %{
+                     "x" => number(x),
+                     "y" => number(y) - 12,
+                     "width" => String.length(text) * 7,
+                     "height" => 16
+                   }}
+
+          assert leaves != [] and labels != [] and captions != [], key
+
+          for {other, at} <- leaves ++ labels ++ Enum.map(captions, &{&1["text"], &1}) do
+            refute overlaps?(box, at), "#{key}: #{id}'s word overlaps #{other}"
+          end
+        end
       end
     end
   end
@@ -1398,6 +1501,12 @@ defmodule StatifierBlocks.MapLayoutTest do
   end
 
   defp centre(box), do: box["x"] + box["width"] / 2
+
+  # Whether two boxes share any area; boxes that only touch do not.
+  defp overlaps?(a, b),
+    do:
+      a["x"] < b["x"] + b["width"] and b["x"] < a["x"] + a["width"] and
+        a["y"] < b["y"] + b["height"] and b["y"] < a["y"] + a["height"]
 
   # Whether `box` lies wholly inside `outer`.
   defp inside?(box, outer) do
