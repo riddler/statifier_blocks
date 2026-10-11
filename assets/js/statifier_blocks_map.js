@@ -65,10 +65,21 @@ export function escapeText(value) {
 // twice: once to read where the body's steps stand, and again with the
 // group's ports put there (`portsFrom`). See `StatifierBlocks.Map`'s
 // moduledoc, "The happy path runs straight".
+//
+// The second layout only straightens the line; the first is already a
+// whole drawing, with the group's edges at its middle. So a second layout
+// that fails answers the first, and only a first layout that fails
+// rejects.
 export async function layout(graph, elk = elkInstance()) {
   const first = await layoutOnce(graph, elk)
   const ported = portsFrom(graph, first)
-  return ported === null ? first : layoutOnce(ported, elk)
+  if (ported === null) return first
+
+  try {
+    return await layoutOnce(ported, elk)
+  } catch (_reason) {
+    return first
+  }
 }
 
 async function layoutOnce(graph, elk) {

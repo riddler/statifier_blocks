@@ -1502,6 +1502,34 @@ defmodule StatifierBlocks.MapLayoutTest do
       assert html =~ "the layout came back empty"
       refute html =~ "<svg"
     end
+
+    # The registration's group holds a branch, so its drawing takes two
+    # layouts, the second only to put the group's ports on its body's line.
+    # When that second layout fails, the first is still a whole drawing,
+    # with the group's edges at its middle, so the hook draws it rather than
+    # the error pane.
+    #
+    # Sabotage: made layout() rethrow the second layout's rejection; the
+    # error pane was drawn and this went red. Reverted from a copy.
+    test "a second layout that fails draws the first, not the error pane",
+         %{tmp_dir: dir} do
+      graph = library_graph("patron_registration")
+      %{"drawn" => "map", "boxes" => two_pass} = run(dir, "two_pass", graph)
+
+      assert %{
+               "drawn" => "map",
+               "layouts" => 2,
+               "boxes" => boxes,
+               "first" => first,
+               "html" => html
+             } =
+               run(dir, "second_refused", graph, "reject-second")
+
+      assert boxes == first
+      refute boxes == two_pass
+      assert html =~ "<svg"
+      refute html =~ ~s(data-map-error="true")
+    end
   end
 
   describe "what a click on the map sends" do

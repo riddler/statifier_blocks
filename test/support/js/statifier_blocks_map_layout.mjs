@@ -1,7 +1,12 @@
 // Test driver for assets/js/statifier_blocks_map.js, run by
 // StatifierBlocks.MapLayoutTest through Node.
 //
-//   node statifier_blocks_map_layout.mjs <graph.json> [editable]
+//   node statifier_blocks_map_layout.mjs <graph.json> [editable] [reject-second]
+//
+// `reject-second` makes elkjs reject the second layout it is asked for,
+// as a layout that fails would. `first` in what it prints is every box of
+// the first layout elkjs answered, in absolute coordinates, so a test can
+// tell which layout was drawn.
 //
 // Lays the graph out through the real elkjs and draws it with the hook's
 // own drawMap/3, then prints one JSON object: what was drawn ("map" or
@@ -37,15 +42,24 @@ import {boxes, drawMap, edgesOf, interruptsOf, mapGesture, timersOf} from "../..
 // the reference host's; the hook has none of its own.
 const events = {select: "select-row", insert: "insert-open"}
 
+const flags = process.argv.slice(3)
+const editable = flags.includes("editable")
+const rejectSecond = flags.includes("reject-second")
+
 let layouts = 0
+const first = {}
 const realLayout = ELK.prototype.layout
-ELK.prototype.layout = function (...args) {
+ELK.prototype.layout = async function (...args) {
   layouts += 1
-  return realLayout.apply(this, args)
+  if (rejectSecond && layouts === 2) throw new Error("the second layout was refused")
+  const laid = await realLayout.apply(this, args)
+  if (layouts === 1) {
+    for (const box of boxes(laid)) first[box.id] = {x: box.x, y: box.y, width: box.width, height: box.height}
+  }
+  return laid
 }
 
 const graph = JSON.parse(readFileSync(process.argv[2], "utf8"))
-const editable = process.argv[3] === "editable"
 const target = {innerHTML: ""}
 const {drawn, laid} = await drawMap(target, graph, {editable})
 
@@ -315,4 +329,4 @@ for (const el of all.filter((e) => !inKey(e))) {
 const [, svgWidth, svgHeight] = html.match(/<svg [^>]*width="([\d.]+)" height="([\d.]+)"/) || []
 const svg = svgWidth === undefined ? null : {width: Number(svgWidth), height: Number(svgHeight), laidWidth: laid ? laid.width : null, laidHeight: laid ? laid.height : null}
 
-process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges, layouts, key, drawnMarks: [...drawnMarks], svg}))
+process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, first, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges, layouts, key, drawnMarks: [...drawnMarks], svg}))
