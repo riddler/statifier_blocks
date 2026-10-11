@@ -283,7 +283,9 @@ defmodule StatifierBlocks.Map do
   where the body's steps stand; the hook then puts the group's two ports
   at the centre of the widest of them, in the same shape as the ones
   above, and lays the graph out again. A graph whose every group carries
-  its ports is laid out once.
+  its ports is laid out once. The first layout is already a whole
+  drawing, its line bent at the group, so when the second layout fails
+  the hook draws the first rather than the error pane.
 
   ## The key
 
