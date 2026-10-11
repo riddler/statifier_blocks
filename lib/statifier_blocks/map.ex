@@ -81,7 +81,10 @@ defmodule StatifierBlocks.Map do
     of" and then one numbered entry per arm, in slot order, each the arm's
     label and its condition as authored (`When "renew": copy.holds == 0
     AND loan.renewals < 2`), the arms with no condition ("Otherwise",
-    "Cannot be decided") by their label alone.
+    "Cannot be decided") by their label alone. An entry wider than a line
+    wraps, and its later lines are indented under its label, by the width
+    of its number, so a wrapped condition does not read as an entry of its
+    own.
     This header is the map's own: the branch type's sentence, which the
     list draws, is not changed by it.
   - **The arms sit under one band.** The branch's node carries `band: true`
@@ -320,6 +323,8 @@ defmodule StatifierBlocks.Map do
   alias StatifierBlocks.ViewModel.Slot
 
   @char_width 7
+  # The indent of a wrapped arm entry's later lines; see `arm_entry/2`.
+  @no_break_space <<0xA0::utf8>>
   @line_height 16
   @leaf_min_width 150
   @leaf_max_width 260
@@ -561,19 +566,31 @@ defmodule StatifierBlocks.Map do
   # A branch's header: the package's "one of", then one numbered entry per
   # arm, in slot order, each the arm's label and its condition as authored;
   # see the moduledoc's "The Branch". An entry wider than a line wraps onto
-  # the next.
+  # the next, indented under its label (see `arm_entry/2`).
   @spec arm_lines(Node.t()) :: [String.t()]
   defp arm_lines(%Node{} = node) do
     arms =
       node
       |> ViewModel.body_slots()
       |> Enum.with_index(1)
-      |> Enum.flat_map(fn {slot, n} -> wrap("#{n}. #{slot_header(slot)}") end)
+      |> Enum.flat_map(fn {slot, n} -> arm_entry(slot, n) end)
 
     case ViewModel.fan_label(node) do
       nil -> arms
       label -> ["#{String.capitalize(label)}, in order:" | arms]
     end
+  end
+
+  # One arm's entry: its number, then its label and condition, wrapped.
+  # Every line after the first is indented by the number's width, so it
+  # stands under the label and a wrapped condition does not read as an
+  # entry of its own. The indent is no-break spaces: the hook draws each
+  # line as its own SVG text, which would fold plain leading spaces away.
+  @spec arm_entry(Slot.t(), pos_integer()) :: [String.t()]
+  defp arm_entry(%Slot{} = slot, n) do
+    number = "#{n}. "
+    indent = String.duplicate(@no_break_space, String.length(number))
+    wrap(number <> slot_header(slot), indent)
   end
 
   @spec put_band(graph_node(), Node.t()) :: graph_node()
@@ -1254,18 +1271,27 @@ defmodule StatifierBlocks.Map do
 
   # Words onto lines no wider than a leaf holds. A single word longer than a
   # line keeps its own line rather than being cut: nothing on the map
-  # truncates but a caption (see the moduledoc's "Captions").
-  @spec wrap(String.t()) :: [String.t()]
-  defp wrap(text) do
+  # truncates but a caption (see the moduledoc's "Captions"). Every line
+  # after the first starts with `indent`, which counts against its room.
+  @spec wrap(String.t(), String.t()) :: [String.t()]
+  defp wrap(text, indent \\ "") do
     per_line = div(@leaf_max_width - @leaf_padding, @char_width)
+    continued = per_line - String.length(indent)
 
-    text
-    |> String.split(~r/\s+/, trim: true)
-    |> Enum.reduce([], fn
-      word, [] -> [word]
-      word, [line | rest] -> join(word, line, rest, per_line)
-    end)
-    |> Enum.reverse()
+    lines =
+      text
+      |> String.split(~r/\s+/, trim: true)
+      |> Enum.reduce([], fn
+        word, [] -> [word]
+        word, [line] -> join(word, line, [], per_line)
+        word, [line | rest] -> join(word, line, rest, continued)
+      end)
+      |> Enum.reverse()
+
+    case lines do
+      [] -> []
+      [first | rest] -> [first | Enum.map(rest, &(indent <> &1))]
+    end
   end
 
   @spec join(String.t(), String.t(), [String.t()], pos_integer()) :: [String.t()]

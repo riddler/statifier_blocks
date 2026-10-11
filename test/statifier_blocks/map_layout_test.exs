@@ -318,7 +318,7 @@ defmodule StatifierBlocks.MapLayoutTest do
          "One of, in order:",
          "1. When \"returned\": loan.returned",
          "2. When \"renew\": copy.holds == 0",
-         "AND loan.renewals < 2",
+         String.duplicate(<<0xA0::utf8>>, 3) <> "AND loan.renewals < 2",
          "3. Otherwise",
          "4. Cannot be decided"
        ]},
@@ -333,11 +333,12 @@ defmodule StatifierBlocks.MapLayoutTest do
     ]
 
     # The header under the branch's title names every arm with its
-    # condition, in slot order, as the markup draws it.
+    # condition, in slot order, as the markup draws it; the loan's wrapped
+    # renew arm keeps its later line's indent of no-break spaces.
     #
     # Sabotage: made arm_lines/1 reverse the arms; this went red. Made
-    # arm_lines/1 drop the arms with no condition; this went red. Each
-    # reverted from a copy.
+    # arm_lines/1 drop the arms with no condition; this went red. Made
+    # arm_entry/2's indent ""; this went red. Each reverted from a copy.
     test "both library branches draw a header naming every arm in slot order",
          %{tmp_dir: dir} do
       for {key, branch, _next, header} <- @branches do

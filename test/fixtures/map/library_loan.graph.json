@@ -327,7 +327,7 @@
             "One of, in order:",
             "1. When \"returned\": loan.returned",
             "2. When \"renew\": copy.holds == 0",
-            "AND loan.renewals < 2",
+            "\u00a0\u00a0\u00a0AND loan.renewals < 2",
             "3. Otherwise",
             "4. Cannot be decided"
           ],
