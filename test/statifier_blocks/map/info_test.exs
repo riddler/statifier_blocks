@@ -993,6 +993,41 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert fact(timer, "Delay") == "7d"
     end
 
+    # Each timer edge is described in its own line, found by the edge it
+    # draws rather than by where that line falls among the outline's: a
+    # loan that sends itself two reminders, each heard by its own wait,
+    # says of each dotted edge which reminder reaches which wait, and when.
+    #
+    # Sabotage: made edge_line/2 render the outline's every edge and take
+    # the first timer line; the second edge said the first's sentence and
+    # this went red. Reverted from a copy.
+    test "each timer edge says its own line, found by its edge" do
+      send = fn id, event, delay ->
+        Block.new("core.send", id: id, config: %{"event" => event, "delay" => delay})
+      end
+
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              send.("remind", "loan.due_soon", "14d"),
+              send.("chase", "loan.overdue", "21d"),
+              Block.new("core.await", id: "soon", config: %{"event" => "loan.due_soon"}),
+              Block.new("core.await", id: "late", config: %{"event" => "loan.overdue"})
+            ]
+          }
+        )
+
+      described = describe_root(root)
+
+      assert described["remind->soon/timer"].sentence ==
+               "In 14 days, loan.due_soon reaches Wait for loan.due_soon"
+
+      assert described["chase->late/timer"].sentence ==
+               "In 21 days, loan.overdue reaches Wait until the loan is overdue"
+    end
+
     # The timer's explanation names what hears it in the key's words, so the
     # thing at the arrow's end cannot be read as the timed wait the clock
     # marks.

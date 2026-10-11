@@ -630,6 +630,19 @@ const KEY_ENTRY_GAP = 6
 // The server's width estimate: 7px a character.
 const CHAR_WIDTH = 7
 
+// The right edge of what the drawing draws: the laid-out width, or further
+// right where a timer edge reaches. A timer edge between two steps of one
+// column runs out past their right sides, with its delay beside it, so it
+// can stand right of every box the layout placed; the SVG is held wide
+// enough for it, with a key or without one.
+function drawnRight(laid) {
+  return timersOf(laid).reduce((widest, timer) => Math.max(
+    widest,
+    ...timer.points.map((p) => p.x),
+    timer.label.x + String(timer.delay).length * CHAR_WIDTH,
+  ), laid.width)
+}
+
 // Where the key and each of its entries stand beside `laid`, absolute, as
 // `{x, y, width, height, entries: [{mark, lines, x, y}]}`, or null for a
 // graph with no key.
@@ -637,15 +650,8 @@ export function keyOf(laid) {
   const legend = Array.isArray(laid.legend) ? laid.legend : []
   if (legend.length === 0) return null
 
-  // A timer edge between two steps of one column runs out past their
-  // right sides, with its delay beside it, so it can stand right of every
-  // box the layout placed: the key stands clear of that too.
-  const right = timersOf(laid).reduce((widest, timer) => Math.max(
-    widest,
-    ...timer.points.map((p) => p.x),
-    timer.label.x + String(timer.delay).length * CHAR_WIDTH,
-  ), laid.width)
-  const x = Math.ceil(right) + KEY_GAP
+  // The key stands clear of every timer edge as well as every box.
+  const x = Math.ceil(drawnRight(laid)) + KEY_GAP
   let y = KEY_PAD + LINE_HEIGHT + KEY_ENTRY_GAP
   let widest = 0
   const entries = legend.map(({mark, lines}) => {
@@ -732,7 +738,7 @@ function svgOf(laid, editable, mark, defs) {
   const edges = edgesOf(laid).map(drawEdge).join("") +
     interruptsOf(laid).map(drawInterrupt).join("") + timersOf(laid).map(drawTimer).join("")
   const key = keyOf(laid)
-  const width = key === null ? Math.ceil(laid.width) : Math.ceil(key.x + key.width)
+  const width = key === null ? Math.ceil(drawnRight(laid)) : Math.ceil(key.x + key.width)
   const height = Math.ceil(key === null ? laid.height : Math.max(laid.height, key.height))
 
   return `<svg xmlns="${SVG_NS}" class="sb-map__svg" ${mark} ` +

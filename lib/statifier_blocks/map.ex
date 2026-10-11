@@ -233,10 +233,11 @@ defmodule StatifierBlocks.Map do
   after the layout, so a timer edge never moves a box. They are the edges
   `StatifierBlocks.Describe.outline/3` answers with `kind: :timer`, read
   here off the same view model - only blocks the palette resolved, and
-  nothing on a drafts shelf - and the test beside this module holds the two
-  equal for every fixture. A timer edge is not a transition: it says which
-  block hears the event a send arms, so it is dotted where an interrupt
-  edge is dashed.
+  nothing on a drafts shelf - and the tests beside this module hold the two
+  equal for every fixture and for a delayed send that is the document's
+  root, from which neither draws one. A timer edge is not a transition: it
+  says which block hears the event a send arms, so it is dotted where an
+  interrupt edge is dashed.
 
   ## Timer marks
 

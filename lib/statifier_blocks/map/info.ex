@@ -925,19 +925,13 @@ defmodule StatifierBlocks.Map.Info do
   # delay.
   @spec timer(map(), context()) :: t()
   defp timer(%{"id" => id, "sources" => [from], "targets" => [to]} = drawn, context) do
-    index =
-      Enum.find_index(
+    edge =
+      Enum.find(
         context.edges,
         &(&1.kind == :timer and &1.from == {:block, from} and &1.to == {:block, to})
       )
 
-    sentence =
-      if index,
-        do:
-          context.outline
-          |> Describe.render([])
-          |> Enum.at(length(context.outline.nodes) + index)
-          |> Phrasing.line(context.phrase)
+    sentence = if edge, do: edge |> edge_line(context) |> Phrasing.line(context.phrase)
 
     %__MODULE__{
       id: id,
@@ -956,6 +950,14 @@ defmodule StatifierBlocks.Map.Info do
         {"Delay", drawn["delay"]}
       ]
     }
+  end
+
+  # The line `Describe.render/2` gives `edge`: the outline rendered with
+  # its own nodes, which an edge line names its ends by, and that one edge,
+  # so the line is the edge's own whatever other edges the outline holds.
+  @spec edge_line(Describe.Edge.t(), context()) :: String.t()
+  defp edge_line(%Describe.Edge{} = edge, context) do
+    %Describe{context.outline | edges: [edge]} |> Describe.render([]) |> List.last()
   end
 
   @spec lands(String.t(), String.t(), context()) :: String.t()

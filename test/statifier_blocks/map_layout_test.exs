@@ -1192,6 +1192,62 @@ defmodule StatifierBlocks.MapLayoutTest do
       assert box["x"] > run_x
     end
 
+    # A timer edge between two steps of one column runs out past both
+    # right sides and back, so its run and its delay stand right of every
+    # box: the SVG is held wide enough for them whether or not a key
+    # stands beside the drawing to widen it. Laid out with the graph's
+    # `legend` taken off, so nothing but the timer edge can widen it.
+    #
+    # Sabotage: made renderSvg take the laid-out width alone when there
+    # is no key; the run and the delay fell outside the SVG and this went
+    # red. Reverted from a copy.
+    test "a timer edge between two steps of one column widens the SVG for its run",
+         %{tmp_dir: dir} do
+      root =
+        Block.new("core.sequence",
+          id: "root",
+          slots: %{
+            "body" => [
+              Block.new("core.send",
+                id: "remind",
+                config: %{"event" => "loan.overdue", "delay" => "1000d"}
+              ),
+              Block.new("core.await", id: "overdue", config: %{"event" => "loan.overdue"})
+            ]
+          }
+        )
+
+      graph =
+        root
+        |> Document.new()
+        |> ViewModel.build(Palette.core(), [])
+        |> BlockMap.graph()
+        |> Map.delete("legend")
+
+      %{
+        "drawn" => "map",
+        "key" => nil,
+        "boxes" => boxes,
+        "timers" => [timer],
+        "captions" => captions,
+        "svg" => svg
+      } = run(dir, "timer-column", graph)
+
+      %{"remind" => send, "overdue" => hears} = boxes
+      assert send["x"] < hears["x"] + hears["width"] and hears["x"] < send["x"] + send["width"]
+
+      points = path_points(timer["d"])
+      run_x = points |> Enum.map(& &1.x) |> Enum.max()
+      assert run_x > send["x"] + send["width"] and run_x > hears["x"] + hears["width"]
+
+      [%{"text" => "1000d", "x" => x}] = captions["remind->overdue/timer"]
+      delay_right = x + text_width(["1000d"]) - 24
+
+      assert run_x > svg["laidWidth"] or delay_right > svg["laidWidth"]
+      assert svg["width"] >= run_x
+      assert svg["width"] >= delay_right
+    end
+
     # Each entry is drawn with the drawing's own glyph: the dot, the ring
     # (dashed for an abandon end) with its dot, an arrow solid, dashed or
     # dotted in the drawing's own dash and ending in its arrowhead, the
