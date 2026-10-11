@@ -11,8 +11,11 @@ defmodule StatifierBlocks.FlowPatternsComposedTest do
   the guide's library world: a hold is placed, the desk may be asked to
   confirm it within a day, the item may wait on the hold shelf for seven
   days, and the hold is closed when both lanes are done. The compiled lines
-  each pattern carries are the guide's own lines, byte for byte, which is
-  what shows that nesting a pattern inside another changes nothing about it.
+  the bounded step and the park carry are the guide's own lines, byte for
+  byte, which is what shows that nesting a pattern inside another changes
+  nothing about it. The optional arms' lines are not the guide's: they carry
+  this document's lanes and guards, so they are checked against the
+  compiled chart alone.
 
   A pure test. Nothing here names LiveView, so it compiles and runs headless.
   """
