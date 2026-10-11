@@ -1746,7 +1746,8 @@ an insert armed from the map, since what the list opens may sit below it.
 `map` on the description region says whether a map is mounted beside it,
 and a host with a map leaves it at its default, `true`; `false` is how the
 editor draws the region under its canvas: no hover layer, no store, and no
-paragraph on how to read the map in the document's description. `label`
+paragraph on how to read the map, nor the map's key, in the document's
+description. `label`
 on the description region is its accessible name, the `aria-label` of the
 live region, `"Description"` by default; a host passes its own words.
 

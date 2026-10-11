@@ -553,10 +553,7 @@ defmodule StatifierBlocks.Map.InfoTest do
 
   describe "idle/4" do
     # Sabotage: counted the root among the steps; this went red. Reverted
-    # from a copy. Sabotage: cut the dotted timer arrow from the how-to-read
-    # line; this went red. Reverted from a copy. Sabotage: cut the dashed arrow from the how-to-read
-    # line; this went red. Reverted from a copy. Sabotage: cut the ring
-    # from the how-to-read line; this went red. Reverted from a copy.
+    # from a copy.
     test "the document: its name, description, what starts it, and its counts" do
       {_graph, _descriptions, loan} = described("library_loan")
 
@@ -565,13 +562,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert loan.title == "Riverbend Public Library loan"
       assert loan.sentence =~ "A patron borrows a copy"
       assert loan.explanation =~ BlockMap.empty_text()
-      assert loan.explanation =~ "A dashed arrow runs from an interrupt rule"
-      assert loan.explanation =~ "a dot inside a ring marked End where it finishes"
-      assert loan.explanation =~ "An hourglass marks a step that waits for an event"
-      # Sabotage: cut the timed wait from the clock's clause in the
-      # how-to-read line; this went red. Reverted from a copy.
-      assert loan.explanation =~ "a clock a timed wait or a message sent after a delay"
-      assert loan.explanation =~ "a dotted arrow, labelled with the delay"
+      assert loan.explanation =~ "The key beside the drawing"
       assert loan.explanation =~ "or point at the map"
       assert fact(loan, "What starts it") == "Starts when told to"
       assert fact(loan, "Listens for") == ["copy.returned", "copy.reported_lost"]
@@ -582,6 +573,44 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert patron.title == "Riverbend Public Library patron registration"
       assert fact(patron, "Steps") == "10"
       assert fact(patron, "Open slots") == "1"
+    end
+
+    # The map is hidden from assistive technology, so the key it draws
+    # reaches the region as text: the "Key" fact, last, holding the line
+    # of every entry the graph's key carries, in the key's order, and only
+    # those.
+    #
+    # Sabotage: made key/1 answer no fact; this went red. Reverted from a
+    # copy. Sabotage: made key/1 list the lines in reverse; this went red.
+    # Reverted from a copy.
+    test "the key's lines, as the last fact, for the marks the map draws" do
+      for key <- @library do
+        {graph, _descriptions, idle} = described(key)
+        lines = for %{"line" => line} <- graph["legend"], do: line
+
+        assert lines != [], key
+        assert List.last(idle.facts) == {"Key", lines}, key
+      end
+
+      {loan_graph, _descriptions, loan} = described("library_loan")
+      {_graph, _descriptions, patron} = described("patron_registration")
+      refute Enum.any?(loan_graph["legend"], &(&1["mark"] == "timer"))
+      assert length(fact(patron, "Key")) > length(fact(loan, "Key"))
+    end
+
+    # A graph that carries no key - one built before the graph carried
+    # it, say - has no "Key" fact rather than an empty one.
+    #
+    # Sabotage: made key/1 answer the fact with an empty list; this went
+    # red. Reverted from a copy.
+    test "a graph with no key gives no key fact" do
+      document = MapFixtures.document!("library_loan")
+      view_model = ViewModel.build(document, Palette.core(), [])
+      outline = Describe.outline(document, Palette.core(), [])
+      graph = view_model |> BlockMap.graph() |> Map.delete("legend")
+
+      idle = Info.idle(document, graph, view_model, outline)
+      refute Enum.any?(idle.facts, &match?({"Key", _}, &1))
     end
 
     # How the document finishes, beside what starts it: the words its end
@@ -637,14 +666,18 @@ defmodule StatifierBlocks.Map.InfoTest do
     end
   end
 
-  describe "the paragraph on how to read the map" do
-    # Every class the Map hook draws a mark under, with the words in the
-    # paragraph that name that mark. The classes are read out of the hook
-    # itself, so a mark the hook starts drawing fails the first test here
-    # until the paragraph names it.
+  describe "the paragraph on how to read the map, and the key" do
+    # Every class the Map hook draws under, with the words that name that
+    # thing: in the paragraph, for the boxes and what is drawn on them, or
+    # in the key's line for one mark, for every mark the key names. The
+    # classes are read out of the hook itself, so a mark the hook starts
+    # drawing fails the first test here until the paragraph or the key
+    # names it.
     @hook "assets/js/statifier_blocks_map.js"
 
-    @named %{
+    # Named in the paragraph: the boxes, what is drawn on them, and the key
+    # itself, which the paragraph points at.
+    @in_paragraph %{
       "block" => "Every box on the map is a step",
       "block--container" => "drawn inside the step that holds it",
       "title" => "its type's name on top",
@@ -653,28 +686,37 @@ defmodule StatifierBlocks.Map.InfoTest do
       "slot-label" => "a branch's arms or a parallel's lanes",
       "empty" => "A dashed box saying",
       "empty-text" => "is a place no step fills yet",
-      "start" => "The filled dot marked Start is where the document starts",
-      "start-word" => "marked Start",
-      "start-caption" => "its arrow captioned with what starts it",
-      "end" => "a dot inside a ring marked End where it finishes",
-      "end-word" => "marked End",
-      "end-ring" => "a solid ring when its last step finishes",
-      "end-dot" => "a dashed ring, reached by a dashed arrow",
-      "edge--end" => "the outcome named on the arrow into it",
-      "end-caption" => "the outcome named on the arrow into it",
-      "edge" => "An arrow runs from a step to the one after it",
-      "band" => "a band",
-      "band-group" => "stands over the arms' boxes",
-      "fork" => "a fork mark",
-      "join" => "the arms come back together at a dot",
-      "edge--rejoin" => "a heavier arrow leads on",
       "caption" => "A one-line caption",
-      "edge--interrupt" => "A dashed arrow runs from an interrupt rule",
-      "mark" => "An hourglass marks a step that waits for an event",
-      "edge--timer" => "a dotted arrow",
-      "timer-caption" => "labelled with the delay",
       "block--selected" => "The selected step's box is outlined",
-      "gap" => "a \"+\" at a box's lower right corner"
+      "gap" => "a \"+\" at a box's lower right corner",
+      "key" => "The key beside the drawing",
+      "key-title" => "The key beside the drawing",
+      "key-entry" => "says what each of its other marks means",
+      "key-line" => "says what each of its other marks means"
+    }
+
+    # Named in the key: each class with the mark whose line names it and
+    # the words in that line.
+    @in_key %{
+      "start" => {"start", "The filled dot marked Start"},
+      "start-word" => {"start", "marked Start"},
+      "start-caption" => {"start", "its arrow captioned with what starts it"},
+      "end" => {"end", "A dot inside a solid ring marked End"},
+      "end-word" => {"end", "marked End"},
+      "end-ring" => {"end", "solid ring"},
+      "end-dot" => {"end", "A dot inside"},
+      "edge--end" => {"end", "the outcome named on the arrow into it"},
+      "end-caption" => {"end", "the outcome named on the arrow into it"},
+      "edge" => {"arrow", "An arrow runs from a step to the one after it"},
+      "band" => {"fork", "A band"},
+      "band-group" => {"fork", "stands over a branch's arms"},
+      "fork" => {"fork", "a fork mark"},
+      "join" => {"join", "the arms come back together at a dot"},
+      "edge--rejoin" => {"join", "a heavier arrow leads on"},
+      "edge--interrupt" => {"interrupt", "A dashed arrow runs from an interrupt rule"},
+      "mark" => {"wait", "An hourglass marks a step that waits for an event"},
+      "edge--timer" => {"timer", "A dotted arrow"},
+      "timer-caption" => {"timer", "labelled with the delay"}
     }
 
     # The canvas itself, and the pane drawn in place of a map that could
@@ -691,36 +733,30 @@ defmodule StatifierBlocks.Map.InfoTest do
     # The classes the hook builds by putting a value from the graph after a
     # stem it also draws plain, each with the graph key the value is read
     # from. Every value the graph gives under that key is a word in the
-    # variants table below, so the paragraph names each class these build.
+    # variants table below, so the paragraph or the key names each class
+    # these build.
     @modifiers %{"end--${}" => "outcome", "mark--${}" => "mark", "slot--${}" => "style"}
 
-    # Each value the graph gives a mark, a slot or an end, and the words
-    # that name that one.
+    # Each value the graph gives a mark, a slot or an end, and where the
+    # words that name that one are: the paragraph, or a mark's key line.
     @variants %{
-      "wait" => "An hourglass",
-      "clock" => "a clock a timed wait or a message sent after a delay",
-      "arm" => "a branch's arms",
-      "body" => "a group's body as a pane",
-      "rail" => "its interrupt rules in a column beside it",
-      "tray" => "a shelf of drafts",
-      "done" => "a solid ring",
-      "abandon" => "a dashed ring"
+      "wait" => {"wait", "An hourglass"},
+      "clock" => {"clock", "A clock marks a timed wait or a message sent after a delay"},
+      "arm" => {:paragraph, "a branch's arms"},
+      "body" => {:paragraph, "a group's body as a pane"},
+      "rail" => {:paragraph, "its interrupt rules in a column beside it"},
+      "tray" => {:paragraph, "a shelf of drafts"},
+      "done" => {"end", "solid ring"},
+      "abandon" => {"end-abandon", "A dashed ring"}
     }
 
-    # Sabotage: cut the fork mark from the paragraph; this went red on
-    # "fork". Reverted from a copy. Sabotage: added a class the paragraph
-    # does not name to a template in the hook; this went red. Reverted from
-    # a copy. Sabotage: cut "its arrow captioned with what starts it" from
-    # the paragraph; this went red on "start-caption". Reverted from a copy.
-    # Sabotage: added an interpolated class the table does not list to a
-    # template in the hook; this went red. Reverted from a copy.
-    # Sabotage: added a class interpolated after a stem the paragraph names
+    # Sabotage: cut "its arrow captioned with what starts it" from the
+    # start's key line; this went red on "start-caption". Reverted from a
+    # copy. Sabotage: added a class neither the paragraph nor the key names
     # to a template in the hook; this went red. Reverted from a copy.
-    # Sabotage: made hook_classes/1 read every interpolation as part of the
-    # name before it; this went red. Reverted from a copy.
-    # Sabotage: cut "marked End" from the paragraph; this went red on
-    # "end-word". Reverted from a copy.
-    test "names every mark the hook draws" do
+    # Sabotage: cut the pointer at the key from the paragraph; this went
+    # red on "key". Reverted from a copy.
+    test "names every mark the hook draws, in the paragraph or the key" do
       {_graph, _descriptions, idle} = described("library_loan")
       {plain, built} = @hook |> File.read!() |> hook_classes()
 
@@ -729,11 +765,32 @@ defmodule StatifierBlocks.Map.InfoTest do
       interpolated = Enum.flat_map(built, &Map.get(@interpolated, &1, []))
       drawn = Enum.uniq(plain ++ interpolated)
 
-      assert Enum.sort(drawn -- @not_marks) == Enum.sort(Map.keys(@named))
+      assert Enum.sort(drawn -- @not_marks) ==
+               Enum.sort(Map.keys(@in_paragraph) ++ Map.keys(@in_key))
 
-      for {class, words} <- @named do
+      for {class, words} <- @in_paragraph do
         assert idle.explanation =~ words, "the paragraph does not name #{class}"
       end
+
+      lines = key_lines()
+
+      for {class, {mark, words}} <- @in_key do
+        assert Map.fetch!(lines, mark) =~ words, "the key's #{mark} line does not name #{class}"
+      end
+    end
+
+    # Between them the two teaching documents draw every mark the key
+    # has a line for, so every line above is read off a real key.
+    #
+    # Sabotage: made drawn_marks/1 leave out the graph's timer edges; this
+    # went red on "timer". Reverted from a copy.
+    test "the two library fixtures' keys name every mark between them" do
+      marks = key_lines() |> Map.keys() |> Enum.sort()
+
+      assert marks ==
+               Enum.sort(~w(start end end-abandon arrow fork join interrupt wait clock timer))
+
+      for {_class, {mark, _words}} <- @in_key, do: assert(mark in marks)
     end
 
     # Sabotage: made mark/1 answer "hourglass" for an await; this went red
@@ -746,7 +803,7 @@ defmodule StatifierBlocks.Map.InfoTest do
           |> Enum.uniq()
 
         assert values != [], "the graph gives no #{key} for #{class}"
-        assert values -- Map.keys(@variants) == [], "#{class} builds a class the paragraph misses"
+        assert values -- Map.keys(@variants) == [], "#{class} builds a class nothing names"
       end
     end
 
@@ -766,10 +823,11 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert hook_classes(hook) == {["fork"], ["mark--${}"]}
     end
 
-    # Sabotage: made the clock's clause name only a message sent after a
+    # Sabotage: made the clock's key line name only a message sent after a
     # delay; this went red on "clock". Reverted from a copy.
     test "names every kind of mark, slot and end the graph gives" do
       {_graph, _descriptions, idle} = described("library_loan")
+      lines = key_lines()
 
       given =
         Enum.flat_map(@library, fn key ->
@@ -780,19 +838,29 @@ defmodule StatifierBlocks.Map.InfoTest do
 
       assert given -- Map.keys(@variants) == []
 
-      for {value, words} <- @variants do
-        assert idle.explanation =~ words, "the paragraph does not name #{value}"
+      for {value, {where, words}} <- @variants do
+        text = if where == :paragraph, do: idle.explanation, else: Map.fetch!(lines, where)
+        assert text =~ words, "nothing names #{value}"
       end
     end
 
-    # Sabotage: named the fork mark a second time, in the caption's
-    # sentence; this went red. Reverted from a copy.
+    # Each mark is named once, in the key and not again in the paragraph,
+    # and no sentence of the paragraph is said twice.
+    #
+    # Sabotage: put the fork mark back into the paragraph's sentence on a
+    # branch's box; this went red. Reverted from a copy.
     test "names each mark once and says no sentence twice" do
       {_graph, _descriptions, idle} = described("library_loan")
       text = idle.explanation
+      key = key_lines() |> Map.values() |> Enum.join("\n")
 
-      for words <- Map.values(@named) ++ Map.values(@variants) do
+      for words <- Map.values(@in_paragraph) do
         assert length(String.split(text, words)) == 2, "named more than once: #{words}"
+      end
+
+      for {_mark, words} <- Map.values(@in_key) do
+        assert length(String.split(key, words)) == 2, "named more than once in the key: #{words}"
+        refute text =~ words, "named in the paragraph and in the key: #{words}"
       end
 
       sentences = String.split(text, ~r/(?<=[.;])\s+/, trim: true)
@@ -800,33 +868,30 @@ defmodule StatifierBlocks.Map.InfoTest do
     end
 
     # The rejoin in plain words, and the arm's condition said once: in the
-    # branch's list of arms, not again where the arms come back together.
+    # paragraph's sentence on a branch's box, not again in the key's line
+    # for where the arms come back together.
     #
-    # Sabotage: made the rejoin clause read "after whichever arm's
+    # Sabotage: made the join's key line read "after whichever arm's
     # condition holds"; this went red. Reverted from a copy.
     test "says the rejoin in plain words and the condition once" do
       {_graph, _descriptions, idle} = described("library_loan")
+      join = Map.fetch!(key_lines(), "join")
 
-      assert [rejoin] =
-               idle.explanation
-               |> String.split(~r/(?<=[.;])\s+/)
-               |> Enum.filter(&(&1 =~ "come back together"))
-
-      refute rejoin =~ "condition"
+      assert join =~ "come back together"
+      refute join =~ "condition"
       assert length(String.split(idle.explanation, "condition")) == 2
     end
 
-    # A timer edge runs to an interrupt rule or an await; the paragraph
-    # names what hears it so it cannot be read as the timed wait the clock
-    # marks.
+    # A timer edge runs to an interrupt rule or an await; the key names
+    # what hears it so it cannot be read as the timed wait the clock marks.
     #
     # Sabotage: put back "to the rule or the wait that hears it"; this went
     # red. Reverted from a copy.
     test "names what hears a timer as a rule or an hourglass step" do
-      {_graph, _descriptions, idle} = described("library_loan")
+      timer = Map.fetch!(key_lines(), "timer")
 
-      assert idle.explanation =~ "to the interrupt rule or the hourglass step that hears it"
-      refute idle.explanation =~ "the wait that hears it"
+      assert timer =~ "to the interrupt rule or the hourglass step that hears it"
+      refute timer =~ "the wait that hears it"
     end
   end
 
@@ -1144,6 +1209,15 @@ defmodule StatifierBlocks.Map.InfoTest do
   end
 
   # Every mark, slot style and end outcome a graph gives, at any depth.
+  # Every line the two teaching documents' keys carry, by mark.
+  defp key_lines do
+    for key <- @library,
+        {graph, _descriptions, _idle} = described(key),
+        %{"mark" => mark, "line" => line} <- graph["legend"],
+        into: %{},
+        do: {mark, line}
+  end
+
   defp graph_values(node) do
     own = [node["mark"], node["style"], node["kind"] == "end" && node["outcome"]]
     inside = node |> Map.get("children", []) |> Enum.flat_map(&graph_values/1)

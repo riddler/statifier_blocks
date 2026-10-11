@@ -30,6 +30,7 @@ defmodule StatifierBlocks.Map.Info do
   | what a connector carries | the outline's `:sequence` edge between the same two blocks |
   | what a timer edge says, and what a send arms or a rule hears | the outline's `:timer` edges, and a timer edge's line in `Describe.render/2` |
   | what a type is for | `StatifierBlocks.BlockType.explain/1` of the block's type, through the palette |
+  | the key's lines | the `legend` `StatifierBlocks.Map.graph/2` carries |
 
   A type's explanation is the package's: the paragraph its optional
   `explain/0` callback answers, else its palette entry's `description`.
@@ -157,25 +158,12 @@ defmodule StatifierBlocks.Map.Info do
                  "side by side, a group's body as a pane with its interrupt rules in a " <>
                  "column beside it, or a shelf of drafts. A dashed box saying " <>
                  "\"#{BlockMap.empty_text()}\" is a place no step fills yet. " <>
-                 "The filled dot marked Start is where the document starts, its arrow " <>
-                 "captioned with what starts it, and a dot inside a ring marked End where " <>
-                 "it finishes: a solid ring " <>
-                 "when its last step finishes, a dashed ring, reached by a dashed arrow, " <>
-                 "when an interrupt rule abandons that step, the outcome named on the " <>
-                 "arrow into it. An arrow runs from a step to the one after it. " <>
                  "A branch's box lists its arms in the order it tries them, each with its " <>
-                 "condition, and a band with a fork mark stands over the arms' boxes; " <>
-                 "after whichever arm runs, the arms come back together at a dot on the " <>
-                 "branch's bottom edge, where a heavier arrow leads on. A one-line " <>
-                 "caption, on a branch's band or under a group's rules column, says what " <>
-                 "that kind of step does. A dashed arrow runs from an interrupt rule to " <>
-                 "where it takes its group: out of it, or back to the head of its body. " <>
-                 "An hourglass marks a step that waits for an event, and a clock a timed " <>
-                 "wait or a message sent after a delay; a dotted arrow, labelled with the " <>
-                 "delay, runs from that message to the interrupt rule or the hourglass " <>
-                 "step that hears it. The selected step's box is outlined, and on a page " <>
-                 "that can edit, a \"+\" at a box's lower right corner is where a step can " <>
-                 "be added right after it. " <>
+                 "condition. A one-line caption, on a branch's band or under a group's " <>
+                 "rules column, says what that kind of step does. The selected step's box " <>
+                 "is outlined, and on a page that can edit, a \"+\" at a box's lower right " <>
+                 "corner is where a step can be added right after it. The key beside the " <>
+                 "drawing says what each of its other marks means. " <>
                  "Select a step in the list, or point at the map, to read about it here."
 
   @unresolved "A block of a type this palette does not know, so nothing can be said about what it does."
@@ -217,7 +205,9 @@ defmodule StatifierBlocks.Map.Info do
   @doc """
   The document described, for when nothing is selected: its name and
   description, what starts it, how it finishes, what it listens for, how
-  to read the map, and how many steps and open slots it has.
+  to read the map, how many steps and open slots it has, and the key: the
+  line for each mark the map's key names, the `legend` of `graph`, as the
+  "Key" fact, since the map itself is hidden from assistive technology.
   """
   @spec idle(Document.t(), BlockMap.t(), ViewModel.t(), Describe.t()) :: t()
   def idle(%Document{} = document, graph, %ViewModel{}, %Describe{nodes: nodes}) do
@@ -233,8 +223,18 @@ defmodule StatifierBlocks.Map.Info do
           [
             {"Steps", Integer.to_string(max(length(nodes) - 1, 0))},
             {"Open slots", graph |> markers() |> length() |> Integer.to_string()}
-          ]
+          ] ++ key(graph)
     }
+  end
+
+  # The key's lines, in the words the map's key draws beside each mark;
+  # none for a graph that carries no key.
+  @spec key(BlockMap.t()) :: [fact()]
+  defp key(graph) do
+    case for(%{"line" => line} <- Map.get(graph, "legend", []), do: line) do
+      [] -> []
+      lines -> [{"Key", lines}]
+    end
   end
 
   # What starts the document, in the words the map's start edge carries

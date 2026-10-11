@@ -21,6 +21,9 @@
 // every end mark as drawn - its outcome, its circles, whether its ring is
 // dashed, and what a click on it asks - and `endEdges`, every path drawn
 // into an end mark with its outcome and whether it is dashed, and
+// `key`, the key as drawn - its box, and each entry's mark, glyph and
+// lines - with `drawnMarks`, every kind of mark the drawing outside the
+// key carries, and `svg`, the drawing's own width and height, and
 // `childGestures`, the same
 // asked of a click on each of that element's children (the rect, text,
 // circle or path a real click lands on), which reach the element by walking
@@ -259,4 +262,57 @@ for (const [, id, rest] of html.matchAll(/data-map-node="([^"]*)" data-map-kind=
     .map((m) => unescape(m[1]))
 }
 
-process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges, layouts}))
+// The key, read off the markup: the group marked data-map-key, its box,
+// and each entry - the mark it names, every element its glyph is drawn
+// with (tag, class, style, and whether it ends in the arrowhead), and the
+// lines written beside it - and what a click on any of it asks.
+const textOf = (el) =>
+  unescape((html.slice(html.indexOf(el.token) + el.token.length).match(/^([^<]*)<\/text>/) || [])[1] || "")
+const keyEl = all.find((e) => e.dataset.mapKey !== undefined)
+const inKey = (el) => keyEl && el.closest("[data-map-key]") === keyEl
+let key = null
+if (keyEl) {
+  const [box] = keyEl.children
+  key = {
+    box: {x: num(box, "x"), y: num(box, "y"), width: num(box, "width"), height: num(box, "height")},
+    title: textOf(keyEl.children[1]),
+    entries: keyEl.children.filter((c) => c.dataset.mapKeyMark !== undefined).map((entry) => ({
+      mark: entry.dataset.mapKeyMark,
+      glyph: entry.children.filter((c) => c.tag !== "text").map((c) => ({
+        tag: c.tag,
+        class: (c.token.match(/\sclass="([^"]*)"/) || [])[1] || null,
+        style: styleOf(c),
+        arrow: /marker-end=/.test(c.token),
+      })),
+      lines: entry.children.filter((c) => c.tag === "text").map((c) => ({
+        text: textOf(c), x: num(c, "x"), y: num(c, "y"),
+      })),
+    })),
+    gestures: all.filter(inKey).map((c) => mapGesture(c, editable, events)),
+    described: all.filter(inKey).some((c) => c.dataset.mapNode !== undefined || c.dataset.mapEdge !== undefined),
+  }
+}
+
+// Every kind of mark the drawing carries outside the key, in the key's
+// words: the start dot, each end by its outcome, solid, dashed and dotted
+// arrows, the join dot, the fork mark, the hourglass and the clock.
+const drawnMarks = new Set()
+for (const el of all.filter((e) => !inKey(e))) {
+  const d = el.dataset
+  if (d.mapStart !== undefined) drawnMarks.add("start")
+  if (d.mapEnd !== undefined) drawnMarks.add(d.mapOutcome === "abandon" ? "end-abandon" : "end")
+  if (d.mapJoin !== undefined) drawnMarks.add("join")
+  if (d.mapFork !== undefined) drawnMarks.add("fork")
+  if (d.mapMark !== undefined) drawnMarks.add(d.mapMark)
+  if (el.tag === "path" && d.mapEdge !== undefined) {
+    const kind = d.mapEdgeKind
+    if (kind === "interrupt" || (kind === "end" && dashed(el))) drawnMarks.add("interrupt")
+    else if (kind === "timer") drawnMarks.add("timer")
+    else if (kind !== "rejoin") drawnMarks.add("arrow")
+  }
+}
+
+const [, svgWidth, svgHeight] = html.match(/<svg [^>]*width="([\d.]+)" height="([\d.]+)"/) || []
+const svg = svgWidth === undefined ? null : {width: Number(svgWidth), height: Number(svgHeight), laidWidth: laid ? laid.width : null, laidHeight: laid ? laid.height : null}
+
+process.stdout.write(JSON.stringify({drawn, html: target.innerHTML, boxes: laidOut, edges, interrupts, timers, marks, bands, rejoins, headers, captions, gestures, childGestures, starts, ends, endEdges, layouts, key, drawnMarks: [...drawnMarks], svg}))

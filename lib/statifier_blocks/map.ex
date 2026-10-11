@@ -285,6 +285,35 @@ defmodule StatifierBlocks.Map do
   above, and lays the graph out again. A graph whose every group carries
   its ports is laid out once.
 
+  ## The key
+
+  The graph's root carries `legend`, the key the hook draws beside the
+  drawing: one entry per kind of mark the drawing uses, each
+  `%{"mark" => mark, "line" => line, "lines" => lines}`, in a fixed
+  order, and none for a mark the drawing does not use. `line` is what the
+  mark means, in words, and `lines` is the same words wrapped to a line
+  somewhat wider than a box's, which is what the hook writes beside the
+  mark's glyph.
+
+  | Mark | Drawn where the graph has |
+  |---|---|
+  | `start` | the start dot, which every graph has |
+  | `end` | a `done` end mark |
+  | `end-abandon` | an `abandon` end mark |
+  | `arrow` | a solid edge: the start edge, a connector, or an edge into the `done` end |
+  | `fork` | a branch's band, with its fork mark |
+  | `join` | a `rejoin` edge, with its join dot |
+  | `interrupt` | a dashed edge: an interrupt edge, or an edge into the `abandon` end |
+  | `wait` | a block carrying the `wait` mark |
+  | `clock` | a block carrying the `clock` mark |
+  | `timer` | a timer edge |
+
+  The key is data in the graph, read off the graph itself, so the Map stays
+  pure and the key cannot name a mark the drawing lacks. The map region is
+  hidden from assistive technology, so the same lines reach the description
+  region as text: `StatifierBlocks.Map.Info.idle/4` carries them as its
+  "Key" fact.
+
   ## Order is semantic, so it is forced
 
   A branch evaluates its arms in slot order and a sequence runs its steps
@@ -356,6 +385,36 @@ defmodule StatifierBlocks.Map do
   @body_lead 48
   @fork_room 26
   @pad 12
+  # The characters a line of the key holds: wider than a box's, so the key
+  # stays short beside the drawing.
+  @key_line 46
+
+  # The key's entries, in the order the hook draws them: each mark and what
+  # it means; see the moduledoc's "The key".
+  @legend [
+    {"start",
+     "The filled dot marked Start is where the document starts, its arrow captioned " <>
+       "with what starts it"},
+    {"end",
+     "A dot inside a solid ring marked End is where the document finishes when its " <>
+       "last step finishes, the outcome named on the arrow into it"},
+    {"end-abandon",
+     "A dashed ring, reached by a dashed arrow, is where the document finishes when " <>
+       "an interrupt rule abandons its last step"},
+    {"arrow", "An arrow runs from a step to the one after it"},
+    {"fork", "A band with a fork mark stands over a branch's arms"},
+    {"join",
+     "After whichever arm runs, the arms come back together at a dot, where a heavier " <>
+       "arrow leads on"},
+    {"interrupt",
+     "A dashed arrow runs from an interrupt rule to where it takes its group: out of " <>
+       "it, or back to the head of its body"},
+    {"wait", "An hourglass marks a step that waits for an event"},
+    {"clock", "A clock marks a timed wait or a message sent after a delay"},
+    {"timer",
+     "A dotted arrow, labelled with the delay, runs from a message sent after a delay " <>
+       "to the interrupt rule or the hourglass step that hears it"}
+  ]
 
   @force_model_order "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder"
   @consider_model_order "org.eclipse.elk.layered.considerModelOrder.strategy"
@@ -391,8 +450,9 @@ defmodule StatifierBlocks.Map do
 
   @typedoc """
   The whole graph: the ELK root, with the start dot and the document's root
-  block as its two children, the start edge as its one edge, and `timers`,
-  the timer edges the hook draws after the layout.
+  block as its two children, the start edge as its one edge, `timers`, the
+  timer edges the hook draws after the layout, and `legend`, the key the
+  hook draws beside the drawing.
   """
   @type t :: %{required(String.t()) => term()}
 
@@ -421,6 +481,7 @@ defmodule StatifierBlocks.Map do
     }
     |> put_start(root)
     |> put_timers(view_model)
+    |> put_legend()
     |> put_selected(Keyword.fetch!(opts, :selected))
   end
 
@@ -493,6 +554,51 @@ defmodule StatifierBlocks.Map do
   """
   @spec start_text() :: String.t()
   def start_text, do: @start_text
+
+  # ----------------------------------------------------------------- the key
+
+  # The key: one entry per kind of mark `graph` draws, in the key's own
+  # order; see the moduledoc's "The key".
+  @spec put_legend(t()) :: t()
+  defp put_legend(graph) do
+    used = graph |> drawn_marks() |> MapSet.new()
+
+    legend =
+      for {mark, line} <- @legend,
+          MapSet.member?(used, mark),
+          do: %{"mark" => mark, "line" => line, "lines" => wrap(line, "", @key_line)}
+
+    Map.put(graph, "legend", legend)
+  end
+
+  # Every kind of mark a graph node, its edges and everything under it
+  # draw, with repeats; the graph's timer edges are its root's.
+  @spec drawn_marks(graph_node()) :: [String.t()]
+  defp drawn_marks(%{} = graph_node) do
+    own =
+      node_marks(graph_node) ++
+        Enum.flat_map(Map.get(graph_node, "edges", []), &edge_marks/1) ++
+        if(Map.get(graph_node, "interrupts", []) == [], do: [], else: ["interrupt"]) ++
+        if(Map.get(graph_node, "timers", []) == [], do: [], else: ["timer"])
+
+    own ++ Enum.flat_map(Map.get(graph_node, "children", []), &drawn_marks/1)
+  end
+
+  @spec node_marks(graph_node()) :: [String.t()]
+  defp node_marks(%{"kind" => "start"}), do: ["start"]
+  defp node_marks(%{"kind" => "end", "outcome" => @abandon}), do: ["end-abandon"]
+  defp node_marks(%{"kind" => "end"}), do: ["end"]
+
+  defp node_marks(%{} = graph_node) do
+    Enum.reject([graph_node["mark"], if(graph_node["band"] == true, do: "fork")], &is_nil/1)
+  end
+
+  # A rejoin is drawn with its join dot, an edge into the abandon end
+  # dashed, and every other edge solid.
+  @spec edge_marks(map()) :: [String.t()]
+  defp edge_marks(%{"kind" => "rejoin"}), do: ["join"]
+  defp edge_marks(%{"kind" => "end", "outcome" => @abandon}), do: ["interrupt"]
+  defp edge_marks(%{}), do: ["arrow"]
 
   # --------------------------------------------------------------- selection
 
@@ -1308,13 +1414,13 @@ defmodule StatifierBlocks.Map do
   defp under(title, title), do: []
   defp under(text, _title), do: wrap(text)
 
-  # Words onto lines no wider than a leaf holds. A single word longer than a
+  # Words onto lines no wider than a leaf holds, or than `per_line`
+  # characters where one is given (the key's). A single word longer than a
   # line keeps its own line rather than being cut: nothing on the map
   # truncates but a caption (see the moduledoc's "Captions"). Every line
   # after the first starts with `indent`, which counts against its room.
-  @spec wrap(String.t(), String.t()) :: [String.t()]
-  defp wrap(text, indent \\ "") do
-    per_line = div(@leaf_max_width - @leaf_padding, @char_width)
+  @spec wrap(String.t(), String.t(), pos_integer()) :: [String.t()]
+  defp wrap(text, indent \\ "", per_line \\ div(@leaf_max_width - @leaf_padding, @char_width)) do
     continued = per_line - String.length(indent)
 
     lines =

@@ -4972,6 +4972,16 @@ button.sb-inspector__group-row:hover {
   cursor: default;
 }
 
+/* The key beside the drawing selects nothing either. Its lines keep the
+   map's 12px, so the width estimate the hook sizes it by holds. */
+.sb-map__svg .sb-map__key {
+  cursor: default;
+}
+
+.sb-map__svg .sb-map__key-title {
+  font-weight: 600;
+}
+
 .sb-map__svg .sb-map__empty-text {
   fill: var(--sb-fg-subtle);
   font-style: italic;

@@ -962,3 +962,86 @@ Where it holds:
   package's own `StatifierBlocks.Map`.
 
 Filed with `sb-v3zy`.
+
+## Note (2026-10-10): the Map draws a key of its marks
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It records a rule ruled by the operator, 2026-10-09, where the
+code holds it, and how sentences elsewhere now read.
+
+The rule: the Map draws a compact visual key of the marks on it. The way
+it is met, as data in the graph that the hook draws, was decided by the
+conductor under a standing consent, 2026-10-10. `StatifierBlocks.Map.graph/2`
+answers a `legend`: one entry for each kind of mark the drawing uses (the
+start dot, the done and the abandon end rings, solid, dashed and dotted
+arrows, the fork, the join, the hourglass and the clock), each with the
+line that says what that mark means. The key is read off the graph
+itself, so it never lists a mark the drawing does not use, and the Map
+stays the pure reader decision (a) makes it. The hook draws the key with
+the drawing's own glyphs at the drawing's top right, beside the drawing
+and clear of it.
+
+How it reaches assistive technology: the map region is hidden from it
+(decision (d)), and the key is part of that hidden picture, so the same
+lines reach the description region as text. `StatifierBlocks.Map.Info.idle/4`
+answers them as its last fact, "Key". The idle explanation, the paragraph
+on how to read the map, is cut to match: what the key says about each
+mark leaves the paragraph, which keeps its sentences on the boxes, the
+shaded boxes, the empty marker, a branch's list of arms, the captions,
+the selection and the "+", and gains one that points at the key.
+`description_region/1` with `map={false}`, the editor's, leaves the "Key"
+fact out as it leaves out the paragraph, since no map stands beside it.
+
+Where it holds:
+
+- `put_legend/1` and `drawn_marks/1` (`lib/statifier_blocks/map.ex`,
+  `defp put_legend`, `defp drawn_marks`) build the key from the graph;
+  `@legend` holds each mark's line, and the moduledoc's "The key" section
+  says so.
+- `key/1` (`lib/statifier_blocks/map/info.ex`, `defp key`) answers the
+  "Key" fact, and `@how_to_read` is the cut paragraph.
+- `shown_facts/2` (`lib/statifier_blocks/editor/map_regions.ex`,
+  `defp shown_facts`) leaves the fact out of a region with no map.
+- `keyOf` and `drawKey` (`assets/js/statifier_blocks_map.js`,
+  `export function keyOf`, `function drawKey`) place the key and draw it;
+  `keyGlyph` draws each mark with the functions the drawing draws it with
+  (`startGlyph`, `endGlyph`, `forkGlyph`, `markGlyph`) or in the
+  drawing's own arrowhead and dashes, and `renderSvg` widens the SVG to
+  hold the key.
+- `test/statifier_blocks/map_test.exs`, describe "the key", pins which
+  marks each teaching document's key names, in order, a smaller key for a
+  smaller drawing, and each entry's wrapped lines.
+- `test/statifier_blocks/map_layout_test.exs`, describe "the key, as
+  drawn", lays both teaching documents out through the vendored elkjs and
+  pins a key of exactly the marks the drawing carries, read off the
+  markup on both sides; the key at the drawing's top right, inside the
+  SVG and clear of every box, edge end and caption; each entry's glyph as
+  the drawing's own; and a key a click or a pointer on which asks and
+  names nothing.
+- `test/statifier_blocks/map/info_test.exs`, "the key's lines, as the
+  last fact, for the marks the map draws", pins the fact; its describe
+  "the paragraph on how to read the map, and the key" binds every class
+  the hook draws to words in the paragraph or in one mark's key line.
+  `test/statifier_blocks/editor/map_regions_test.exs`, describe "the map
+  attr", pins the key's lines in a host's region and their absence with
+  `map={false}`. Both graphs under `test/fixtures/map/` are regenerated
+  from the package's own `StatifierBlocks.Map`.
+
+How sentences elsewhere now read:
+
+- This record's Note of 2026-09-29, "a timed wait carries the clock
+  mark", says the paragraph (`@how_to_read`) says an hourglass marks a
+  step that waits for an event and a clock a timed wait or a message sent
+  after a delay. Those words are now the key's lines for the hourglass
+  and the clock.
+- This record's Note of 2026-10-10, "the start dot and every end mark
+  carry their words", says the paragraph names the dot marked Start and
+  the ring marked End. Those words are now the key's lines for the start
+  dot and the done end.
+- This record's Note of 2026-09-29, "the editor's own description region
+  is decided in ADR-0005", and `ADR-0005`'s Amendment of 2026-09-29, "the
+  shell arrangement, one description region under the canvas", say that
+  `map={false}` drops the paragraph, the hover layer and the store. It now
+  drops the "Key" fact too.
+
+Filed with `sb-9dwx`.

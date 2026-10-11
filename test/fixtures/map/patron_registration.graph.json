@@ -465,6 +465,95 @@
     "org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers": "28",
     "org.eclipse.elk.spacing.nodeNode": "24"
   },
+  "legend": [
+    {
+      "line": "The filled dot marked Start is where the document starts, its arrow captioned with what starts it",
+      "lines": [
+        "The filled dot marked Start is where the",
+        "document starts, its arrow captioned with what",
+        "starts it"
+      ],
+      "mark": "start"
+    },
+    {
+      "line": "A dot inside a solid ring marked End is where the document finishes when its last step finishes, the outcome named on the arrow into it",
+      "lines": [
+        "A dot inside a solid ring marked End is where",
+        "the document finishes when its last step",
+        "finishes, the outcome named on the arrow into",
+        "it"
+      ],
+      "mark": "end"
+    },
+    {
+      "line": "A dashed ring, reached by a dashed arrow, is where the document finishes when an interrupt rule abandons its last step",
+      "lines": [
+        "A dashed ring, reached by a dashed arrow, is",
+        "where the document finishes when an interrupt",
+        "rule abandons its last step"
+      ],
+      "mark": "end-abandon"
+    },
+    {
+      "line": "An arrow runs from a step to the one after it",
+      "lines": [
+        "An arrow runs from a step to the one after it"
+      ],
+      "mark": "arrow"
+    },
+    {
+      "line": "A band with a fork mark stands over a branch's arms",
+      "lines": [
+        "A band with a fork mark stands over a branch's",
+        "arms"
+      ],
+      "mark": "fork"
+    },
+    {
+      "line": "After whichever arm runs, the arms come back together at a dot, where a heavier arrow leads on",
+      "lines": [
+        "After whichever arm runs, the arms come back",
+        "together at a dot, where a heavier arrow leads",
+        "on"
+      ],
+      "mark": "join"
+    },
+    {
+      "line": "A dashed arrow runs from an interrupt rule to where it takes its group: out of it, or back to the head of its body",
+      "lines": [
+        "A dashed arrow runs from an interrupt rule to",
+        "where it takes its group: out of it, or back",
+        "to the head of its body"
+      ],
+      "mark": "interrupt"
+    },
+    {
+      "line": "An hourglass marks a step that waits for an event",
+      "lines": [
+        "An hourglass marks a step that waits for an",
+        "event"
+      ],
+      "mark": "wait"
+    },
+    {
+      "line": "A clock marks a timed wait or a message sent after a delay",
+      "lines": [
+        "A clock marks a timed wait or a message sent",
+        "after a delay"
+      ],
+      "mark": "clock"
+    },
+    {
+      "line": "A dotted arrow, labelled with the delay, runs from a message sent after a delay to the interrupt rule or the hourglass step that hears it",
+      "lines": [
+        "A dotted arrow, labelled with the delay, runs",
+        "from a message sent after a delay to the",
+        "interrupt rule or the hourglass step that",
+        "hears it"
+      ],
+      "mark": "timer"
+    }
+  ],
   "timers": [
     {
       "delay": "7d",
