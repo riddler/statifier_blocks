@@ -19,12 +19,12 @@ defmodule StatifierBlocks.MapFixtures do
   the library loan's graph was regenerated when a timed wait gained the
   clock mark, both graphs when the start dot moved out of the root's box
   to stand first in the graph, above it, both again when the start dot
-  gained the word Start and every end mark the word End, and the library
+  gained the word Start and every end mark the word End, the library
   loan's again when a wrapped arm entry's later lines gained their
-  indent. They differ from the reference host's by those four changes:
-  the one mark on the loan period, the dot and its edge at the graph's
-  top level, the words on the marks, and the indented line under the
-  renew arm.
+  indent, and both again when the graph gained its key. They differ from
+  the reference host's by those five changes: the one mark on the loan
+  period, the dot and its edge at the graph's top level, the words on the
+  marks, the indented line under the renew arm, and the `legend`.
   """
 
   alias StatifierBlocks.{Block, Decode, Document, Palette, ViewModel}

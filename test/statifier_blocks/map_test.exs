@@ -1274,6 +1274,59 @@ defmodule StatifierBlocks.MapTest do
     end
   end
 
+  describe "the key" do
+    # The key names the kinds of mark each teaching document's drawing
+    # uses, in the key's own order, and no other: the loan has no abandon
+    # end and no timer edge, the registration has every kind.
+    #
+    # Sabotage: made node_marks/1 read an abandon end as a done one; this
+    # went red on the registration. Reverted from a copy.
+    # Sabotage: made drawn_marks/1 leave out the graph's timer edges; this
+    # went red on the registration. Reverted from a copy.
+    test "each teaching document's key names the marks its drawing uses, in order" do
+      assert legend_marks(graph("library_loan")) ==
+               ~w(start end arrow fork join interrupt wait clock)
+
+      assert legend_marks(graph("patron_registration")) ==
+               ~w(start end end-abandon arrow fork join interrupt wait clock timer)
+    end
+
+    # A drawing with fewer marks has a shorter key: one step and no
+    # branch, group or timer draws the dot, the done end and solid
+    # arrows; a root with no step yet draws no end at all.
+    #
+    # Sabotage: made drawn_marks/1 leave out every node's edges; this went
+    # red on "arrow". Reverted from a copy.
+    test "a smaller drawing has a smaller key" do
+      assert legend_marks(BlockMap.graph(build(no_accepts_document()))) == ~w(start end arrow)
+
+      empty = "core.sequence" |> Block.new(id: "root") |> Document.new() |> build()
+      assert legend_marks(BlockMap.graph(empty)) == ~w(start arrow)
+    end
+
+    # Each entry carries its mark, its line, and the line wrapped for the
+    # hook to write beside the glyph: the same words, none cut, no wrapped
+    # line wider than the key holds unless it is one word.
+    #
+    # Sabotage: made put_legend/1 wrap at a box's width; this went red on
+    # the line count. Reverted from a copy.
+    test "each entry's lines are its line, wrapped for the key" do
+      for key <- MapFixtures.keys(),
+          %{"line" => line, "lines" => lines} = entry <- graph(key)["legend"] do
+        assert Map.keys(entry) == ["line", "lines", "mark"]
+        assert Enum.join(lines, " ") == line
+
+        for wrapped <- lines,
+            do: assert(String.length(wrapped) <= 46 or not String.contains?(wrapped, " "))
+      end
+
+      assert [_one, _two, _three] =
+               graph("patron_registration")["legend"]
+               |> Enum.find(&(&1["mark"] == "start"))
+               |> Map.fetch!("lines")
+    end
+  end
+
   # ------------------------------------------------------------------ helpers
 
   # The graph's JSON, or the error the encoder raised on a term JSON has no
@@ -1289,6 +1342,8 @@ defmodule StatifierBlocks.MapTest do
   defp documents, do: for(key <- MapFixtures.keys(), do: {key, MapFixtures.document!(key)})
 
   defp view_models, do: for({key, document} <- documents(), do: {key, build(document)})
+
+  defp legend_marks(graph), do: for(%{"mark" => mark} <- graph["legend"], do: mark)
 
   defp graph(key),
     do: BlockMap.graph(MapFixtures.view_model!(key), phrase: &MapFixtures.phrase/1)

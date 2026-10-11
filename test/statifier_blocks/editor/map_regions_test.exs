@@ -518,6 +518,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert count_of(default, "#map-description-hover") == 1
         assert count_of(default, "#map-description-store") == 1
 
+        # The map is hidden from assistive technology, so its key reaches
+        # the region as text: every line of it, under "Key".
+        {"Key", key} = List.last(idle.facts)
+        text = LazyHTML.text(one(default, "#map-description"))
+        assert text =~ "Key"
+        for line <- key, do: assert(text =~ line)
+
         {:ok, view, _html} = mount_host(conn, document)
         assert LazyHTML.text(region(view)) =~ idle.explanation
       end
@@ -526,7 +533,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # red on the idle paragraph.
       # Sabotage: made the paragraph's `:if` read `@map` alone; this went
       # red on the selected block's explanation.
-      test "false drops the how-to-read paragraph, the layer and the store, and nothing else" do
+      # Sabotage: made shown_facts/2 keep the key without a map; this went
+      # red on the key's lines.
+      test "false drops the how-to-read paragraph, the key, the layer and the store, and nothing else" do
         document = MapFixtures.document!("library_loan")
         {_graph, elements, idle} = described("library_loan")
 
@@ -535,6 +544,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert count_of(none, "#map-description-store") == 0
         assert count_of(none, "#map-description .sb-map__description-text") == 0
         refute LazyHTML.text(one(none, "#map-description")) =~ idle.explanation
+        {"Key", key} = List.last(idle.facts)
+        for line <- key, do: refute(LazyHTML.text(one(none, "#map-description")) =~ line)
+        assert LazyHTML.text(one(none, "#map-description")) =~ "Open slots"
         assert LazyHTML.text(one(none, "#map-description")) =~ idle.title
         assert LazyHTML.attribute(one(none, "#map-description"), "aria-live") == ["polite"]
 

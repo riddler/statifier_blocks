@@ -346,11 +346,16 @@ export function bandOf(node) {
   }
 }
 
-// The fork mark, a 14px glyph: one stem splitting into three.
-function drawFork({x, y}) {
-  return `<path class="sb-map__fork" data-map-fork="true" ` +
+// The fork mark, a 14px glyph: one stem splitting into three. The key
+// draws the same glyph, without the attribute that names a band's.
+function forkGlyph({x, y}, attrs = "") {
+  return `<path class="sb-map__fork"${attrs} ` +
     `d="M${x + 7} ${y} V${y + 5} M${x + 7} ${y + 5} L${x + 1} ${y + 13} ` +
     `M${x + 7} ${y + 5} V${y + 13} M${x + 7} ${y + 5} L${x + 13} ${y + 13}" style="${MARK_STYLE}"/>`
+}
+
+function drawFork(at) {
+  return forkGlyph(at, ` data-map-fork="true"`)
 }
 
 function drawBand(node) {
@@ -427,12 +432,7 @@ function drawNode(node) {
     const r = Math.min(w, h) / 2 - 1
     return `<g class="sb-map__end sb-map__end--${abandon ? "abandon" : "done"}" ` +
       `data-map-end="${id}" data-map-node="${id}" data-map-outcome="${escapeText(node.outcome)}">` +
-      `<circle class="sb-map__end-ring" cx="${cx}" cy="${cy}" r="${r}" ` +
-      `style="fill: none; stroke: var(--sb-map-edge, #64748b); stroke-width: 1.5` +
-      `${abandon ? "; stroke-dasharray: 3 2" : ""}"/>` +
-      `<circle class="sb-map__end-dot" cx="${cx}" cy="${cy}" r="${r / 2}" ` +
-      `style="fill: var(--sb-map-edge, #64748b)"/>` +
-      drawWord(node, "sb-map__end-word") + `</g>`
+      endGlyph(cx, cy, r, abandon) + drawWord(node, "sb-map__end-word") + `</g>`
   }
 
   // Where the document starts: the state chart's initial mark, a filled
@@ -440,8 +440,7 @@ function drawNode(node) {
   // and it carries no data-map-kind, so a click on it selects nothing.
   if (node.kind === "start") {
     return `<g class="sb-map__start" data-map-start="${id}" data-map-node="${id}">` +
-      `<circle cx="${x + w / 2}" cy="${y + h / 2}" r="${Math.min(w, h) / 2}" ` +
-      `style="fill: var(--sb-map-edge, #64748b)"/>` +
+      startGlyph(x + w / 2, y + h / 2, Math.min(w, h) / 2) +
       drawWord(node, "sb-map__start-word") + `</g>`
   }
 
@@ -468,6 +467,20 @@ function drawNode(node) {
     `</g>`
 }
 
+// The start dot's glyph: a filled dot.
+function startGlyph(cx, cy, r) {
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" style="fill: var(--sb-map-edge, #64748b)"/>`
+}
+
+// An end mark's glyph: a ring, dashed for an abandon end, with a dot in it.
+function endGlyph(cx, cy, r, abandon) {
+  return `<circle class="sb-map__end-ring" cx="${cx}" cy="${cy}" r="${r}" ` +
+    `style="fill: none; stroke: var(--sb-map-edge, #64748b); stroke-width: 1.5` +
+    `${abandon ? "; stroke-dasharray: 3 2" : ""}"/>` +
+    `<circle class="sb-map__end-dot" cx="${cx}" cy="${cy}" r="${r / 2}" ` +
+    `style="fill: var(--sb-map-edge, #64748b)"/>`
+}
+
 // The word a start dot or an end mark carries, written where the layout
 // placed the mark's one label: beside the mark, in the room the layout left
 // it (the server sized the label and asked for it outside the mark). A
@@ -492,14 +505,19 @@ function drawMark(node) {
   if (node.mark !== "wait" && node.mark !== "clock") return ""
   const x = node.x + node.width - 22
   const y = node.y + HEADER_BASE - 4
-  const glyph = node.mark === "wait"
+
+  return `<g class="sb-map__mark sb-map__mark--${node.mark}" data-map-mark="${node.mark}">` +
+    markGlyph(node.mark, x, y) + `</g>`
+}
+
+// The hourglass (`wait`) or the clock face (`clock`), 14px square from its
+// top left corner.
+function markGlyph(mark, x, y) {
+  return mark === "wait"
     ? `<path d="M${x + 2} ${y} H${x + 12} M${x + 2} ${y + 14} H${x + 12} ` +
       `M${x + 3} ${y} L${x + 11} ${y + 14} M${x + 11} ${y} L${x + 3} ${y + 14}" style="${MARK_STYLE}"/>`
     : `<circle cx="${x + 7}" cy="${y + 7}" r="6.5" style="${MARK_STYLE}"/>` +
       `<path d="M${x + 7} ${y + 3} V${y + 7} H${x + 10}" style="${MARK_STYLE}"/>`
-
-  return `<g class="sb-map__mark sb-map__mark--${node.mark}" data-map-mark="${node.mark}">` +
-    glyph + `</g>`
 }
 
 // A layout edge. A branch's rejoin is drawn heavier, with a join dot where
@@ -571,6 +589,86 @@ function drawTimer(edge) {
     `data-map-edge="${id}" x="${edge.label.x}" y="${edge.label.y}">${escapeText(edge.delay)}</text>`
 }
 
+// ------------------------------------------------------------------- key
+//
+// The key: the graph's `legend`, one entry per kind of mark the drawing
+// uses, each drawn with the drawing's own glyph and the server's words for
+// it (`StatifierBlocks.Map`'s moduledoc, "The key"). It stands at the
+// drawing's top right, beside it and clear of it: the SVG is widened to
+// hold it, and made tall enough when the key is the taller of the two.
+// It is part of the picture, so it is hidden from assistive technology
+// with the rest; the description region carries the same lines as text.
+// It carries no map id, so pointing at it shows nothing and a click on it
+// asks nothing.
+const KEY_GAP = 24
+const KEY_PAD = 8
+const KEY_GLYPH = 28
+const KEY_ENTRY_GAP = 6
+// The server's width estimate: 7px a character.
+const CHAR_WIDTH = 7
+
+// Where the key and each of its entries stand beside `laid`, absolute, as
+// `{x, y, width, height, entries: [{mark, lines, x, y}]}`, or null for a
+// graph with no key.
+export function keyOf(laid) {
+  const legend = Array.isArray(laid.legend) ? laid.legend : []
+  if (legend.length === 0) return null
+
+  const x = Math.ceil(laid.width) + KEY_GAP
+  let y = KEY_PAD + LINE_HEIGHT + KEY_ENTRY_GAP
+  let widest = 0
+  const entries = legend.map(({mark, lines}) => {
+    const text = Array.isArray(lines) && lines.length > 0 ? lines : [""]
+    const entry = {mark, lines: text, x: x + KEY_PAD, y}
+    for (const line of text) widest = Math.max(widest, String(line).length)
+    y += Math.max(text.length * LINE_HEIGHT, LINE_HEIGHT) + KEY_ENTRY_GAP
+    return entry
+  })
+
+  return {x, y: 0, width: 2 * KEY_PAD + KEY_GLYPH + widest * CHAR_WIDTH, height: y + KEY_PAD - KEY_ENTRY_GAP, entries}
+}
+
+// One mark's glyph in the key, in the 20 by 14 box at (x, y): the
+// drawing's own dot, ring, arrow, fork, join, hourglass or clock.
+function keyGlyph(mark, x, y) {
+  const mid = y + 7
+  const edge = "fill: none; stroke: var(--sb-map-edge, #64748b)"
+  const arrow = (style) => `<path d="M${x} ${mid} H${x + 20}" marker-end="url(#sb-map-arrow)" style="${style}"/>`
+
+  switch (mark) {
+    case "start": return startGlyph(x + 7, mid, 7)
+    case "end": return endGlyph(x + 9, mid, 9, false)
+    case "end-abandon": return endGlyph(x + 9, mid, 9, true)
+    case "arrow": return arrow(edge)
+    case "interrupt": return arrow(`${edge}; stroke-dasharray: 5 4`)
+    case "timer": return arrow(`${edge}; stroke-dasharray: 2 3`)
+    case "join":
+      return arrow(`${edge}; stroke-width: 1.5`) +
+        `<circle cx="${x + 3.5}" cy="${mid}" r="3.5" style="fill: var(--sb-map-edge, #64748b)"/>`
+    case "fork": return forkGlyph({x: x + 3, y})
+    case "wait":
+    case "clock": return markGlyph(mark, x + 3, y)
+    default: return ""
+  }
+}
+
+function drawKey(key) {
+  if (key === null) return ""
+  const entries = key.entries.map(({mark, lines, x, y}) =>
+    `<g class="sb-map__key-entry" data-map-key-mark="${escapeText(mark)}">` +
+    keyGlyph(mark, x, y + 1) +
+    lines.map((line, i) =>
+      `<text class="sb-map__key-line" x="${x + KEY_GLYPH}" y="${y + 12 + i * LINE_HEIGHT}">` +
+      `${escapeText(line)}</text>`).join("") +
+    `</g>`).join("")
+
+  return `<g class="sb-map__key" data-map-key="true">` +
+    `<rect x="${key.x}" y="${key.y}" width="${key.width}" height="${key.height}" rx="6" ` +
+    `style="fill: var(--sb-map-block-fill, #ffffff); stroke: var(--sb-map-slot-stroke, #cbd5e1)"/>` +
+    `<text class="sb-map__key-title" x="${key.x + KEY_PAD}" y="${key.y + KEY_PAD + 12}">Key</text>` +
+    entries + `</g>`
+}
+
 // The laid-out graph as one SVG string. The picture is decoration over the
 // list, which is the accessible path through the same document, so the SVG
 // is hidden from assistive technology and takes no focus.
@@ -583,8 +681,9 @@ export function renderSvg(laid, {editable = false} = {}) {
   const gaps = editable ? all.map(drawGap).join("") : ""
   const edges = edgesOf(laid).map(drawEdge).join("") +
     interruptsOf(laid).map(drawInterrupt).join("") + timersOf(laid).map(drawTimer).join("")
-  const width = Math.ceil(laid.width)
-  const height = Math.ceil(laid.height)
+  const key = keyOf(laid)
+  const width = key === null ? Math.ceil(laid.width) : Math.ceil(key.x + key.width)
+  const height = Math.ceil(key === null ? laid.height : Math.max(laid.height, key.height))
 
   return `<svg xmlns="${SVG_NS}" class="sb-map__svg" data-map-svg="true" ` +
     `width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" ` +
@@ -592,7 +691,7 @@ export function renderSvg(laid, {editable = false} = {}) {
     `<defs><marker id="sb-map-arrow" viewBox="0 0 10 10" refX="10" refY="5" ` +
     `markerWidth="7" markerHeight="7" orient="auto-start-reverse">` +
     `<path d="M0 0 L10 5 L0 10 z" style="fill: var(--sb-map-edge, #64748b)"/></marker></defs>` +
-    nodes + edges + gaps +
+    nodes + edges + gaps + drawKey(key) +
     `</svg>`
 }
 

@@ -1033,6 +1033,164 @@ defmodule StatifierBlocks.MapLayoutTest do
     end
   end
 
+  describe "the key, as drawn" do
+    # The key names exactly the kinds of mark the drawing beside it
+    # carries, read off the markup on both sides: every mark drawn has an
+    # entry, and no entry names a mark that is not drawn. Each entry writes
+    # the graph's own line, wrapped as the graph wraps it, under the title
+    # Key.
+    #
+    # Sabotage: made drawKey skip the last entry; this went red on the
+    # library loan's clock. Reverted from a copy.
+    # Sabotage: made keyOf read each entry's `line` rather than its
+    # `lines`; this went red on the lines. Reverted from a copy.
+    test "both library fixtures draw a key of exactly the marks the drawing carries",
+         %{tmp_dir: dir} do
+      for key <- MapFixtures.keys() do
+        graph = library_graph(key)
+
+        %{"drawn" => "map", "key" => drawn, "drawnMarks" => marks} =
+          run(dir, "#{key}-key", graph)
+
+        assert %{"title" => "Key", "entries" => entries} = drawn
+        assert Enum.map(entries, & &1["mark"]) == Enum.map(graph["legend"], & &1["mark"]), key
+        assert Enum.sort(marks) == Enum.sort(Enum.map(entries, & &1["mark"])), key
+
+        for {entry, legend} <- Enum.zip(entries, graph["legend"]) do
+          assert Enum.map(entry["lines"], & &1["text"]) == legend["lines"], key
+        end
+      end
+    end
+
+    # The key stands at the drawing's top right: beside the drawing, to
+    # the right of every box the layout placed and level with the top,
+    # inside the SVG, which is widened to hold it, and clear of every box,
+    # every edge and every caption; every line it writes stays inside its
+    # box at the map's own estimate.
+    #
+    # Sabotage: made renderSvg keep the laid-out width; the key fell
+    # outside the SVG and this went red. Reverted from a copy.
+    # Sabotage: made keyOf stand the key at the drawing's left edge; it
+    # stood inside the drawing and this went red. Reverted from a copy.
+    test "both library fixtures draw the key at the top right, clear of the drawing",
+         %{tmp_dir: dir} do
+      for key <- MapFixtures.keys() do
+        %{
+          "drawn" => "map",
+          "key" => %{"box" => box, "entries" => entries},
+          "svg" => svg,
+          "boxes" => boxes,
+          "edges" => edges
+        } = run(dir, "#{key}-key", library_graph(key))
+
+        assert box["x"] >= svg["laidWidth"], key
+        assert box["y"] == 0, key
+        assert box["x"] + box["width"] <= svg["width"], key
+        assert box["y"] + box["height"] <= svg["height"], key
+        assert svg["height"] >= svg["laidHeight"], key
+
+        for {id, at} <- boxes, do: refute(overlaps?(box, at), "#{key}: the key lies over #{id}")
+
+        for %{"start" => start, "end" => stop, "labels" => labels} <- edges,
+            point <- [start, stop] do
+          refute overlaps?(box, %{
+                   "x" => point["x"],
+                   "y" => point["y"],
+                   "width" => 0,
+                   "height" => 0
+                 })
+
+          for label <- labels, do: refute(overlaps?(box, label), "#{key}: #{label["text"]}")
+        end
+
+        for %{"lines" => lines} <- entries, %{"text" => text, "x" => x, "y" => y} <- lines do
+          line = %{"x" => x, "y" => y - 12, "width" => text_width([text]) - 24, "height" => 16}
+          assert inside?(line, box), "#{key}: #{inspect(text)} runs out of the key"
+        end
+      end
+    end
+
+    # Each entry is drawn with the drawing's own glyph: the dot, the ring
+    # (dashed for an abandon end) with its dot, an arrow solid, dashed or
+    # dotted in the drawing's own dash and ending in its arrowhead, the
+    # heavier arrow with its join dot, the fork mark, the hourglass and the
+    # clock face.
+    #
+    # Sabotage: made keyGlyph draw the abandon end's ring solid; this went
+    # red. Reverted from a copy. Sabotage: made keyGlyph draw the dotted
+    # arrow in the dashed arrow's dash; this went red. Reverted from a
+    # copy.
+    test "each entry carries the drawing's own glyph", %{tmp_dir: dir} do
+      %{"key" => %{"entries" => entries}, "html" => html, "timers" => timers} =
+        run(dir, "patron_registration-key", library_graph("patron_registration"))
+
+      glyphs = Map.new(entries, &{&1["mark"], &1["glyph"]})
+
+      [interrupt_dash] =
+        for [_all, dash] <-
+              Regex.scan(
+                ~r/<path [^>]*data-map-edge-kind="interrupt"[^>]*stroke-dasharray: ([\d ]+)"/,
+                html
+              ),
+            uniq: true,
+            do: dash
+
+      [timer_dash] = timers |> Enum.map(& &1["dash"]) |> Enum.uniq()
+
+      assert [%{"tag" => "circle", "style" => "fill: var(--sb-map-edge, #64748b)"}] =
+               glyphs["start"]
+
+      assert [%{"class" => "sb-map__end-ring", "style" => solid}, %{"class" => "sb-map__end-dot"}] =
+               glyphs["end"]
+
+      refute solid =~ "dasharray"
+
+      assert [
+               %{"class" => "sb-map__end-ring", "style" => dashed},
+               %{"class" => "sb-map__end-dot"}
+             ] =
+               glyphs["end-abandon"]
+
+      assert dashed =~ "stroke-dasharray: 3 2"
+
+      assert [%{"tag" => "path", "arrow" => true, "style" => arrow}] = glyphs["arrow"]
+      refute arrow =~ "dasharray"
+
+      assert [%{"tag" => "path", "arrow" => true, "style" => interrupt}] = glyphs["interrupt"]
+      assert interrupt =~ "stroke-dasharray: #{interrupt_dash}"
+
+      assert [%{"tag" => "path", "arrow" => true, "style" => timer}] = glyphs["timer"]
+      assert timer =~ "stroke-dasharray: #{timer_dash}"
+      refute interrupt_dash == timer_dash
+
+      assert [%{"tag" => "path", "arrow" => true, "style" => heavier}, %{"tag" => "circle"}] =
+               glyphs["join"]
+
+      assert heavier =~ "stroke-width: 1.5"
+      assert [%{"tag" => "path", "class" => "sb-map__fork"}] = glyphs["fork"]
+      assert [%{"tag" => "path"}] = glyphs["wait"]
+      assert [%{"tag" => "circle"}, %{"tag" => "path"}] = glyphs["clock"]
+    end
+
+    # The key is part of the picture, not a control and not a thing to
+    # describe: a click anywhere on it asks nothing, and nothing in it
+    # carries a map id a pointer could name.
+    #
+    # Sabotage: gave each entry the data-map-node of the mark it names;
+    # this went red. Reverted from a copy.
+    test "a click on the key asks nothing and a pointer on it names nothing",
+         %{tmp_dir: dir} do
+      for mode <- [nil, "editable"] do
+        %{"key" => %{"gestures" => gestures, "described" => described}} =
+          run(dir, "library_loan-key-#{mode}", library_graph("library_loan"), mode)
+
+        assert gestures != []
+        assert Enum.uniq(gestures) == [nil]
+        refute described
+      end
+    end
+  end
+
   describe "the Group, as drawn" do
     # The two library groups, their body's pane and their rules column, the
     # rules in rail order.
