@@ -335,6 +335,11 @@ defmodule StatifierBlocks.Datamodel do
   A path is declared when the datamodel holds it whole or when either
   declaration surface holds its root segment (11k, 11l).
 
+  A `{:list, {:path, opts}}` field is read row by row: each row is checked
+  as a `{:path, opts}` field's value is, and an undeclared one gets the same
+  `:info` advisory, anchored on the list field's key. A path repeated
+  across rows is reported once.
+
   A block whose type the palette cannot resolve produces nothing here - it
   already has a `:resolution` finding from `StatifierBlocks.ViewModel`, and
   a block with no schema declares no datamodel path. A field annotated
@@ -816,15 +821,48 @@ defmodule StatifierBlocks.Datamodel do
     declared_findings =
       ref
       |> StatifierBlocks.Palette.call(:config_schema, [config], [])
-      |> Enum.filter(&BlockType.datamodel_path?/1)
-      |> Enum.flat_map(fn decl ->
-        case BlockType.fetch_value(config, BlockType.value_path(decl)) do
-          {:ok, path} -> advisory(id, decl.key, path, declared, roots)
-          :error -> []
-        end
-      end)
+      |> Enum.flat_map(&field_findings(id, &1, config, declared, roots))
 
     declared_findings ++ capture_findings(id, config, declared, roots)
+  end
+
+  # One field declaration's advisories, in schema order. A `{:list, {:path,
+  # opts}}` field holds one datamodel path per row, and each row is read as
+  # a `{:path, opts}` field's value is read: the same check, the same
+  # `:info`, anchored on the field's key rather than on a row index, since
+  # the key is what 11e anchors on and the editor draws a field's findings
+  # beneath the field. The list is asked about here rather than through
+  # `BlockType.datamodel_path?/1`, because that predicate also decides what
+  # `StatifierBlocks.Environment` reads as a location, and a list of paths
+  # names no single location. A path repeated across rows is reported once.
+  @spec field_findings(
+          Block.id(),
+          BlockType.field_decl(),
+          Block.config(),
+          MapSet.t(String.t()),
+          MapSet.t(String.t())
+        ) :: [Finding.t()]
+  defp field_findings(id, %{type: {:list, {:path, _opts}}} = decl, config, declared, roots) do
+    case BlockType.fetch_value(config, BlockType.value_path(decl)) do
+      {:ok, rows} when is_list(rows) ->
+        rows
+        |> Enum.uniq()
+        |> Enum.flat_map(&advisory(id, decl.key, &1, declared, roots))
+
+      _absent_or_not_a_list ->
+        []
+    end
+  end
+
+  defp field_findings(id, decl, config, declared, roots) do
+    if BlockType.datamodel_path?(decl) do
+      case BlockType.fetch_value(config, BlockType.value_path(decl)) do
+        {:ok, path} -> advisory(id, decl.key, path, declared, roots)
+        :error -> []
+      end
+    else
+      []
+    end
   end
 
   # A capture's target paths, which no field declaration names. A `capture`
