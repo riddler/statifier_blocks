@@ -810,7 +810,7 @@ defmodule StatifierBlocks.Map.Info do
       id: id,
       kind: :start,
       title: "Start",
-      sentence: "#{BlockMap.start_text()}, #{first}",
+      sentence: "#{BlockMap.start_text()}. First: #{full_stop(first)}",
       explanation:
         "The arrow from the start dot: when the host starts an execution of the " <>
           "document, the step it points at runs first.",
@@ -996,6 +996,11 @@ defmodule StatifierBlocks.Map.Info do
       node -> Phrasing.sentence(node, context.phrase)
     end
   end
+
+  # A line closed as a sentence: one full stop, which a line that already
+  # ends in one keeps rather than doubles.
+  @spec full_stop(String.t()) :: String.t()
+  defp full_stop(line), do: if(String.ends_with?(line, "."), do: line, else: line <> ".")
 
   @spec finishes_inside(String.t(), context()) :: String.t()
   defp finishes_inside(id, context) do

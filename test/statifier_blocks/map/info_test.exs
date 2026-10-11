@@ -61,6 +61,34 @@ defmodule StatifierBlocks.Map.InfoTest do
       }
   end
 
+  # A host type whose own sentence is a whole sentence, full stop included,
+  # as a host's line may be.
+  defmodule CardStamp do
+    @moduledoc false
+    @behaviour StatifierBlocks.BlockType
+
+    @impl true
+    def current_version, do: 1
+
+    @impl true
+    def slots(_config), do: []
+
+    @impl true
+    def config_schema(_config), do: []
+
+    @impl true
+    def validate_config(_config), do: :ok
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+    @impl true
+    def sentence(_config), do: "Stamp the patron's card."
+
+    @impl true
+    def palette_entry, do: %{label: "Card stamp", group: "Library"}
+  end
+
   # The library fixtures are the two teaching documents the region is read
   # against; between them every kind the map draws is drawn at least once.
   @library ["library_loan", "patron_registration"]
@@ -451,7 +479,8 @@ defmodule StatifierBlocks.Map.InfoTest do
     # the edge's: the idle description lists them as what it listens for.
     #
     # Sabotage: made describe/2 answer :end for the start dot; this went
-    # red. Reverted from a copy.
+    # red. Reverted from a copy. Sabotage: joined the edge's two sentences
+    # with a comma again; this went red. Reverted from a copy.
     test "the start dot and its edge are described" do
       loan = by_id("library_loan")
 
@@ -462,7 +491,30 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert %Info{kind: :start, title: "Start"} = edge
       assert fact(edge, "What starts it") == "Starts when told to"
       assert fact(edge, "First step") == "Run interruptible steps"
+      assert edge.sentence == "Starts when told to. First: Run interruptible steps."
       refute edge.sentence =~ "copy.returned"
+    end
+
+    # The start edge reads as two sentences, what starts the document and
+    # then the step that runs first, closed with one full stop whether or
+    # not the first step's own line ends in one.
+    #
+    # Sabotage: made the edge add its full stop to every first step; the
+    # card stamp's line ended in two and this went red. Reverted from a
+    # copy.
+    test "the start edge reads as two sentences, with one full stop" do
+      wait = Block.new("core.wait", id: "loan_period", config: %{"duration" => "21 days"})
+      root = Block.new("core.sequence", id: "root", slots: %{"body" => [wait]})
+
+      assert %{"root/start->loan_period" => edge} = describe_root(root)
+      assert edge.sentence == "Starts when told to. First: Wait 21 days."
+
+      stamp = Block.new("library.card_stamp", id: "stamp")
+      root = Block.new("core.sequence", id: "root", slots: %{"body" => [stamp]})
+      palette = Palette.new(Map.put(Palette.core_types(), "library.card_stamp", CardStamp))
+
+      assert %{"root/start->stamp" => edge} = describe_root(root, palette)
+      assert edge.sentence == "Starts when told to. First: Stamp the patron's card."
     end
 
     # The two shapes no fixture has: a document with no step yet, whose
@@ -471,13 +523,17 @@ defmodule StatifierBlocks.Map.InfoTest do
     #
     # Sabotage: made the start edge read its first step with target/2,
     # which calls a marker "the document finishes"; this went red. Made
-    # elements/6 drop the graph's own edges; this went red. Each reverted
-    # from a copy.
+    # elements/6 drop the graph's own edges; this went red. Joined the
+    # empty document's two sentences with a comma again; this went red.
+    # Each reverted from a copy.
     test "a start into an empty slot, and one the graph carries, are described" do
       empty = Block.new("core.sequence", id: "root", slots: %{"body" => []})
 
       assert %{"root/start->root/body/empty" => edge} = describe_root(empty)
       assert fact(edge, "First step") == "no step yet (#{BlockMap.empty_text()})"
+
+      assert edge.sentence ==
+               "Starts when told to. First: no step yet (#{BlockMap.empty_text()})."
 
       group =
         Block.new("core.group",
