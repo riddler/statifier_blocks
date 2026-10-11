@@ -796,3 +796,81 @@ sequence under a host's name draws a sequence's edges` (`:467`) does for
 item 5. The hand-built test `a delayed send's node line, an undelayed send
 and any other step are written as before` (`:787`) already showed a node
 whose type name is not `core.send` written without the marks.
+
+## Note (2026-10-10): the cites into `describe.ex`, re-located at `30b0b40`
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. Later changes to
+`lib/statifier_blocks/describe.ex` moved many of the lines the Notes and
+Amendments above cite there by number (`sb-mb8g`). Each of those cites
+carries the SHA it was read at and named its anchor's line at that SHA; none
+is edited. This Note re-locates every numbered cite into `describe.ex` by its
+anchor, read at `30b0b40`, which is `main` when this request was written. A
+function with several clauses is located at the clause the cite named. A row
+whose two line columns agree has not moved.
+
+| Where the cite is | Anchor | Cited | At `30b0b40` |
+|---|---|---|---|
+| Note (2026-09-27) on decision 1, read at `a53155f` | `def outline` | `:121` | `:219` |
+| the same | `defp resolve` | `:191` | `:321` |
+| the same | `defp outcomes` | `:199` | `:329` |
+| the same | `defp container_edges(ResumableGroup, ...)` | `:226` | `:356` |
+| Note (2026-09-27), the flip, read at `647e44f` | `def outline` | `:121` | `:219` |
+| the same | `defp node/4` | `:164` | `:268` |
+| the same | `defp container_edges/4` | `:220` | `:350` |
+| the same | `defp edges/3` | `:208` | `:338` |
+| the same | `defp select/3` | `:371` | `:501` |
+| the same | `defp branch_edges/2` | `:251` | `:381` |
+| the same | `defp unwired_undecided?/1` | `:275` | `:405` |
+| the same | `defp chain/3` | `:288` | `:418` |
+| the same | `container_edges/4`'s last clause | `:234` | `:364` |
+| the same | `def render` | `:151` | `:255` |
+| the same | `defp edge_line/2` | `:407` | `:613` |
+| the same | `defp flat/1` | `:455` | `:729` |
+| the same | `defp phrase/4`, the clause for a module | `:462` | `:736` |
+| the same | `defp ask/4` | `:469` | `:743` |
+| the same | `defp usable/1` | `:481` | `:755` |
+| Note (2026-09-28), the flip, read at `12d3d22` | `defp timer_edges/2` | `:437` | `:534` |
+| the same | `defp timer_edge/3` | `:466` | `:565` |
+| the same | `defp timer_party/2` | `:456` | `:555` |
+| the same | `def outline` | `:153` | `:219` |
+| the same | `edge_line/2`'s `:timer` clause | `:534` | `:637` |
+| Amendment (2026-09-29), items 5 and 6, read at `a2e008c` | `defp container_edges` | `:280` | `:350` |
+| the same | `defp edges` | `:268` | `:338` |
+| the same | `Code.ensure_loaded?` in `defp phrase` | `:604` | `:737` |
+| Note (2026-09-29), the flip, read at `520c6d8` | `defp edge_line/2` (its `:entry` clause) | `:612` | `:613` |
+| the same | `defp target/2` | `:658` | `:669` |
+| the same | `@nouns` | `:196` | `:196` |
+| the same | `defp node_noun/2` | `:290` | `:290` |
+| the same | `defp label/1` | `:303` | `:303` |
+| the same | `defp opening/1` | `:680` | `:691` |
+| the same | `@plural_nouns` | `:207` | `:207` |
+| the same | `defp container_name/1` | `:686` | `:697` |
+| the same | `defp edges/3` | `:338` | `:338` |
+| the same | `defp container_edges/4` | `:350` | `:350` |
+| the same | `Code.ensure_loaded?` in `defp phrase/4` | `:726` | `:737` |
+| the same | `defp embedded_name/1` | `:698` | `:709` |
+| the same | the `:timer` clause of `edge_line/2` | `:636` | `:637` |
+| Note (2026-09-30), read at `142a391` | `defp timer_edges/2` | `:534` | `:534` |
+| the same | `its delay` in the `:timer` clause | `:638` | `:638` |
+| the same | `its event` in the `:timer` clause | `:639` | `:639` |
+| Note (2026-10-10) on `timed_out`, read at `ace81ce` | `defp outcomes/1` | `:329` | `:329` |
+| Note (2026-10-10) on the delayed send, read at `5307d76` | `render/2` | `:255` | `:255` |
+| the same | `defp embedded_name/1` | `:709` | `:709` |
+| the same | `defp delayed_send?/1` | `:717` | `:717` |
+| the same | the moduledoc's delayed-send sentence | `:150` | `:150` |
+
+The flip Note of 2026-09-29 re-located three of the Amendment's cites at
+`520c6d8` in its own closing paragraph (`:350`, `:338` and `:726`); those
+are the rows above for `defp container_edges/4`, `defp edges/3` and
+`Code.ensure_loaded?` read at `520c6d8`. The Note of 2026-09-30 cites
+`defp timer_edges/2` for the `is_binary(parent)` guard inside it, which sits
+at `:545` both at `142a391` and at `30b0b40`.
+
+A cite above that names an anchor in `describe.ex` with no line, such as
+`defp select/3` in the Note of 2026-09-27 on decision 1 or `defp node_line/1`
+in the flip Note of 2026-09-29, still names a function that is there at
+`30b0b40`, and needs nothing here.
+
+What this changes. Nothing: no code changes, and no line above this Note
+moves.
