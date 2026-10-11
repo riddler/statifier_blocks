@@ -189,21 +189,26 @@ defmodule StatifierBlocks.Map do
     to bottom. Its minimum size is written width first, the documented
     way round: a layout of its own is not transposed (see "Sizes").
   - **The column carries a caption.** The rules' slot node carries
-    `caption`, `caption/1` of the group's type (see "Captions"), which the
-    hook draws under the column's label.
+    `caption`, the words "Rules: watch the steps while they run", which
+    the hook draws under the column's label, and `explanation_lines`,
+    `caption/1` of the group's type (see "Captions") wrapped to lines,
+    which the hook draws under that, one line each.
 
   ## Captions
 
-  A structural container the map draws apart says what its type does in
-  one line: a branch on its band, a group on its rules column, under the
-  column's label. Nothing else carries a caption, and a leaf never does.
+  A structural container the map draws apart says what its type does: a
+  branch on its band, a group on its rules column, under the column's
+  label and its caption. Nothing else carries one, and a leaf never does.
   The words are the type's own: `caption/1` is the first sentence of
   `StatifierBlocks.BlockType.explain/1`, the paragraph the package's
   optional `explain/0` callback answers, and the description region shows
-  the whole paragraph. A caption is one line, so a first sentence wider
-  than a leaf's widest line is cut at a word and ends in "...": the
-  caption is the one text on the map that is cut, because the region
-  carries all of it.
+  the whole paragraph. The sentence is whole: never cut, never ended in
+  "...". A branch's band carries it as one line and is held wide enough
+  for it; a group's rules column carries it as `explanation_lines`, the
+  sentence wrapped to lines no wider than a box's (a word longer than a
+  line keeps a line of its own), the way the key carries a mark's `line`
+  as its `lines`, and the column is held wide and tall enough for every
+  one of them.
 
   ## Interrupt edges
 
@@ -404,6 +409,8 @@ defmodule StatifierBlocks.Map do
   @start_word "Start"
   @end_word "End"
   @start_size 14
+  # What a group's rules column says under its label; see "The Group".
+  @rules_caption "Rules: watch the steps while they run"
   @rule_spacing 24
   @body_lead 48
   @fork_room 26
@@ -465,7 +472,8 @@ defmodule StatifierBlocks.Map do
   placing it),
   `title` and `lines`, on a slot `style`, on a timer block
   `mark`, on a group with interrupt rules `interrupts`, on a branch `band`,
-  `caption` and `caption_width`, on a group's rules column `caption`, on
+  `caption` and `caption_width`, on a group's rules column `caption` and
+  `explanation_lines`, on
   a group whose body is all leaves the `ports` its edges attach to, on a
   drafts shelf `drafts`, and on the selected block `selected`.
   """
@@ -551,15 +559,15 @@ defmodule StatifierBlocks.Map do
   end
 
   @doc """
-  The one-line caption the map draws for a block of `type`, or `nil`: the
+  The caption the map draws for a block of `type`, or `nil`: the whole
   first sentence of the type's explanation for a branch and the two group
-  types, cut at a word to one line; see the moduledoc's "Captions".
+  types, never cut; see the moduledoc's "Captions".
   """
   @spec caption(String.t()) :: String.t() | nil
   def caption(type) when type in @captioned_types do
     with {:ok, ref} <- Palette.fetch(Palette.core(), type),
          text when is_binary(text) <- BlockType.explain(ref) do
-      text |> first_sentence() |> one_line()
+      first_sentence(text)
     else
       _unexplained -> nil
     end
@@ -814,12 +822,13 @@ defmodule StatifierBlocks.Map do
     end
   end
 
-  # What a rules column says under its title: its label, then the caption.
+  # What a rules column says under its title: its label, then its caption,
+  # then the group's sentence on lines of its own.
   @spec column_lines(Node.t(), Slot.t()) :: [String.t()]
   defp column_lines(%Node{} = node, %Slot{} = slot) do
     case caption(node.type) do
       nil -> wrap(slot_header(slot))
-      caption -> wrap(slot_header(slot)) ++ [caption]
+      sentence -> wrap(slot_header(slot)) ++ [@rules_caption | wrap(sentence)]
     end
   end
 
@@ -1278,12 +1287,19 @@ defmodule StatifierBlocks.Map do
     |> put_caption(style, node)
   end
 
-  # A group's rules column carries its caption; see the moduledoc.
+  # A group's rules column carries its caption and its type's sentence,
+  # wrapped; see the moduledoc's "The Group".
   @spec put_caption(graph_node(), String.t(), Node.t()) :: graph_node()
   defp put_caption(graph_node, "rail", %Node{type: type}) when type in @group_types do
     case caption(type) do
-      nil -> graph_node
-      caption -> Map.put(graph_node, "caption", caption)
+      nil ->
+        graph_node
+
+      sentence ->
+        Map.merge(graph_node, %{
+          "caption" => @rules_caption,
+          "explanation_lines" => wrap(sentence)
+        })
     end
   end
 
@@ -1446,27 +1462,6 @@ defmodule StatifierBlocks.Map do
     end
   end
 
-  # `text` on one line no wider than a leaf holds: whole, or cut at a word
-  # with "..." after it; see the moduledoc's "Captions".
-  @spec one_line(String.t()) :: String.t()
-  defp one_line(text) do
-    per_line = div(@leaf_max_width - @leaf_padding, @char_width)
-
-    if String.length(text) <= per_line,
-      do: text,
-      else: fit(String.split(text, ~r/\s+/, trim: true), "", per_line - 3) <> "..."
-  end
-
-  # The longest run of `words` from the front, after `line`, that is no
-  # longer than `room`.
-  @spec fit([String.t()], String.t(), non_neg_integer()) :: String.t()
-  defp fit([], line, _room), do: line
-
-  defp fit([word | rest], line, room) do
-    next = if line == "", do: word, else: "#{line} #{word}"
-    if String.length(next) <= room, do: fit(rest, next, room), else: line
-  end
-
   # The lines under a box's title: `text` wrapped, or none when it only
   # repeats the title.
   @spec under(String.t(), String.t()) :: [String.t()]
@@ -1476,7 +1471,7 @@ defmodule StatifierBlocks.Map do
   # Words onto lines no wider than a leaf holds, or than `per_line`
   # characters where one is given (the key's). A single word longer than a
   # line keeps its own line rather than being cut: nothing on the map
-  # truncates but a caption (see the moduledoc's "Captions"). Every line
+  # truncates, a caption included (see the moduledoc's "Captions"). Every line
   # after the first starts with `indent`, which counts against its room.
   @spec wrap(String.t(), String.t(), pos_integer()) :: [String.t()]
   defp wrap(text, indent \\ "", per_line \\ div(@leaf_max_width - @leaf_padding, @char_width)) do

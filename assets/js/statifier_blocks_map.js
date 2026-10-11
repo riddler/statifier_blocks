@@ -392,13 +392,22 @@ function drawBand(node) {
     drawFork(band.fork) + drawCaption(band.caption, node.caption) + `</g>`
 }
 
-// A container's one-line caption: on a branch's band, or under a group's
-// rules column's label. The text is the server's: the first sentence of
-// the type's own explanation, cut to one line.
+// A container's caption: on a branch's band, the whole first sentence of
+// the type's own explanation; under a group's rules column's label, the
+// column's own caption, with that sentence on the lines under it (see
+// drawCaptionLines). The text is the server's, written as it comes.
 function drawCaption(at, text) {
   if (!at || !text) return ""
   return `<text class="sb-map__caption" data-map-caption="true" x="${at.x}" y="${at.y}">` +
     `${escapeText(text)}</text>`
+}
+
+// A group's sentence under its rules column's caption: one line each, from
+// `at` down, as the server wrapped it.
+function drawCaptionLines(at, lines) {
+  return (lines || [])
+    .map((line, i) => drawCaption({x: at.x, y: at.y + i * LINE_HEIGHT}, line))
+    .join("")
 }
 
 function textLines(node, x, y, className) {
@@ -468,15 +477,18 @@ function drawNode(node) {
   }
 
   // A slot's box: an arm, a rail, a tray, or a group's body pane. A group's
-  // rules column carries its caption on the line under its label.
+  // rules column carries its caption on the line under its label, and its
+  // type's sentence on the lines under that.
   if (node.kind === "slot") {
     const style = escapeText(node.style || "arm")
     const top = y + HEADER_BASE + LINE_HEIGHT - 4
     const caption = {x: x + 12, y: top + (node.lines || []).length * LINE_HEIGHT}
+    const sentence = {x: caption.x, y: caption.y + (node.caption ? LINE_HEIGHT : 0)}
     return `<g class="sb-map__slot sb-map__slot--${style}" data-map-node="${id}" data-map-kind="slot">` +
       `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" ` +
       `style="fill: var(--sb-map-slot-fill, #f8fafc); stroke: var(--sb-map-slot-stroke, #cbd5e1)"/>` +
       textLines(node, x + 12, top, "sb-map__slot-label") + drawCaption(caption, node.caption) +
+      drawCaptionLines(sentence, node.explanation_lines) +
       `</g>`
   }
 
