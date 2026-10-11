@@ -812,3 +812,66 @@ The Note on selection cites `hover/2` and two of its lines at `9a324a2`
 cites describe code that is gone and are not re-located.
 
 Filed with `sb-062y`.
+
+## Amendment (2026-10-10): decision (d)'s description region, for a document the outline cannot describe
+
+**Status: proposed (2026-10-10, bead `sb-sx9v`).** A decision record merges
+at proposed and is flipped to accepted by a separate request through the
+same `docs/adr/` gate. Additive: no text above this line is edited, no line
+above it is removed, and the head `Status:` line at `:3` is not extended.
+Every decision above stands as printed except where this section says how
+decision (d) reads.
+
+**Why this is an Amendment and not a Note.** The Note of 2026-09-29 on a
+host's description region said how decision (d)'s bullet reads for a
+document the outline cannot read. That limits what (d) decides, and by this
+directory's README a note decides nothing, so the limit belongs in (d)
+itself. This section puts it there. It decides nothing the package does not
+already do: the rule was ruled by the operator, 2026-09-29, and
+statifier_blocks 0.42.0 shipped it ("`description_region/1` degrades instead
+of raising on a composite whose declaration cannot expand", that release's
+changelog entry). Recording it as an Amendment rather than a further Note
+was decided by the conductor under a standing consent, 2026-10-10.
+
+Code cites below were read at `2b40578` and carry their anchors; re-locate
+by anchor, not by number.
+
+### Decision (d), as amended
+
+Decision (d)'s second bullet under "The description region is part of the
+Map's surface" reads, with this section:
+
+- The description region is rendered on the server with the selected or
+  idle content for every document whose outline
+  `StatifierBlocks.Describe.outline/3` answers.
+- For a document whose outline raises, as one does for a composite whose
+  declaration cannot expand, the region renders no description, neither a
+  block's nor the document's idle one, and carries no
+  `data-map-description`; it keeps its id, its `aria-live` and its label.
+  The server-rendered content of the bullet above does not apply to it.
+  `description_region/1` holds this
+  (`lib/statifier_blocks/editor/map_regions.ex:227`,
+  `def description_region`).
+
+The rest of the bullet stands as printed: the map region is `aria-hidden`,
+and the host's list stays the keyboard and screen-reader path.
+
+### The degrade Note's editor sentence
+
+The Note of 2026-09-29 on a host's description region gives the editor's
+behaviour in one sentence that walks its check step by step ("it asks first,
+through its private `describable?/2` ..., which rescues any raise out of the
+outline, and leaves its region out when the answer is `false`"). Read as one
+claim with one anchor, it says: the editor leaves its description region out
+for a document whose outline raises
+(`lib/statifier_blocks/editor.ex:3940`, `defp describable?/2`). The Note
+stays as printed, and the Note of 2026-09-30 still re-locates its cites.
+
+### What this Amendment does not decide
+
+- Any change to what a function answers; the code it describes is the code
+  0.42.0 shipped.
+- The width of the rescue, which the Note of 2026-09-29 records: any raise
+  out of the outline.
+- Anything about the map region or the hover layer on such a document
+  beyond what that Note records.
