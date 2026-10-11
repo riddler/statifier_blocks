@@ -541,6 +541,33 @@ defmodule StatifierBlocks.MapTest do
       assert Enum.map(BlockMap.timers(graph), &{&1["from"], &1["to"]}) == described
     end
 
+    # A delayed send that is the document's root block has no parent:
+    # Describe draws no timer edge from such a send, and neither does the
+    # map, though the send is delayed and carries the clock mark that says
+    # so. The map reads the view model rather than the outline, so this
+    # holds the two equal where the outline turns a send away for having
+    # no parent.
+    #
+    # Sabotage: added core.send to @timer_targets, so a send could hear its
+    # own event; this went red. Reverted from a copy.
+    test "a delayed send at the root, with no parent, draws no timer edge, as in Describe" do
+      root = Block.new("core.send", id: "root", config: %{"event" => "x.due", "delay" => "1h"})
+      document = Document.new(root)
+      graph = document |> build() |> BlockMap.graph()
+      outline = Describe.outline(document, Palette.core(), [])
+
+      assert [%{id: "root", parent: nil}] = outline.nodes
+      assert [%{"id" => "root/start"}, %{"id" => "root", "mark" => "clock"}] = graph["children"]
+
+      described =
+        for %Edge{kind: :timer, from: {:block, from}, to: {:block, to}} <- outline.edges,
+            do: {from, to}
+
+      assert described == []
+      assert Enum.map(BlockMap.timers(graph), &{&1["from"], &1["to"]}) == described
+      refute Map.has_key?(graph, "timers")
+    end
+
     # Sabotage: made put_interrupts/2 take the group's last drawn child as
     # the head; this went red. Reverted from a copy.
     test "each library group's two rules leave it by its exit" do
