@@ -695,3 +695,53 @@ they are already present at `a2e008c`, the commit the Amendment of
 2026-09-29 read its cites at. Item 8 therefore stated wording the code
 already had, and the flip Note's reading of item 8 at `520c6d8` holds as
 written: the clause writes those words, and the test pins them.
+
+## Note (2026-10-10): why the describe lists `timed_out` for an await with no timeout
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing new, and edits no clause. It records, beside decision 1's paragraph
+"Declared, not compiled, outcomes", the reason that paragraph's difference
+stays, so a reader who sees `received, timed_out` on an await with no
+deadline finds why here rather than reading it as a slip (`sb-dcnk`). Every
+cite below was read at `ace81ce`.
+
+What the describe lists. A node's outcomes are its type's declared ones,
+`BlockType.outcomes/2` read through `BlockType.outcome_names/1` in `defp
+outcomes/1` (`lib/statifier_blocks/describe.ex:329`), and a `:sequence` or
+`:exit` edge carries its source node's list. `core.await` declares both
+outcomes for every config: `def outcomes(_config)`
+(`lib/statifier_blocks/core/await.ex:123`) ignores the config, so an await
+with no `timeout` lists `received` and `timed_out`, as decision 1's
+paragraph (`:145` above) already says.
+
+Why the declaration does not follow `timeout`. The await's moduledoc gives
+the reason in its section "Both outcomes are declared whether or not a
+deadline is stored" (`lib/statifier_blocks/core/await.ex:37`): deriving the
+list from `timeout` would take a declared seam away from an author who
+cleared the field, and an author's wiring of `timed_out` would go with it.
+That is the failure ADR-0002 decision 6's `slots/1` stability rule exists
+to avoid on the slot side, and ADR-0002's Amendment of 2026-08-28 (A1)
+extends that rule to `outcomes/1`. ADR-0002's G14d, in its Amendment of
+2026-09-05 on the `core.await` row, put the question, and the Note beneath
+G14d answered it: `outcomes/1` returns both outcomes for every config. The
+emitted chart stays honest either way: with no `timeout`, no timer is armed
+and no `timed_out` final is written (the same moduledoc section), which is
+why the compiled listings decision 1's paragraph compares against say only
+`received`.
+
+What this changes. Nothing: `outcomes/1` is unchanged, and so is what the
+describe lists. Dropping `timed_out` from a no-timeout await was considered
+and not taken, because a declared slot a stored document has wired would
+disappear when its deadline is cleared, which is a change to the type's
+contract rather than to the description (decided by the conductor under a
+standing consent, 2026-10-10).
+
+The tests that pin it. In `test/statifier_blocks/describe_test.exs`, `the
+library loan renders the default lines` (`:129`) asserts the line `Wait for
+fines.paid (received, timed_out) ends the branch` (`:148`) for `blk_LPAY`, a
+`core.await` whose config in `test/fixtures/flow_graph_note/library_loan.json`
+stores an `event` and no `timeout`; `nodes carry their parent, depth, kind,
+outcomes and arrangement` (`:159`) asserts the same node's `["received",
+"timed_out"]` (`:168`). In `test/statifier_blocks/core/await_test.exs`,
+`declares both outcomes for every config` (`:65`) asserts the list for a
+config with no `timeout` and for one with a blank `timeout`.
