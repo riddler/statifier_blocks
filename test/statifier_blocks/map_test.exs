@@ -32,7 +32,7 @@ defmodule StatifierBlocks.MapTest do
   @force "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder"
   @consider "org.eclipse.elk.layered.considerModelOrder.strategy"
 
-  describe "the reference host's graph" do
+  describe "the checked-in regenerated fixture" do
     # The move changes nothing the graph answers: for each teaching
     # document, the package's graph under the library world's words is the
     # JSON value the reference host's map module answered at the commit the
@@ -41,7 +41,7 @@ defmodule StatifierBlocks.MapTest do
     # ahead of the root's box (see MapFixtures).
     #
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
-    test "each teaching document's graph is the reference host's" do
+    test "each teaching document's graph equals its checked-in regenerated fixture" do
       for key <- MapFixtures.keys() do
         assert graph(key) == MapFixtures.host_graph!(key), key
       end
