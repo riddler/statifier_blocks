@@ -814,6 +814,71 @@ defmodule StatifierBlocks.DescribeTest do
     end
   end
 
+  describe "an embedded delayed send is recognised by its type name and sentence shape" do
+    # A host's own reminder step: no slots, no config, and a sentence in
+    # the shape `core.send` writes for a delay.
+    defmodule Reminder do
+      @moduledoc false
+      @behaviour StatifierBlocks.BlockType
+
+      @impl true
+      def current_version, do: 1
+
+      @impl true
+      def slots(_config), do: []
+
+      @impl true
+      def config_schema(_config), do: []
+
+      @impl true
+      def validate_config(_config), do: :ok
+
+      @impl true
+      def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+
+      @impl true
+      def sentence(_config), do: "In 7 days, send a reminder"
+    end
+
+    defp entry_line(palette, step) do
+      Block.new("core.sequence", id: "root", slots: %{"body" => [step]})
+      |> Document.new()
+      |> Describe.outline(palette, [])
+      |> Describe.render([])
+      |> Enum.find(&String.starts_with?(&1, "The steps start with "))
+    end
+
+    # Sabotage: in `Describe.embedded_name/1`, answer `name(node)` for a
+    # delayed send -> the entry line reads `The steps start with In 7 days,
+    # send a reminder`, red.
+    test "a host's own module under core.send with a delayed send's sentence is quoted" do
+      palette =
+        Palette.new(%{"core.sequence" => StatifierBlocks.Core.Sequence, "core.send" => Reminder})
+
+      assert entry_line(palette, Block.new("core.send", id: "remind")) ==
+               "The steps start with \"In 7 days, send a reminder\""
+    end
+
+    # Sabotage: in `Describe.embedded_name/1`, drop the `core.send` type
+    # match -> the entry line reads `The steps start with "In 7 days, send
+    # loan.overdue"`, red.
+    test "the package's delayed send under a host's name is not quoted" do
+      palette =
+        Palette.new(%{
+          "core.sequence" => StatifierBlocks.Core.Sequence,
+          "library.overdue_notice" => StatifierBlocks.Core.Send
+        })
+
+      step =
+        Block.new("library.overdue_notice",
+          id: "overdue",
+          config: %{"event" => "loan.overdue", "delay" => "7d"}
+        )
+
+      assert entry_line(palette, step) == "The steps start with In 7 days, send loan.overdue"
+    end
+  end
+
   describe "the timer edge" do
     defp delayed(id, event, delay),
       do: Block.new("core.send", id: id, config: %{"event" => event, "delay" => delay})
