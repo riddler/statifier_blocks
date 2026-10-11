@@ -417,7 +417,9 @@ caption and `explanation_lines` (`:46`). It is flipped to accepted on
 
 Every claim the Amendment makes was re-verified against `main` at `fa7b1d0`.
 The Amendment cites its code by anchor alone; it merged in `f082d40`, and
-the one commit after it, the release, touches none of the files it cites.
+the three commits after it (two that touch only `changelog.d/` fragments
+and `docs/upgrading.md`, then the release) touch none of the files it
+cites.
 Every cite below was read at `fa7b1d0` and is written anchor first, line
 second.
 
