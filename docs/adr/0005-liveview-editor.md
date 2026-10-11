@@ -14398,3 +14398,73 @@ The test "the stylesheet stacks the shown layer over the region" is at
 Note's other cites have not moved.
 
 Filed with `sb-062y`.
+
+## Note (2026-10-10): the Map hook's once-only warning flag, read against clause 7f
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no line above it. It is added at the foot of the file, so
+no line another record cites moves. Every cite into `assets/`, `lib/` and
+`test/` below was read at `2b40578` and is written anchor first, line
+second; every cite into this file reads at the same commit.
+
+The Note of 2026-09-30 on cites that have moved records that `draw()` sets
+`this.warnedNoCanvas`, and says that it does not read the flag against
+clause 7f (`:14389-14392`). This Note does. The flag is still set at the
+line that Note gives.
+
+### What the flag is
+
+In `assets/js/statifier_blocks_map.js` at `2b40578`:
+
+- **It guards one console line.** `draw()` (`:849`, inside `export const
+  StatifierBlocksMap`, `:801`) looks for the child marked `data-map-canvas`
+  on every call (`:850`). When there is none and the flag is not yet set,
+  it sets the flag (`:852`) and writes one `console.warn` saying that the
+  element has no such child, that the map is drawn into the element itself,
+  and that this is not supported (`:853-857`). Nothing else in the file
+  reads or writes the flag.
+- **It decides nothing that is drawn, selected or sent.** Where the drawing
+  goes is read afresh from the element on every call (`const target =
+  canvas || this.el`, `:859`), not from the flag, and the flag is read only
+  in the condition that guards the warning. The comment above the hook
+  states the result: the hook "draws into the element, as it always has,
+  and says so once per mount" (`:780`).
+- **A page on the package's own markup never sets it.** `map_region/1`
+  renders the child (`lib/statifier_blocks/editor/map_regions.ex:183`,
+  inside `def map_region`).
+
+The test "an element with no canvas child is drawn into and warned about
+once" (`test/statifier_blocks/map_layout_test.exs:1186`) holds one warning
+across a mount and three patches on an element without the child, the
+drawing still made into the element, and no warning on an element with the
+child.
+
+### How clause 7f reads
+
+Clause 7f's "holds no behaviour" (`:13479-13483`) allows a draw-only hook no
+validity rule, no document state, and nothing that survives a re-render
+except what it needs to skip a layout it has drawn, to drop one a newer
+graph has overtaken, and to scroll into view what a click it sent has
+opened. The flag survives every re-render of its mount, and it serves none
+of those three needs. It is read here as the Note of 2026-09-29 on what the
+hook keeps (`:14107`) read `this.onOver` and `this.onOut`, which also
+outlive a re-render and also serve none of the three: it is no validity
+rule and no document state, and it decides nothing that is drawn, selected
+or sent. All it carries from one render to the next is whether the console
+has already been told about markup the hook does not support. Clause 7f
+holds as written, and the list of what the hook keeps reads complete with
+the flag beside the entries of the Note of 2026-09-29.
+
+The flag touches the clause's other two rules not at all. A `console.warn`
+writes no DOM, so the three writes "draws what the server computed" allows
+are unchanged, and the hook's one `this.pushEvent` (`:821`) is unchanged,
+so it pushes nothing of its own.
+
+### What this Note does not do
+
+It edits no line above it, amends no clause of decision 7, and changes no
+code, test or changelog fragment. The flag stays in the hook. The Note of
+2026-09-30 on cites that have moved and the Note of 2026-09-29 on what the
+hook keeps stand as printed.
+
+Filed with `sb-bwoo`.
