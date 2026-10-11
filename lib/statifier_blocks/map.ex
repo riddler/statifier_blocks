@@ -287,6 +287,24 @@ defmodule StatifierBlocks.Map do
   drawing, its line bent at the group, so when the second layout fails
   the hook draws the first rather than the error pane.
 
+  ## The drafts shelf
+
+  A drafts shelf holds steps an author has put down but not wired into the
+  flow, so the path is read without it. Its block's node carries `drafts`,
+  `%{"count" => count, "label" => label}`: `count` is how many steps sit on
+  the shelf, the blocks in its slot, and `label` is the row its drawer
+  reads, "Drafts: 2 steps not wired in" ("1 step" for one). The node stays
+  where the outline visits it, so `nodes/1` is unchanged; the hook takes it
+  out of the drawing before the layout and lays it out on its own, so the
+  path is laid out as though the shelf were not there.
+
+  The hook draws the shelf in a drawer under the drawing and outside it: a
+  native disclosure element whose row reads `label`, holding the shelf as
+  its own drawing. On a page that cannot edit the drawer is closed, and a
+  click on its row opens it in place; on a page that can edit it is drawn
+  open, in the same place. Whether it is open lives in that element, not in
+  the hook. The shelf's entry in the key (below) is the same row.
+
   ## The key
 
   The graph's root carries `legend`, the key the hook draws beside the
@@ -309,6 +327,7 @@ defmodule StatifierBlocks.Map do
   | `wait` | a block carrying the `wait` mark |
   | `clock` | a block carrying the `clock` mark |
   | `timer` | a timer edge |
+  | `drafts` | a drafts shelf, its line the drawer's own row, `label` |
 
   The key is data in the graph, read off the graph itself, so the Map stays
   pure and the key cannot name a mark the drawing lacks. The map region is
@@ -445,8 +464,8 @@ defmodule StatifierBlocks.Map do
   `title` and `lines`, on a slot `style`, on a timer block
   `mark`, on a group with interrupt rules `interrupts`, on a branch `band`,
   `caption` and `caption_width`, on a group's rules column `caption`, on
-  a group whose body is all leaves the `ports` its edges attach to, and
-  on the selected block `selected`.
+  a group whose body is all leaves the `ports` its edges attach to, on a
+  drafts shelf `drafts`, and on the selected block `selected`.
   """
   @type graph_node :: %{required(String.t()) => term()}
 
@@ -565,13 +584,22 @@ defmodule StatifierBlocks.Map do
   defp put_legend(graph) do
     used = graph |> drawn_marks() |> MapSet.new()
 
+    # The drafts shelf's entry is its drawer's own row, after every mark:
+    # one drawer, the first shelf's, as the hook draws one.
+    shelves = for %{"drafts" => %{"label" => label}} <- walk(graph), do: {"drafts", label}
+    drafts = Enum.take(shelves, 1)
+
     legend =
-      for {mark, line} <- @legend,
-          MapSet.member?(used, mark),
+      for {mark, line} <- Enum.filter(@legend, &MapSet.member?(used, elem(&1, 0))) ++ drafts,
           do: %{"mark" => mark, "line" => line, "lines" => wrap(line, "", @key_line)}
 
     Map.put(graph, "legend", legend)
   end
+
+  # `graph_node` and every node under it, parents first.
+  @spec walk(graph_node()) :: [graph_node()]
+  defp walk(%{} = graph_node),
+    do: [graph_node | Enum.flat_map(Map.get(graph_node, "children", []), &walk/1)]
 
   # Every kind of mark a graph node, its edges and everything under it
   # draw, with repeats; the graph's timer edges are its root's.
@@ -672,7 +700,27 @@ defmodule StatifierBlocks.Map do
     |> put_band(node)
     |> put_interrupts(node)
     |> put_ports(node)
+    |> put_drafts(node)
   end
+
+  # ------------------------------------------------------------ the drafts
+
+  # The drafts shelf carries its drawer's row: how many steps are on it,
+  # and the words the row reads; see the moduledoc's "The drafts shelf".
+  @spec put_drafts(graph_node(), Node.t()) :: graph_node()
+  defp put_drafts(graph_node, %Node{slots: slots} = node) do
+    if ViewModel.shelf?(node) do
+      count = slots |> Enum.map(&length(&1.children)) |> Enum.sum()
+      Map.put(graph_node, "drafts", %{"count" => count, "label" => drafts_label(count)})
+    else
+      graph_node
+    end
+  end
+
+  # The drawer's row, in the words ruled for it; one step is a step.
+  @spec drafts_label(non_neg_integer()) :: String.t()
+  defp drafts_label(1), do: "Drafts: 1 step not wired in"
+  defp drafts_label(count), do: "Drafts: #{count} steps not wired in"
 
   # ------------------------------------------------------------ the Branch
 
@@ -921,12 +969,19 @@ defmodule StatifierBlocks.Map do
          [first | _rest] <- drawn["children"] do
       case ViewModel.flow_children(body) do
         [%Node{block_id: step} | _rest] -> step
-        [] -> first["id"]
+        [] -> unflowed_target(first, root_id)
       end
     else
       _not_inline -> root_id
     end
   end
+
+  # A body with no step in its flow: its empty marker, or, when it holds
+  # only a drafts shelf, the root's box, since the shelf is drawn apart
+  # from the path.
+  @spec unflowed_target(graph_node(), String.t()) :: String.t()
+  defp unflowed_target(%{"drafts" => _drafts}, root_id), do: root_id
+  defp unflowed_target(%{"id" => id}, _root_id), do: id
 
   @spec start_mark(String.t()) :: graph_node()
   defp start_mark(id),

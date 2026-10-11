@@ -716,7 +716,9 @@ defmodule StatifierBlocks.Map.InfoTest do
       "edge--interrupt" => {"interrupt", "A dashed arrow runs from an interrupt rule"},
       "mark" => {"wait", "An hourglass marks a step that waits for an event"},
       "edge--timer" => {"timer", "A dotted arrow"},
-      "timer-caption" => {"timer", "labelled with the delay"}
+      "timer-caption" => {"timer", "labelled with the delay"},
+      "drafts" => {"drafts", "Drafts:"},
+      "drafts-row" => {"drafts", "not wired in"}
     }
 
     # The canvas itself, and the pane drawn in place of a map that could
@@ -780,15 +782,20 @@ defmodule StatifierBlocks.Map.InfoTest do
     end
 
     # Between them the two teaching documents draw every mark the key
-    # has a line for, so every line above is read off a real key.
+    # has a line for but the drafts shelf's, which a loan with a shelf
+    # draws, so every line above is read off a real key.
     #
     # Sabotage: made drawn_marks/1 leave out the graph's timer edges; this
-    # went red on "timer". Reverted from a copy.
-    test "the two library fixtures' keys name every mark between them" do
+    # went red on "timer". Reverted from a copy. Sabotage: made
+    # put_legend/1 leave the shelf's entry out; this went red. Reverted
+    # from a copy.
+    test "the two library fixtures' keys and a shelf's name every mark between them" do
       marks = key_lines() |> Map.keys() |> Enum.sort()
 
       assert marks ==
-               Enum.sort(~w(start end end-abandon arrow fork join interrupt wait clock timer))
+               Enum.sort(
+                 ~w(start end end-abandon arrow fork join interrupt wait clock timer drafts)
+               )
 
       for {_class, {mark, _words}} <- @in_key, do: assert(mark in marks)
     end
@@ -1223,13 +1230,36 @@ defmodule StatifierBlocks.Map.InfoTest do
   end
 
   # Every mark, slot style and end outcome a graph gives, at any depth.
-  # Every line the two teaching documents' keys carry, by mark.
+  # Every line the two teaching documents' keys carry, by mark, and the
+  # line a loan with a drafts shelf adds for it.
   defp key_lines do
-    for key <- @library,
-        {graph, _descriptions, _idle} = described(key),
+    shelf = described_document(Document.new(shelf_root()), Palette.core())
+
+    for {graph, _descriptions, _idle} <- Enum.map(@library, &described/1) ++ [shelf],
         %{"mark" => mark, "line" => line} <- graph["legend"],
         into: %{},
         do: {mark, line}
+  end
+
+  # A loan's overdue notice, with a second notice parked on the drafts
+  # shelf.
+  defp shelf_root do
+    Block.new("core.sequence",
+      id: "root",
+      slots: %{
+        "body" => [
+          Block.new("core.send", id: "notice", config: %{"event" => "loan.overdue"}),
+          Block.new("core.drafts",
+            id: "shelf",
+            slots: %{
+              "body" => [
+                Block.new("core.send", id: "second", config: %{"event" => "loan.overdue"})
+              ]
+            }
+          )
+        ]
+      }
+    )
   end
 
   defp graph_values(node) do
