@@ -224,6 +224,12 @@ export function edgesOf(laid) {
 // of its box to the group's bottom edge, which is where the group is left;
 // a `resume` rule (`to: "body"`) up from the top of its box to the head of
 // the group's body, and in from its side when the head sits to the left.
+// When the head's middle is not well above the rule's top (by the reach
+// below), a path straight across at that height would run through the
+// rule's own box or skim its top, so it goes up a short way, left past
+// the rule's side, and down to the head's height before it turns in.
+const RESUME_REACH = 12
+
 export function interruptsOf(laid) {
   const all = boxes(laid)
   const byId = new Map(all.map((box) => [box.id, box]))
@@ -242,7 +248,13 @@ export function interruptsOf(laid) {
         const head = byId.get(edge.head)
         if (head && head.x + head.width < x) {
           const y = head.y + head.height / 2
-          points = [{x, y: rule.y}, {x, y}, {x: head.x + head.width, y}]
+          const side = head.x + head.width
+          const top = rule.y - RESUME_REACH
+          const beside = rule.x - RESUME_REACH
+
+          points = y > top && side < beside
+            ? [{x, y: rule.y}, {x, y: top}, {x: beside, y: top}, {x: beside, y}, {x: side, y}]
+            : [{x, y: rule.y}, {x, y}, {x: side, y}]
         } else {
           points = [{x, y: rule.y}, {x, y: head ? head.y + head.height : group.y}]
         }

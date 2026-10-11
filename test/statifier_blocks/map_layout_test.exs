@@ -191,7 +191,7 @@ defmodule StatifierBlocks.MapLayoutTest do
     # left of the rules column. Neither teaching document has a resume
     # rule, so the library loan of the flow graph note carries the case: its
     # loan period resumes on a renewal. Read off the markup's own path data.
-    # The run between the two ends is left unpinned.
+    # The run between the two ends is pinned by the next test.
     #
     # Sabotage: made interruptsOf draw a resume edge to the head's left side
     # rather than its right; this went red. Reverted from a copy.
@@ -228,6 +228,44 @@ defmodule StatifierBlocks.MapLayoutTest do
       assert_in_delta start.y, rule["y"], 0.5
       assert_in_delta stop.x, head["x"] + head["width"], 0.5
       assert_in_delta stop.y, y, 0.5
+    end
+
+    # The whole of that resume edge, not only its ends. The head's middle
+    # sits lower than the rule's top on this fixture, so a path that went
+    # straight across at the head's middle would run down through the
+    # rule's own box. Every run of the drawn path is level or upright, the
+    # first goes up, and none passes through the inside of the rule's box;
+    # the path only touches the box where it leaves its top.
+    #
+    # Sabotage: made interruptsOf draw the resume edge straight from the
+    # rule's top to the head's middle whatever their heights; this went red.
+    # Moved the path's upright run beside the rule inside the rule's box;
+    # this went red. Each reverted from a copy.
+    test "a resume edge never crosses its own rule's box", %{tmp_dir: dir} do
+      {:ok, document} = Decode.decode(File.read!(@flow_graph_loan))
+      graph = document |> ViewModel.build(Palette.core(), []) |> BlockMap.graph()
+
+      %{"drawn" => "map", "boxes" => boxes, "interrupts" => drawn} =
+        run(dir, "flow_graph_loan", graph)
+
+      id = "blk_LREN->blk_LLEN/body"
+      edge = Enum.find(drawn, &(&1["id"] == id)) || flunk("#{id} is not drawn")
+      rule = boxes["blk_LREN"]
+      head = boxes["blk_LRET"]
+
+      # The case this pins: the head's middle is lower than the rule's top.
+      assert head["y"] + head["height"] / 2 > rule["y"]
+
+      [start, second | _rest] = points = path_points(edge["d"])
+      assert_in_delta start.y, rule["y"], 0.5
+      assert second.y < start.y, "the path's first run does not go up: #{edge["d"]}"
+
+      for [a, b] <- Enum.chunk_every(points, 2, 1, :discard) do
+        assert a.x == b.x or a.y == b.y, "a run of #{edge["d"]} is neither level nor upright"
+
+        refute runs_inside?(a, b, rule),
+               "#{edge["d"]} runs through its rule's box #{inspect(rule)}"
+      end
     end
 
     # The registration's deadline send is drawn joined to the rule that
@@ -1811,6 +1849,21 @@ defmodule StatifierBlocks.MapLayoutTest do
   end
 
   defp centre(box), do: box["x"] + box["width"] / 2
+
+  # Whether the level or upright run from `a` to `b` passes through the
+  # inside of `box`; a run along or ending on the box's edge does not.
+  defp runs_inside?(a, b, box) do
+    {left, right} = Enum.min_max([a.x, b.x])
+    {top, bottom} = Enum.min_max([a.y, b.y])
+    {x0, x1} = {box["x"], box["x"] + box["width"]}
+    {y0, y1} = {box["y"], box["y"] + box["height"]}
+
+    if left == right do
+      x0 < left and left < x1 and max(top, y0) < min(bottom, y1)
+    else
+      y0 < top and top < y1 and max(left, x0) < min(right, x1)
+    end
+  end
 
   # Whether two boxes share any area; boxes that only touch do not.
   defp overlaps?(a, b),
