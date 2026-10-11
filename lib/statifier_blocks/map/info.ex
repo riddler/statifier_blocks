@@ -152,12 +152,12 @@ defmodule StatifierBlocks.Map.Info do
   @enforce_keys [:kind, :title, :explanation]
   defstruct [:id, :kind, :title, :explanation, note: nil, sentence: nil, settings: [], facts: []]
 
-  @how_to_read "Every box on the map is a step, drawn inside the step that holds it, with " <>
+  @how_to_read "A plain box is a step, drawn inside the step that holds it, with " <>
                  "its type's name on top and what it does under it. A shaded box inside " <>
                  "a step is a place it holds steps: a branch's arms or a parallel's lanes " <>
-                 "side by side, a group's body as a pane with its interrupt rules in a " <>
-                 "column beside it, or a shelf of drafts. A dashed box saying " <>
-                 "\"#{BlockMap.empty_text()}\" is a place no step fills yet. " <>
+                 "side by side, or a shelf of drafts. A column beside a group holds " <>
+                 "the rules that watch it, or the step that runs when it fails. A dashed " <>
+                 "box saying \"#{BlockMap.empty_text()}\" is a place no step fills yet. " <>
                  "A branch's box lists its arms in the order it tries them, each with its " <>
                  "condition. A one-line caption, on a branch's band or under a group's " <>
                  "rules column, says what that kind of step does. The selected step's box " <>
