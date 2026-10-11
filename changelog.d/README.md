@@ -78,6 +78,7 @@ nothing else. The commit itself does not tag, push, publish, or cut a GitHub
 release. Once the prep is merged to `origin/main`, the conductor or the
 session that owns the release bead tags that merged commit with the new
 version and pushes the tag, as `CLAUDE.md`'s authority table and its Release
-preps paragraph say. Publishing and the release itself stay the operator's,
-in every campaign and outside every campaign. `.claude/wurk/release.md` is
-the full recipe and it says the same.
+preps paragraph say. The publish is the release workflow's:
+`.github/workflows/release.yml` publishes on that tag push (ADR-0019), and no
+agent or session runs the publish. `.claude/wurk/release.md` is the full
+recipe and it says the same.
