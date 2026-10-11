@@ -119,7 +119,8 @@ defmodule StatifierBlocks.Map do
   edge still leaves the dot itself; an end mark carries End the same way.
   Its edge is the graph's own, carries
   `kind: "start"` and one ELK label, `start_text/0`, so the layout leaves
-  the caption its room. The caption reads the same on every document: what
+  the caption its room. The caption names who starts the document, "Starts
+  when the system is told to", and reads the same on every document: what
   the document listens for while it runs is the description region's to
   say, not the edge's.
 
@@ -399,7 +400,7 @@ defmodule StatifierBlocks.Map do
   @done "done"
   @abandon "abandon"
   @end_size 20
-  @start_text "Starts when told to"
+  @start_text "Starts when the system is told to"
   @start_word "Start"
   @end_word "End"
   @start_size 14

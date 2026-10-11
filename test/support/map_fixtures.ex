@@ -21,10 +21,12 @@ defmodule StatifierBlocks.MapFixtures do
   to stand first in the graph, above it, both again when the start dot
   gained the word Start and every end mark the word End, the library
   loan's again when a wrapped arm entry's later lines gained their
-  indent, and both again when the graph gained its key. They differ from
-  the reference host's by those five changes: the one mark on the loan
-  period, the dot and its edge at the graph's top level, the words on the
-  marks, the indented line under the renew arm, and the `legend`.
+  indent, both again when the graph gained its key, and both again when
+  the start edge's caption came to name who starts the document. They
+  differ from the reference host's by those six changes: the one mark on
+  the loan period, the dot and its edge at the graph's top level, the
+  words on the marks, the indented line under the renew arm, the
+  `legend`, and the start edge's caption.
   """
 
   alias StatifierBlocks.{Block, Decode, Document, Palette, ViewModel}
