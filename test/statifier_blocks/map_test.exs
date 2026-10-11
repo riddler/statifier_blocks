@@ -9,9 +9,10 @@ defmodule StatifierBlocks.MapTest do
   moved here; since then a change to what the package's own
   `StatifierBlocks.Map` answers regenerates them from it. The library
   loan's graph was regenerated when a timed wait gained the clock mark,
-  both graphs when the start dot moved ahead of the root's box, and both
-  again when the start dot and the end marks gained their words (see
-  `StatifierBlocks.MapFixtures`).
+  both graphs when the start dot moved ahead of the root's box, both
+  again when the start dot and the end marks gained their words, and the
+  library loan's again when a wrapped arm entry's later lines gained
+  their indent (see `StatifierBlocks.MapFixtures`).
   """
 
   use ExUnit.Case, async: true
@@ -30,6 +31,7 @@ defmodule StatifierBlocks.MapTest do
   alias StatifierBlocks.ViewModel
   alias StatifierBlocks.ViewModel.Node
 
+  @no_break_space <<0xA0::utf8>>
   @force "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder"
   @consider "org.eclipse.elk.layered.considerModelOrder.strategy"
 
@@ -39,8 +41,8 @@ defmodule StatifierBlocks.MapTest do
     # JSON value the reference host's map module answered at the commit the
     # fixtures were copied from, less what the package has changed since:
     # the clock mark on the library loan's timed wait, the start dot ahead
-    # of the root's box, and the words Start and End on the marks (see
-    # MapFixtures).
+    # of the root's box, the words Start and End on the marks, and the
+    # indent under the library loan's wrapped renew arm (see MapFixtures).
     #
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
     test "each teaching document's graph equals its checked-in regenerated fixture" do
@@ -805,6 +807,71 @@ defmodule StatifierBlocks.MapTest do
 
         assert positions == Enum.sort(positions), key
       end
+    end
+
+    # A wrapped entry's later lines stand indented under its label, by the
+    # width of its number, so a wrapped condition does not read as an entry
+    # of its own; an entry that fits on one line is unchanged. The indent is
+    # no-break spaces, which the drawing keeps where it would fold plain ones
+    # away.
+    #
+    # Sabotage: made arm_entry/2's indent ""; this went red. Made wrap/2's
+    # later lines keep a full line's room; this went red. Made the indent
+    # three spaces wide whatever the number; this went red. Made wrap/2's
+    # first line take a later line's room; this went red. Each reverted
+    # from a copy.
+    test "a wrapped arm entry's later lines are indented under its label" do
+      assert %{"lines" => lines} = find(graph("library_loan"), "blk_ll_due")
+
+      assert lines == [
+               "One of, in order:",
+               ~s(1. When "returned": loan.returned),
+               ~s(2. When "renew": copy.holds == 0),
+               String.duplicate(@no_break_space, 3) <> "AND loan.renewals < 2",
+               "3. Otherwise",
+               "4. Cannot be decided"
+             ]
+
+      long = "copy.holds == 0 AND loan.renewals < 2 AND loan.fines == 0"
+
+      arms =
+        for {n, letter} <- Enum.zip(1..10, ~w(a b c d e f g h i j)),
+            do: %{
+              "slot" => "arm_#{letter}",
+              "cond" => if(n == 10, do: long, else: "loan.returned")
+            }
+
+      branch =
+        Block.new("core.branch",
+          id: "due",
+          config: %{"arms" => arms},
+          slots: Map.new(arms, &{&1["slot"], []})
+        )
+
+      graph =
+        Block.new("core.sequence", id: "root", slots: %{"body" => [branch]})
+        |> Document.new()
+        |> build()
+        |> BlockMap.graph()
+
+      # The entry's first line takes a whole line's room, and each later
+      # line the room less its indent of four.
+      indent = String.duplicate(@no_break_space, 4)
+
+      entry =
+        graph
+        |> find("due")
+        |> Map.fetch!("lines")
+        |> Enum.drop_while(&(not String.starts_with?(&1, "10. ")))
+        |> Enum.take_while(&(not String.starts_with?(&1, "11. ")))
+
+      assert entry == [
+               ~s(10. When "j": copy.holds == 0 AND),
+               indent <> "loan.renewals < 2 AND",
+               indent <> "loan.fines == 0"
+             ]
+
+      assert Enum.all?(entry, &(String.length(&1) <= 33))
     end
 
     # Only a branch carries a band, and only the edge out of a branch is a
