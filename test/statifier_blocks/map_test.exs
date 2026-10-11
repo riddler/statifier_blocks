@@ -9,7 +9,8 @@ defmodule StatifierBlocks.MapTest do
   moved here; since then a change to what the package's own
   `StatifierBlocks.Map` answers regenerates them from it. The library
   loan's graph was regenerated when a timed wait gained the clock mark,
-  and both graphs when the start dot moved ahead of the root's box (see
+  both graphs when the start dot moved ahead of the root's box, and both
+  again when the start dot and the end marks gained their words (see
   `StatifierBlocks.MapFixtures`).
   """
 
@@ -37,8 +38,9 @@ defmodule StatifierBlocks.MapTest do
     # document, the package's graph under the library world's words is the
     # JSON value the reference host's map module answered at the commit the
     # fixtures were copied from, less what the package has changed since:
-    # the clock mark on the library loan's timed wait, and the start dot
-    # ahead of the root's box (see MapFixtures).
+    # the clock mark on the library loan's timed wait, the start dot ahead
+    # of the root's box, and the words Start and End on the marks (see
+    # MapFixtures).
     #
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
     test "each teaching document's graph equals its checked-in regenerated fixture" do
@@ -369,7 +371,8 @@ defmodule StatifierBlocks.MapTest do
       for {_key, view_model} <- [{"titled", titled_view_model()} | view_models()],
           node <- walk(BlockMap.graph(view_model)),
           Map.has_key?(node, "width"),
-          # The start dot and the end marks carry no text to be wide enough for.
+          # The start dot and the end marks carry no title to be wide enough
+          # for: their word stands outside them, where the layout places it.
           node["kind"] not in ["start", "end"] do
         assert node["width"] >= String.length(node["title"]) * 7 + 24, node["id"]
       end
@@ -1060,6 +1063,56 @@ defmodule StatifierBlocks.MapTest do
 
         refute start in BlockMap.nodes(graph)
       end
+    end
+
+    # The start dot carries the word Start, and every end mark the word End
+    # whichever way the document finishes there: each as the mark's one ELK
+    # label, asked to stand outside the mark on its right, so the layout
+    # leaves it room. The outcome stays on the edge into the mark and is not
+    # the mark's word. Both teaching documents, the registration with its
+    # abandon end, and the document written here that declares no events.
+    #
+    # Sabotage: made start_mark/1 carry no word; this went red. Made
+    # end_mark/2 carry the outcome as its word; this went red. Made word/2
+    # ask for the label inside the mark; this went red. Each reverted from a
+    # copy.
+    test "the start dot carries Start and every end mark End, the outcome kept on its edge" do
+      placement = %{"org.eclipse.elk.nodeLabels.placement" => "OUTSIDE V_CENTER H_RIGHT"}
+
+      for {key, document} <- [{"no accepts", no_accepts_document()} | documents()] do
+        graph = document |> build() |> BlockMap.graph()
+
+        [start] = Enum.filter(walk(graph), &(&1["kind"] == "start"))
+        ends = Enum.filter(walk(graph), &(&1["kind"] == "end"))
+        refute ends == [], key
+
+        for %{"id" => id} = mark <- [start | ends] do
+          word = if mark["kind"] == "start", do: "Start", else: "End"
+
+          assert %{
+                   "labels" => [%{"id" => label_id, "text" => ^word, "height" => 16} = label],
+                   "layoutOptions" => ^placement
+                 } = mark,
+                 "#{key}: #{id}"
+
+          assert label_id == "#{id}/word"
+          assert label["width"] >= String.length(word) * 7, "#{key}: #{id}"
+        end
+
+        edges = for node <- walk(graph), edge <- Map.get(node, "edges", []), do: edge
+
+        for %{"id" => id, "outcome" => outcome} <- ends do
+          assert [%{"outcome" => ^outcome, "labels" => [%{"text" => ^outcome}]}] =
+                   Enum.filter(edges, &(&1["targets"] == [id])),
+                 "#{key}: #{id}"
+        end
+      end
+
+      assert ["done", "abandon"] =
+               for(
+                 %{"kind" => "end", "outcome" => outcome} <- walk(graph("patron_registration")),
+                 do: outcome
+               )
     end
 
     # A document with no step yet starts into its root's empty marker.

@@ -155,8 +155,9 @@ defmodule StatifierBlocks.Map.Info do
                  "side by side, a group's body as a pane with its interrupt rules in a " <>
                  "column beside it, or a shelf of drafts. A dashed box saying " <>
                  "\"#{BlockMap.empty_text()}\" is a place no step fills yet. " <>
-                 "The filled dot is where the document starts, its arrow captioned with " <>
-                 "what starts it, and a dot inside a ring where it finishes: a solid ring " <>
+                 "The filled dot marked Start is where the document starts, its arrow " <>
+                 "captioned with what starts it, and a dot inside a ring marked End where " <>
+                 "it finishes: a solid ring " <>
                  "when its last step finishes, a dashed ring, reached by a dashed arrow, " <>
                  "when an interrupt rule abandons that step, the outcome named on the " <>
                  "arrow into it. An arrow runs from a step to the one after it. " <>

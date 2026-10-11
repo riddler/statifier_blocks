@@ -17,10 +17,12 @@ defmodule StatifierBlocks.MapFixtures do
   Since then the package's own `StatifierBlocks.Map` is the owner, and a
   change to what it answers regenerates a graph from it, never by hand:
   the library loan's graph was regenerated when a timed wait gained the
-  clock mark, and both graphs when the start dot moved out of the root's
-  box to stand first in the graph, above it. They differ from the
-  reference host's by those two changes: the one mark on the loan period,
-  and the dot and its edge at the graph's top level.
+  clock mark, both graphs when the start dot moved out of the root's box
+  to stand first in the graph, above it, and both again when the start
+  dot gained the word Start and every end mark the word End. They differ
+  from the reference host's by those three changes: the one mark on the
+  loan period, the dot and its edge at the graph's top level, and the
+  words on the marks.
   """
 
   alias StatifierBlocks.{Decode, Document, Palette, ViewModel}

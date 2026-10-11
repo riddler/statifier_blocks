@@ -105,12 +105,16 @@ defmodule StatifierBlocks.Map do
 
   A document starts when its host starts an execution of it, and the map
   says where that execution begins the way a state chart does: one filled
-  dot, the initial mark, with no text, and one edge from it into the first
-  step of the document's own flow. The dot is a node of `kind: "start"`,
-  keyed `<root id>/start`, and the graph's first node, ahead of the root's
-  box rather than inside it: the layout puts it above that box, so the dot
-  and its caption come first in reading order, above the root's title and
-  every box under it. Its edge is the graph's own, carries
+  dot, the initial mark, carrying the word Start, and one edge from it into
+  the first step of the document's own flow. The dot is a node of
+  `kind: "start"`, keyed `<root id>/start`, and the graph's first node,
+  ahead of the root's box rather than inside it: the layout puts it above
+  that box, so the dot and its caption come first in reading order, above
+  the root's title and every box under it. The word is the dot's one ELK
+  label, which the node asks the layout to place outside it, on its
+  right and level with it, so the layout leaves the word its room and the
+  edge still leaves the dot itself; an end mark carries End the same way.
+  Its edge is the graph's own, carries
   `kind: "start"` and one ELK label, `start_text/0`, so the layout leaves
   the caption its room. The caption reads the same on every document: what
   the document listens for while it runs is the description region's to
@@ -135,7 +139,9 @@ defmodule StatifierBlocks.Map do
   | `abandon` | an `abandon` interrupt rule of a group that is that last step, which leaves the group with nothing after it | a dashed ring | from the group, dashed, captioned `abandon` |
 
   Each mark is a node of `kind: "end"` carrying its `outcome`, keyed
-  `<root id>/end/<outcome>`, drawn right after the last step; its edge
+  `<root id>/end/<outcome>`, drawn right after the last step, and carrying
+  the word End as its one ELK label, whichever way it finishes: the
+  outcome stays on the edge into it, not on the mark. Its edge
   carries the same `outcome` and one ELK label, the outcome's name, so the
   layout leaves the caption its room. The edge out of a branch stays a
   rejoin (see "The Branch"); any other edge into a mark is of
@@ -330,6 +336,8 @@ defmodule StatifierBlocks.Map do
   @abandon "abandon"
   @end_size 20
   @start_text "Starts when told to"
+  @start_word "Start"
+  @end_word "End"
   @start_size 14
   @rule_spacing 24
   @body_lead 48
@@ -341,6 +349,8 @@ defmodule StatifierBlocks.Map do
   @layer_constraint "org.eclipse.elk.layered.layering.layerConstraint"
   @port_constraints "org.eclipse.elk.portConstraints"
   @port_side "org.eclipse.elk.port.side"
+  @node_labels "org.eclipse.elk.nodeLabels.placement"
+  @beside "OUTSIDE V_CENTER H_RIGHT"
 
   @root_options %{
     "org.eclipse.elk.algorithm" => "layered",
@@ -355,7 +365,9 @@ defmodule StatifierBlocks.Map do
 
   @typedoc """
   One graph node, in elkjs's JSON shape plus the fields the hook draws
-  from: `kind` (with `outcome`, all the start dot and an end mark carry),
+  from: `kind` (with `outcome`, all the start dot and an end mark carry
+  beside the ELK `labels` holding their word and the `layoutOptions`
+  placing it),
   `title` and `lines`, on a slot `style`, on a timer block
   `mark`, on a group with interrupt rules `interrupts`, on a branch `band`,
   `caption` and `caption_width`, on a group's rules column `caption`, on
@@ -681,14 +693,20 @@ defmodule StatifierBlocks.Map do
   end
 
   @spec end_mark(String.t(), String.t()) :: graph_node()
-  defp end_mark(root_id, outcome),
-    do: %{
-      "id" => "#{root_id}/end/#{outcome}",
-      "kind" => "end",
-      "outcome" => outcome,
-      "width" => @end_size,
-      "height" => @end_size
-    }
+  defp end_mark(root_id, outcome) do
+    id = "#{root_id}/end/#{outcome}"
+
+    Map.merge(
+      %{
+        "id" => id,
+        "kind" => "end",
+        "outcome" => outcome,
+        "width" => @end_size,
+        "height" => @end_size
+      },
+      word(id, @end_word)
+    )
+  end
 
   @spec end_edge(String.t(), String.t(), String.t(), String.t()) :: map()
   defp end_edge(from, root_id, outcome, kind) do
@@ -748,7 +766,29 @@ defmodule StatifierBlocks.Map do
 
   @spec start_mark(String.t()) :: graph_node()
   defp start_mark(id),
-    do: %{"id" => id, "kind" => "start", "width" => @start_size, "height" => @start_size}
+    do:
+      Map.merge(
+        %{"id" => id, "kind" => "start", "width" => @start_size, "height" => @start_size},
+        word(id, @start_word)
+      )
+
+  # The word a start dot or an end mark carries: its one ELK label, sized
+  # at the estimate and placed outside the mark, on its right and level
+  # with it, so the layout leaves the word its room beside the mark and an
+  # edge still meets the mark itself; see the moduledoc's "The start".
+  @spec word(String.t(), String.t()) :: graph_node()
+  defp word(id, text),
+    do: %{
+      "labels" => [
+        %{
+          "id" => "#{id}/word",
+          "text" => text,
+          "width" => text_width([text]),
+          "height" => @line_height
+        }
+      ],
+      "layoutOptions" => %{@node_labels => @beside}
+    }
 
   @spec start_edge(String.t(), String.t()) :: map()
   defp start_edge(from, to) do
