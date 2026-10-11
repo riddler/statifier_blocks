@@ -306,10 +306,11 @@ does mount them reads the bullets below.
   `data-map-description` attribute, its id, `aria-live` and label kept,
   and with `map={true}` its hover layer and an empty store.
 
-The release's fixes need nothing from a host: a block built before blocks
-had a note, in a document kept as a stored Erlang term, now goes through
-the note edit command, `StatifierBlocks.Map.Info`'s descriptions and the
-editor's note field as a note-free block instead of raising.
+The release's fix for a note-free stored block needs nothing from a host:
+a block built before blocks had a note, in a document kept as a stored
+Erlang term, now goes through the note edit command,
+`StatifierBlocks.Map.Info`'s descriptions and the editor's note field as
+a note-free block instead of raising.
 
 The 0.42.1 patch, which the `"~> 0.42.0"` pin takes, changes documentation
 only: **NONE**, beyond the compiler version every release moves (see the
