@@ -815,7 +815,7 @@ Filed with `sb-062y`.
 
 ## Amendment (2026-10-10): decision (d)'s description region, for a document the outline cannot describe
 
-**Status: proposed (2026-10-10, bead `sb-sx9v`).** A decision record merges
+**Status: accepted (2026-10-10, statifier_blocks 0.43.0); proposed (2026-10-10, bead `sb-sx9v`).** A decision record merges
 at proposed and is flipped to accepted by a separate request through the
 same `docs/adr/` gate. Additive: no text above this line is edited, no line
 above it is removed, and the head `Status:` line at `:3` is not extended.
@@ -1248,3 +1248,62 @@ printed. The code is cited by anchor alone, since it lands in the same
 request.
 
 Filed with `sb-eidj`.
+
+## Note (2026-10-10): the Amendment of 2026-10-10 on decision (d)'s description region is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's own status line (`:818`), where the status word `accepted`
+with its date and the version leads and the original `proposed (2026-10-10,
+...` text stays as written. Everything else is this Note, at the foot of the
+file, so no line another record cites moves. The head `Status:` line at `:3`
+is not extended.
+
+The Amendment decides nothing the package did not already do in 0.42.0, and
+the version that carries its code on the day of this flip is statifier_blocks
+0.43.0, published on Hex from the `v0.43.0` tag at `fa7b1d0`
+(`fa7b1d024eeb9a3e616cb1688f3c7d1e6f682c10`) by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/38114607621 (the job
+"Verify, gate and publish", every step green, the step "Publish to Hex"
+included). It is flipped to accepted on 2026-10-10 after 0.43.0 shipped.
+
+Every claim the Amendment makes was re-verified against `main` at `fa7b1d0`.
+The Amendment read its code cites at `2b40578`; after it merged, the key of
+the Map's marks, its title and a note on the hover changed
+`lib/statifier_blocks/editor/map_regions.ex`, and nothing changed
+`lib/statifier_blocks/editor.ex`'s check. Both cites still read at the lines
+printed. Every cite below was read at `fa7b1d0` and is written anchor first,
+line second.
+
+| Claim | Read at `fa7b1d0` |
+|---|---|
+| Decision (d)'s second bullet, the one amended | the bullet under "The description region is part of the Map's surface" (`:225`) that says the description region "is rendered on the server with the selected or idle content" (the bullet opens at `:234`), as printed |
+| A described document gets the server-rendered content | `def description_region` (`lib/statifier_blocks/editor/map_regions.ex:227`), at the line printed: on `{:ok, outline}` from its private `defp outline` (`:341`) it builds the graph, the elements and the idle description, and the region renders the selected one or the idle one |
+| An outline that raises: no description, no `data-map-description` | `defp outline` rescues any raise into `:error`; the `:error` clause (`:242`) answers no elements and no current description, so the `<.description :if={@current}` call renders nothing and `data-map-description={@current && @current.kind}` (`:268`) is `nil`, which the template leaves off |
+| The region keeps its id, its `aria-live` and its label | the `<section>`'s `id={@id}`, `aria-live="polite"` (`:266`) and `aria-label={@label}` (`:267`) are unconditional |
+| The key's lines add nothing on that path | the "Legend" fact 0.43.0 adds is one of the idle description's facts, which the `:error` clause never builds |
+| The editor leaves its region out | `defp describable?` (`lib/statifier_blocks/editor.ex:3940`), at the line printed, rescues any raise out of `Describe.outline/3` into `false`; the editor assigns it (`:1096`) and mounts its description wrapper only `:if={@describable?}` (`:1203`) |
+| The rest of the bullet stands | the map region's `<section>` is `aria-hidden="true"` (`map_regions.ex:168`); the region's moduledoc, "A document it cannot describe", says the same as the amended bullet |
+| 0.42.0 shipped it | `CHANGELOG.md`'s 0.42.0 section (`:71`) reads "`description_region/1` degrades instead of raising on a composite whose declaration cannot expand" (`:81-82`) |
+| The Note of 2026-09-30 still re-locates the degrade Note's cites | that Note re-locates `def description_region` and `defp describable?` (`:767`, its `map_regions.ex` and `editor.ex` bullets) |
+| The tests | `test/statifier_blocks/editor/map_regions_test.exs`, describe "a document whose composite declaration cannot expand" (`:728`); `test/statifier_blocks/editor/composite_expand_test.exs`, "the canvas is drawn and the description region is left out" (`:468`) |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The Amendment's status line says "proposed (2026-10-10 ..."; it is flipped
+  by one word above, with the date and the version ahead of it.
+- The Amendment says a decision record "merges at proposed and is flipped to
+  accepted by a separate request through the same `docs/adr/` gate". This
+  is that request.
+- The Amendment says the head `Status:` line at `:3` is not extended, and
+  this Note does not extend it either.
+
+### Sentences that no longer hold as written
+
+None. Each claim holds at `fa7b1d0` as written. "What this Amendment does
+not decide" holds too: no function's answer on this path changed in 0.43.0,
+and the rescue is still any raise out of the outline.
+
+Filed with `sb-2zar`.

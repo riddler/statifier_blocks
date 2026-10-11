@@ -320,7 +320,7 @@ Filed with `sb-062y`.
 
 ## Amendment (2026-10-10): a caption is the whole first sentence, and a group's rules column carries its own caption
 
-**Status: proposed (2026-10-10, bead `sb-eidj`).** A decision record merges
+**Status: accepted (2026-10-10, statifier_blocks 0.43.0); proposed (2026-10-10, bead `sb-eidj`).** A decision record merges
 at proposed and is flipped to accepted by a separate request through the
 same `docs/adr/` gate. Additive: no text above this line is edited, no line
 above it is removed, and the head `Status:` line at `:3` is not extended.
@@ -394,3 +394,64 @@ this section: a wrapped sentence costs a line for each line it wraps onto,
 on the group's rules column only.
 
 Filed with `sb-eidj`.
+
+## Note (2026-10-10): the Amendment of 2026-10-10 on decision 4's caption is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's own status line (`:323`), where the status word `accepted`
+with its date and the version leads and the original `proposed (2026-10-10,
+...` text stays as written. Everything else is this Note, at the foot of the
+file, so no line another record cites moves. The head `Status:` line at `:3`
+is not extended.
+
+The code the Amendment records shipped in statifier_blocks 0.43.0, published
+on Hex from the `v0.43.0` tag at `fa7b1d0`
+(`fa7b1d024eeb9a3e616cb1688f3c7d1e6f682c10`) by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/38114607621 (the job
+"Verify, gate and publish", every step green, the step "Publish to Hex"
+included), whose `CHANGELOG.md` section (`:14`) carries both changes under
+Changed: `caption/1`'s whole first sentence (`:45`) and the rules column's
+caption and `explanation_lines` (`:46`). It is flipped to accepted on
+2026-10-10 after 0.43.0 shipped.
+
+Every claim the Amendment makes was re-verified against `main` at `fa7b1d0`.
+The Amendment cites its code by anchor alone; it merged in `f082d40`, and
+the one commit after it, the release, touches none of the files it cites.
+Every cite below was read at `fa7b1d0` and is written anchor first, line
+second.
+
+| Claim | Read at `fa7b1d0` |
+|---|---|
+| The amended text is decision 4's third tier | "as a caption of one line under a **structural container**" (`:165-166`), as quoted |
+| `caption/1` answers the whole first sentence for a branch and the two group types, `nil` for every other type, its return type unchanged | `def caption` (`lib/statifier_blocks/map.ex:567`) answers `first_sentence/1` of `BlockType.explain/1` for `@captioned_types` (`:402`), the branch type and `@group_types` (`:399`); its other clause (`:576`) answers `nil`; `@spec caption(String.t()) :: String.t() \| nil` |
+| Never cut mid-word, never ended in "..." | `defp first_sentence` (`:1458`) answers the text up to its first sentence end, with no cut and no ellipsis |
+| The rules column's node carries `caption` and `explanation_lines` | `defp put_caption` (`:1293`), on a rail of a group type, puts `"caption" => @rules_caption` and `"explanation_lines" => wrap(sentence)`; `@rules_caption` (`:413`) is "Rules: watch the steps while they run" |
+| Wrapped to a box's line | `defp wrap` (`:1477`) wraps at the box's line by default |
+| The column's header is held tall and wide enough | `defp column_lines` (`:828`) answers the label, the caption and the wrapped sentence; `defp column_size` sizes the column from it (`:808`), and `defp slot_options` sets the column's top padding and minimum size from the same lines (`:1317`) |
+| The pair follows the key's `line` and `lines` | each key entry is `%{"mark" => mark, "line" => line, "lines" => wrap(line, ...)}` (`:604`) |
+| The hook writes the caption, then the lines, one each | `function drawCaptionLines` (`assets/js/statifier_blocks_map.js:407`) draws one `<text>` per line; a slot's drawing calls `drawCaption` for the caption and `drawCaptionLines` for `explanation_lines` under it (`:491`) |
+| A branch's band carries `caption/1` on one line, `caption_width` holds it | `defp put_band` (`map.ex:771`) puts `"caption" => caption(node.type)` and `"caption_width" => band_width(node)`; `defp band_width` (`:785`) is the fork mark's room plus the caption's whole width |
+| The tests | `test/statifier_blocks/map_test.exs`, describe "captions" (`:227`); `test/statifier_blocks/map_layout_test.exs`, "the rules column and the branch band carry their captions" (`:1519`), which lays both teaching documents out through the vendored elkjs and pins each line of the column whole, in order, inside the column and above its first rule |
+| What it does not decide | the description region still shows the whole paragraph; the captioned containers are still a branch and the two group types |
+| The Consequences bullet on vertical space | "A caption on every structural container costs vertical space in a renderer" (`:207-209`), read with the Amendment |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The Amendment's status line says "proposed (2026-10-10 ..."; it is flipped
+  by one word above, with the date and the version ahead of it.
+- The Amendment says a decision record "merges at proposed and is flipped to
+  accepted by a separate request through the same `docs/adr/` gate". This
+  is that request.
+- The Amendment says the head `Status:` line at `:3` is not extended, and
+  this Note does not extend it either.
+- The Amendment says "The code this section describes is in the request
+  that adds it"; that request merged as `f082d40`, and 0.43.0 carries it.
+
+### Sentences that no longer hold as written
+
+None. Each claim holds at `fa7b1d0` as written.
+
+Filed with `sb-2zar`.
