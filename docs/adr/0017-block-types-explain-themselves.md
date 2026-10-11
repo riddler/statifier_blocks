@@ -317,3 +317,80 @@ These have not moved since `12d3d22`: `def duration?` in
 Note read it.
 
 Filed with `sb-062y`.
+
+## Amendment (2026-10-10): a caption is the whole first sentence, and a group's rules column carries its own caption
+
+**Status: proposed (2026-10-10, bead `sb-eidj`).** A decision record merges
+at proposed and is flipped to accepted by a separate request through the
+same `docs/adr/` gate. Additive: no text above this line is edited, no line
+above it is removed, and the head `Status:` line at `:3` is not extended.
+Every decision above stands as printed except where this section says how
+decision 4's third tier reads.
+
+**Why this is an Amendment and not a Note.** Decision 4 says the
+explanation is drawn "as a caption of one line under a **structural
+container**". The package's own renderer, `StatifierBlocks.Map`, kept to
+that by cutting a first sentence wider than a box's line at a word and
+ending it in "...", so a group's caption read "A group holds a run of
+steps..." and said nothing of what its rules column is for. The wording
+below and where it is drawn were ruled by the operator, 2026-10-10, and
+they change what decision 4 decides, so the change is recorded here rather
+than in a Note.
+
+The code this section describes is in the request that adds it; it is cited
+by anchor alone, with no line numbers.
+
+### Decision 4's third tier, as amended
+
+3. **The explanation**, `BlockType.explain/1` of the block's type, in a
+   description region beside the drawing, and, under a structural container
+   the renderer draws apart, as a caption: the explanation's whole first
+   sentence, never cut mid-word and never ended in "...". A leaf never
+   carries it.
+   - Where the caption stands on one line, as on a branch's band, the
+     renderer holds the band wide enough for the whole sentence.
+   - Where it does not fit one line, it is wrapped onto lines of its own,
+     each no wider than a box's line.
+   - A group's rules column says, under its label, first its own caption,
+     "Rules: watch the steps while they run", and then the group type's
+     whole first sentence on the lines under that.
+
+In the package's Map this reads:
+
+- `StatifierBlocks.Map.caption/1` (`lib/statifier_blocks/map.ex`,
+  `def caption`) answers the whole first sentence for a branch and the two
+  group types, and `nil` for every other type, as before; its return type
+  is unchanged.
+- A group's rules column's graph node carries `caption`, the column's own
+  caption above, and a new field, `explanation_lines`, the group type's
+  sentence wrapped to a box's line (`defp put_caption`); the column's
+  header is held tall and wide enough for its label, its caption and every
+  one of those lines (`defp column_lines`). The pair follows the key's
+  `line` and `lines`: the words once, and the same words wrapped for the
+  hook to write.
+- The `StatifierBlocksMap` hook writes the column's caption under its label
+  and the sentence's lines under that, one line each
+  (`assets/js/statifier_blocks_map.js`, `function drawCaptionLines`).
+- A branch's band carries `caption/1` on one line, as before, and its
+  `caption_width` holds the whole sentence.
+
+`test/statifier_blocks/map_test.exs`, describe "captions", pins the whole
+sentence, the column's caption and its `explanation_lines`, and the
+column's header; `test/statifier_blocks/map_layout_test.exs`, "the rules
+column and the branch band carry their captions", lays both teaching
+documents out through the vendored elkjs and pins every line of the column
+drawn whole, in order, inside the column and above its first rule.
+
+### What this Amendment does not decide
+
+- The description region's text: it shows the whole paragraph, as decision
+  4 says, and the paragraph on how to read the map is not changed here.
+- Which containers the Map captions: a branch and the two group types, as
+  before.
+- Any other function's answer, and any other words on the Map.
+
+The Consequences bullet on the vertical space a caption costs reads with
+this section: a wrapped sentence costs a line for each line it wraps onto,
+on the group's rules column only.
+
+Filed with `sb-eidj`.

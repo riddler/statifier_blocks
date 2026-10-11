@@ -1219,3 +1219,32 @@ How sentences elsewhere now read:
   region as text in the "Key" fact. It reaches it in the "Legend" fact.
 
 Filed with `sb-c15x`.
+
+## Note (2026-10-10): a group's rules column carries its own caption and its type's whole sentence
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. `ADR-0017`'s Amendment of 2026-10-10 decides what a caption is,
+ruled by the operator, 2026-10-10; this Note says how a sentence in this
+record now reads.
+
+The Note of 2026-09-28 on captions says `StatifierBlocks.Map.graph/2`
+"puts a one-line caption on a branch's band and on a group's rules column"
+and that "That caption is `StatifierBlocks.Map.caption/1`". From the
+request that adds this Note:
+
+- A branch's band still carries `caption/1`, one line, now the whole first
+  sentence of the type's explanation, never cut.
+- A group's rules column carries `caption`, the column's own words, "Rules:
+  watch the steps while they run", and `explanation_lines`, `caption/1` of
+  the group's type wrapped to a box's line, which the hook writes under the
+  caption (`lib/statifier_blocks/map.ex`, `defp put_caption`). What that
+  Note says the caption reads, the core palette's type explanations, holds
+  for these lines.
+
+That Note's quote of `ADR-0017` decision 4, "as a caption of one line
+under a **structural container**", reads with that record's Amendment of
+2026-10-10, which drops the one line. The rest of that Note stands as
+printed. The code is cited by anchor alone, since it lands in the same
+request.
+
+Filed with `sb-eidj`.

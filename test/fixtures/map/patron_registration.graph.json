@@ -242,7 +242,7 @@
               "layoutOptions": {
                 "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
                 "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
-                "org.eclipse.elk.nodeSize.minimum": "(216,327)",
+                "org.eclipse.elk.nodeSize.minimum": "(264,331)",
                 "org.eclipse.elk.padding": "[top=44,left=12,bottom=12,right=12]"
               },
               "lines": [
@@ -252,7 +252,7 @@
               "title": "Steps"
             },
             {
-              "caption": "A group holds a run of steps...",
+              "caption": "Rules: watch the steps while they run",
               "children": [
                 {
                   "gap": true,
@@ -280,6 +280,11 @@
                 }
               ],
               "edges": [],
+              "explanation_lines": [
+                "A group holds a run of steps",
+                "together with the interrupt rules",
+                "on its rail."
+              ],
               "id": "blk_pr_verify/interrupts",
               "kind": "slot",
               "layoutOptions": {
@@ -289,8 +294,8 @@
                 "org.eclipse.elk.layered.crossingMinimization.forceNodeModelOrder": "true",
                 "org.eclipse.elk.layered.layering.layerConstraint": "LAST",
                 "org.eclipse.elk.nodeSize.constraints": "MINIMUM_SIZE",
-                "org.eclipse.elk.nodeSize.minimum": "(241,72)",
-                "org.eclipse.elk.padding": "[top=60,left=12,bottom=12,right=12]",
+                "org.eclipse.elk.nodeSize.minimum": "(283,120)",
+                "org.eclipse.elk.padding": "[top=108,left=12,bottom=12,right=12]",
                 "org.eclipse.elk.separateConnectedComponents": "false",
                 "org.eclipse.elk.spacing.nodeNode": "24"
               },

@@ -111,7 +111,9 @@ defmodule StatifierBlocks.MapLayoutTest do
         for node <- walk(graph), node["id"] != "plan-map", node["kind"] not in ["start", "end"] do
           texts =
             if node["kind"] == "slot",
-              do: node["lines"] ++ List.wrap(node["caption"]),
+              do:
+                node["lines"] ++
+                  List.wrap(node["caption"]) ++ Map.get(node, "explanation_lines", []),
               else: [node["title"] | node["lines"]]
 
           needed = text_width(texts)
@@ -243,7 +245,15 @@ defmodule StatifierBlocks.MapLayoutTest do
     # this went red. Each reverted from a copy.
     test "a resume edge never crosses its own rule's box", %{tmp_dir: dir} do
       {:ok, document} = Decode.decode(File.read!(@flow_graph_loan))
-      graph = document |> ViewModel.build(Palette.core(), []) |> BlockMap.graph()
+
+      # The head is drawn taller than the server holds it, so its middle
+      # stays lower than the rule's top however tall the rules column's
+      # header grows.
+      graph =
+        document
+        |> ViewModel.build(Palette.core(), [])
+        |> BlockMap.graph()
+        |> taller("blk_LRET", 96)
 
       %{"drawn" => "map", "boxes" => boxes, "interrupts" => drawn} =
         run(dir, "flow_graph_loan", graph)
@@ -1494,28 +1504,53 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
-    # The rules column carries the group's caption on the line under its
-    # label, above its first rule; the branch's band carries the branch's,
-    # inside the band and after the fork mark. Both are the type's own
-    # explanation, cut to one line (`BlockMap.caption/1`).
+    # The rules column carries its caption on the line under its label,
+    # then the group's whole sentence (`BlockMap.caption/1`) on the lines
+    # under that, one line apart, all above its first rule and each inside
+    # the column's box at the map's estimate; the branch's band carries the
+    # branch's sentence, whole, inside the band and after the fork mark.
+    # Nothing is cut: the column's lines read back as the sentence itself.
     #
     # Sabotage: made drawNode leave a slot's caption out; this went red.
-    # Made drawBand leave the band's caption out; this went red. Each
-    # reverted from a copy.
+    # Made drawBand leave the band's caption out; this went red. Made
+    # drawNode leave a slot's explanation_lines out; this went red. Made
+    # drawCaptionLines draw every line at the first one's height; this went
+    # red. Each reverted from a copy.
     test "the rules column and the branch band carry their captions", %{tmp_dir: dir} do
       branches = %{"library_loan" => "blk_ll_due", "patron_registration" => "blk_pr_age"}
 
       for {key, group, [first | _rules]} <- @groups do
+        graph = library_graph(key)
+
         %{"drawn" => "map", "boxes" => boxes, "bands" => bands, "captions" => captions} =
-          run(dir, key, library_graph(key))
+          run(dir, key, graph)
 
         rules_id = "#{group}/interrupts"
         column = boxes[rules_id]
+        label_lines = find(graph, rules_id)["lines"]
         group_caption = BlockMap.caption("core.group")
 
-        assert [%{"text" => ^group_caption, "x" => x, "y" => y}] = captions[rules_id]
-        assert x > column["x"] and x < column["x"] + column["width"], key
-        assert y > column["y"] + 16 and y < boxes[first]["y"], key
+        assert [
+                 %{"text" => "Rules: watch the steps while they run", "x" => x, "y" => y}
+                 | sentence
+               ] = captions[rules_id]
+
+        assert Enum.map_join(sentence, " ", & &1["text"]) == group_caption, key
+        assert length(sentence) > 1, key
+        assert y > column["y"] + 16 * length(label_lines) and y < boxes[first]["y"], key
+
+        drawn = [
+          %{"text" => "Rules: watch the steps while they run", "x" => x, "y" => y} | sentence
+        ]
+
+        for {%{"text" => text, "x" => lx, "y" => ly}, i} <- Enum.with_index(drawn) do
+          assert_in_delta lx, x, 0.5, key
+          assert_in_delta ly, y + i * 16, 0.5, "#{key}: #{text}"
+          assert ly < boxes[first]["y"], "#{key}: #{text} runs into the first rule"
+
+          assert lx + text_width([text]) - 12 <= column["x"] + column["width"],
+                 "#{key}: #{text} runs out of the column"
+        end
 
         branch = branches[key]
         branch_caption = BlockMap.caption("core.branch")
@@ -2006,6 +2041,16 @@ defmodule StatifierBlocks.MapLayoutTest do
     do: BlockMap.graph(MapFixtures.view_model!(key), phrase: &MapFixtures.phrase/1)
 
   defp find(graph, id), do: Enum.find(walk(graph), &(&1["id"] == id))
+
+  # `graph` with the leaf `id` held `more` pixels taller than the server
+  # holds it.
+  defp taller(%{"id" => id, "height" => height} = node, id, more),
+    do: %{node | "height" => height + more}
+
+  defp taller(%{"children" => children} = node, id, more),
+    do: %{node | "children" => Enum.map(children, &taller(&1, id, more))}
+
+  defp taller(node, _id, _more), do: node
 
   # `graph` with the branch `id` asking for `room` as its caption_width,
   # and held that wide plus its padding, as the server holds a branch at

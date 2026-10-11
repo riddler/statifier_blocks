@@ -12,8 +12,10 @@ defmodule StatifierBlocks.MapTest do
   both graphs when the start dot moved ahead of the root's box, both
   again when the start dot and the end marks gained their words, the
   library loan's again when a wrapped arm entry's later lines gained
-  their indent, and both again when the start edge's caption came to
-  name who starts the document (see `StatifierBlocks.MapFixtures`).
+  their indent, both again when the graph gained its key, both again when
+  the start edge's caption came to name who starts the document, and both
+  again when a group's rules column gained its own caption and its type's
+  whole sentence on lines of their own (see `StatifierBlocks.MapFixtures`).
   """
 
   use ExUnit.Case, async: true
@@ -43,8 +45,9 @@ defmodule StatifierBlocks.MapTest do
     # fixtures were copied from, less what the package has changed since:
     # the clock mark on the library loan's timed wait, the start dot ahead
     # of the root's box, the words Start and End on the marks, the indent
-    # under the library loan's wrapped renew arm, and the start edge's
-    # caption naming who starts the document (see MapFixtures).
+    # under the library loan's wrapped renew arm, the key, the start edge's
+    # caption naming who starts the document, and the rules column's
+    # caption and sentence lines (see MapFixtures).
     #
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
     test "each teaching document's graph equals its checked-in regenerated fixture" do
@@ -222,62 +225,143 @@ defmodule StatifierBlocks.MapTest do
   end
 
   describe "captions" do
-    # A group's rules column and a branch carry the caption for their type,
-    # and nothing else on the map carries one: not the Invoke's failure
-    # rail either.
+    # A group's rules column and a branch carry a caption, and nothing else
+    # on the map carries one: not the Invoke's failure rail either. A
+    # branch's is its type's sentence, `caption/1`; a group's rules column
+    # is captioned in the words ruled for it, and carries its type's
+    # sentence as `explanation_lines`, which nothing else carries.
     #
     # Sabotage: made put_band/2 leave the caption off; this went red.
-    # Reverted from a copy.
+    # Reverted from a copy. Made put_caption/3 put caption/1 on the column
+    # as before; this went red. Reverted from a copy.
     test "only a group's rules column and a branch carry a caption" do
       for {key, view_model} <- [{"invoke", invoke_view_model()} | view_models()] do
         graph = BlockMap.graph(view_model)
 
-        expected =
+        blocks =
           for node <- walk(graph),
               node["kind"] == "block",
               type = ViewModel.find_node(view_model, node["id"]).type,
               BlockMap.caption(type) != nil,
-              into: %{} do
+              do: {node, type}
+
+        expected =
+          for {node, type} <- blocks, into: %{} do
             if node["band"],
               do: {node["id"], BlockMap.caption(type)},
-              else: {"#{node["id"]}/interrupts", BlockMap.caption(type)}
+              else: {"#{node["id"]}/interrupts", "Rules: watch the steps while they run"}
           end
 
         captioned =
           for node <- walk(graph), node["caption"], into: %{}, do: {node["id"], node["caption"]}
 
         assert captioned == expected, key
+
+        explained =
+          for node <- walk(graph),
+              node["explanation_lines"],
+              into: %{},
+              do: {node["id"], Enum.join(node["explanation_lines"], " ")}
+
+        expected_lines =
+          for {node, type} <- blocks,
+              !node["band"],
+              into: %{},
+              do: {"#{node["id"]}/interrupts", BlockMap.caption(type)}
+
+        assert explained == expected_lines, key
       end
     end
 
     # A caption is the type's own explanation - the first sentence of
-    # `BlockType.explain/1` - on one line: whole where it fits, cut at a
-    # word and ended with "..." where it does not. Only a branch and the
-    # two groups have one; a leaf never does.
+    # `BlockType.explain/1` - whole: never cut, never ended in "...". Only a
+    # branch and the two groups have one; a leaf never does.
     #
     # Sabotage: made caption/1 answer the whole paragraph; this went red.
-    # Reverted from a copy.
-    test "a caption is the first sentence of the type's explanation, on one line" do
-      per_line = div(260 - 24, 7)
-
+    # Made caption/1 cut its sentence to one line with "..." as before; this
+    # went red. Each reverted from a copy.
+    test "a caption is the whole first sentence of the type's explanation" do
       assert BlockMap.caption("core.branch") == "A branch picks one path."
       assert String.starts_with?(Branch.explain(), "A branch picks one path. ")
+
+      assert BlockMap.caption("core.group") ==
+               "A group holds a run of steps together with the interrupt rules on its rail."
+
+      assert BlockMap.caption("core.resumable_group") ==
+               "A resumable group is a group that remembers where it was."
 
       for {type, module} <- [
             {"core.group", Group},
             {"core.resumable_group", ResumableGroup}
           ] do
         caption = BlockMap.caption(type)
-        [sentence | _rest] = String.split(module.explain(), ". ", parts: 2)
-        cut = String.trim_trailing(caption, "...")
-
-        assert String.length(caption) <= per_line, type
-        assert String.ends_with?(caption, "..."), type
-        assert String.starts_with?(sentence <> " ", cut <> " "), type
+        assert String.starts_with?(module.explain(), caption <> " "), type
+        refute String.ends_with?(caption, "..."), type
       end
 
       for type <- ["core.send", "core.await", "core.on_event", "core.sequence", "myapp.intake"],
           do: assert(BlockMap.caption(type) == nil, type)
+    end
+
+    # A group's rules column says, under its label, its caption and then its
+    # type's whole sentence, wrapped to lines no wider than a box's at the
+    # map's estimate: every word of the sentence, in order, no line cut and
+    # no line wider than a box holds. The column's header is tall enough for
+    # its label, its caption and every one of those lines, and its least
+    # width holds the widest of them.
+    #
+    # Sabotage: made put_caption/3 leave explanation_lines off the column;
+    # this went red. Made column_lines/2 leave the sentence's lines out of
+    # the header; this went red. Each reverted from a copy.
+    test "a group's rules column carries its type's sentence on lines of its own" do
+      per_line = div(260 - 24, 7)
+
+      for type <- ["core.group", "core.resumable_group"] do
+        rule =
+          Block.new("core.on_event",
+            id: "lost",
+            config: %{"event" => "copy.reported_lost", "outcome" => "abandon"}
+          )
+
+        step = Block.new("core.await", id: "wait", config: %{"event" => "copy.returned"})
+
+        group =
+          Block.new(type,
+            id: "loan",
+            config: if(type == "core.resumable_group", do: %{"history" => "shallow"}, else: %{}),
+            slots: %{"body" => [step], "interrupts" => [rule]}
+          )
+
+        graph =
+          Block.new("core.sequence", id: "root", slots: %{"body" => [group]})
+          |> Document.new()
+          |> build()
+          |> BlockMap.graph()
+
+        column = find(graph, "loan/interrupts")
+        lines = column["explanation_lines"]
+        assert is_list(lines) and lines != [], type
+        sentence = BlockMap.caption(type)
+
+        assert Enum.join(lines, " ") == sentence, type
+        assert length(lines) > 1, type
+        for line <- lines, do: assert(String.length(line) <= per_line, "#{type}: #{line}")
+
+        header = column["lines"] ++ [column["caption"] | lines]
+        top = 12 + (length(header) + 1) * 16
+
+        assert column["layoutOptions"]["org.eclipse.elk.padding"] =~ "[top=#{top},", type
+
+        [width, _height] =
+          Regex.run(
+            ~r/^\((\d+),(\d+)\)$/,
+            column["layoutOptions"]["org.eclipse.elk.nodeSize.minimum"],
+            capture: :all_but_first
+          )
+
+        widest = header |> Enum.map(&String.length/1) |> Enum.max()
+        assert String.to_integer(width) == widest * 7 + 24, type
+      end
     end
 
     # A branch's `caption_width` is the fork mark's 26px room plus its
