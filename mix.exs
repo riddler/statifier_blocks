@@ -203,13 +203,15 @@ defmodule StatifierBlocks.MixProject do
         # one; the refusal is lifted and the floor rises with it, in one
         # request, because round-tripping the whole of a string is now
         # something this package NEEDS and a need is what a floor is allowed
-        # to state. `~> 9.4.1` admits 9.4.1 and later 9.x and excludes the
-        # 9.4.0 that truncates. What says the version is there is a positive
+        # to state. The requirement `~> 9.4 and >= 9.4.1` admits 9.4.1 and
+        # later 9.x, 9.5 included, and excludes the 9.4.0 that truncates and
+        # the 10.0 line. The floor is the `>= 9.4.1` half; the `~> 9.4` half
+        # is the 9.x cap. What says the version is there is a positive
         # round trip over a non-ASCII literal, in
         # `test/statifier_blocks/core/on_event_test.exs`: it goes red against
         # a resolved predicator that truncates, which is the whole of what
         # this requirement is for.
-        {:predicator, "~> 9.4.1"},
+        {:predicator, "~> 9.4 and >= 9.4.1"},
         # Dev / test
         {:ex_quality, "~> 0.15", only: :dev, runtime: false},
         {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
