@@ -204,9 +204,9 @@ defmodule StatifierBlocks.Core.OnEvent do
   **interim** and ended on 2026-09-13 (ADR-0002's Note of that date). It
   was earned only while predicator 9.4.0's string lexer wrote a literal's
   codepoints back a byte at a time; 9.4.1 fixed that lexer, `mix.exs`
-  requires `~> 9.4.1`, and a positive round trip over a non-ASCII literal
-  in the suite is what says the resolved version is one that reads a
-  string back whole.
+  requires `>= 9.4.1` (and `~> 9.4`), and a positive round trip over a
+  non-ASCII literal in the suite is what says the resolved version is one
+  that reads a string back whole.
 
   One `<assign>` is emitted per pair, on the transition the handler
   already emits and **before** the `<raise>` that carries the outcome.
@@ -1279,8 +1279,8 @@ defmodule StatifierBlocks.Core.OnEvent do
 
   # A document value spelled as a predicator literal expression - the
   # decision ADR-0002's Note of 2026-09-12 delegates to this request, taken
-  # against `predicator` 9.4.1 (the resolved version; `mix.exs` requires
-  # `~> 9.4.1`) and against `Statifier.Compiler.Expressions.compile/3`, which
+  # against `predicator` 9.4.1 (the version measured; `mix.exs` requires
+  # `>= 9.4.1` and `~> 9.4`) and against `Statifier.Compiler.Expressions.compile/3`, which
   # is what an `<assign expr=...>` is read by.
   #
   # The spelling is predicator's own literal grammar rather than the
@@ -1316,7 +1316,7 @@ defmodule StatifierBlocks.Core.OnEvent do
   # The facts this rests on - the escape set the lexer decodes, and that a
   # string literal is written back whole rather than a byte at a time - are
   # that lexer's behaviour rather than a documented grammar, so `mix.exs`
-  # requires the version they were measured at: `~> 9.4.1`.
+  # requires no lower than the version they were measured at: `>= 9.4.1`.
   #
   # The round trips in `test/statifier_blocks/core/on_event_test.exs` hold
   # BOTH of them honest, and the same way: they assert the value read back
@@ -1371,7 +1371,7 @@ defmodule StatifierBlocks.Core.OnEvent do
   # type and left the spelling to the code - so it was declared interim
   # here and in `mix.exs`, and it ended with ADR-0002's Note of 2026-09-13:
   # predicator 9.4.1 reads a string literal back whole, `mix.exs` requires
-  # `~> 9.4.1` for that reason and no other, and `escape/1` plus the round
+  # `>= 9.4.1` for that reason and no other, and `escape/1` plus the round
   # trip in `test/statifier_blocks/core/on_event_test.exs` are now the whole
   # of what a string has to satisfy.
   #
