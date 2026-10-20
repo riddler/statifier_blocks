@@ -86,7 +86,11 @@ defmodule StatifierBlocks.MapFixtures do
   - `"overdue_inside_loan"`: a loan group whose renewal rule only resumes
     it, its body ending in an overdue group a loss report abandons;
   - `"lost_at_either_level"`: the same loan with a return rule that
-    abandons the loan group too, so two groups abandon into one end.
+    abandons the loan group too, so two groups abandon into one end;
+  - `"lost_in_a_closing_sequence"`: that loan with its body ending in a
+    sequence - the overdue notice, then the overdue group - so a sequence
+    stands in tail position under the loan group and the group a loss
+    report abandons is the last step of that sequence.
   """
   @spec deep_abandons() :: [{String.t(), Document.t(), String.t(), [String.t()]}]
   def deep_abandons do
@@ -104,6 +108,8 @@ defmodule StatifierBlocks.MapFixtures do
       {"lost_while_overdue", lost_while_overdue, "blk_ll_due", ["blk_ll_overdue"]},
       {"overdue_inside_loan", nested_loan(["resume"]), "blk_ll_on_loan", ["blk_ll_overdue"]},
       {"lost_at_either_level", nested_loan(["resume", "abandon"]), "blk_ll_on_loan",
+       ["blk_ll_on_loan", "blk_ll_overdue"]},
+      {"lost_in_a_closing_sequence", nested_loan(["resume", "abandon"], true), "blk_ll_on_loan",
        ["blk_ll_on_loan", "blk_ll_overdue"]}
     ]
   end
@@ -117,8 +123,9 @@ defmodule StatifierBlocks.MapFixtures do
   end
 
   # A loan group whose rules take `outcomes` in turn - a renewal, then a
-  # return - its body the loan period and then an overdue group.
-  defp nested_loan(outcomes) do
+  # return - its body the loan period and then an overdue group, or, with
+  # `sequenced?`, a sequence of the overdue notice and that group.
+  defp nested_loan(outcomes, sequenced? \\ false) do
     rules =
       Enum.zip_with(
         [{"blk_ll_renewed_rule", "loan.renewed"}, {"blk_ll_returned_early", "copy.returned"}],
@@ -139,12 +146,21 @@ defmodule StatifierBlocks.MapFixtures do
     on_loan =
       Block.new("core.group",
         id: "blk_ll_on_loan",
-        slots: %{"body" => [period, held(late)], "interrupts" => rules}
+        slots: %{"body" => [period | closing(late, sequenced?)], "interrupts" => rules}
       )
 
     "core.sequence"
     |> Block.new(id: "blk_ll_root", slots: %{"body" => [on_loan]})
     |> Document.new(id: "bdoc_library_loan", accepts: ["copy.returned", "copy.reported_lost"])
+  end
+
+  defp closing(late, false), do: [held(late)]
+
+  defp closing(late, true) do
+    notice =
+      Block.new("core.send", id: "blk_ll_overdue_notice", config: %{"event" => "loan.overdue"})
+
+    [Block.new("core.sequence", id: "blk_ll_closing", slots: %{"body" => [notice, held(late)]})]
   end
 
   defp lost(id),

@@ -490,6 +490,79 @@ defmodule StatifierBlocks.Map.InfoTest do
       end
     end
 
+    # A group deeper in tail position that a rule abandons has its own edge
+    # into the one abandon end, and elements/6 describes each such edge as
+    # it describes the root's last step's: the finish edge's explanation,
+    # the outcome, and the rules of THAT group - the loan group's renewal
+    # and return, the overdue group's loss report - so the description names
+    # which group abandons. The abandon end's own text is the ruled words,
+    # and the done edge stays with the root's last step, naming no rules.
+    # The fourth loan puts a sequence in tail position under the loan
+    # group, so the overdue group is reached through it.
+    #
+    # Sabotage: made tail_slots/1 skip a sequence; the closing-sequence loan
+    # lost its overdue edge and this went red. Made finishing/3 answer the
+    # finishes text for an abandon; this went red. Made the abandon end's
+    # text say "its last step" in place of "a group at the end of its flow";
+    # this went red. Each reverted from a copy.
+    test "a deep abandon's edges name the group that abandons and its rules" do
+      group = "Group (Run interruptible steps)"
+
+      rules = %{
+        "blk_ll_on_loan" => [
+          "When the loan is renewed, resumes #{group}",
+          "When the copy is returned, abandons #{group}"
+        ],
+        "blk_ll_overdue" => ["When the copy is reported lost, abandons #{group}"]
+      }
+
+      finish_explanation =
+        "The arrow into a final mark: the document's last step, or a group at the end " <>
+          "of its flow, is behind it, so when control leaves it this way, the document " <>
+          "finishes with the outcome it names."
+
+      for {key, document, last, abandoning} <- MapFixtures.deep_abandons() do
+        {_graph, descriptions, _idle} = described_document(document, Palette.core())
+        by_id = Map.new(descriptions, &{&1.id, &1})
+
+        done = by_id["#{last}->blk_ll_root/end/done"]
+        assert %Info{kind: :edge} = done, key
+        assert fact(done, "Outcome") == "done", key
+        assert fact(done, "Interrupt rules") == nil, key
+
+        abandon_end = by_id["blk_ll_root/end/abandon"]
+        assert %Info{kind: :end, sentence: "The document finishes: abandon"} = abandon_end, key
+
+        assert abandon_end.explanation ==
+                 "Where the document finishes when an interrupt rule abandons a group at the end " <>
+                   "of its flow, drawn as a dashed ring: the rule leaves the group, and nothing " <>
+                   "comes after the group.",
+               key
+
+        abandon_edges =
+          for {id, %Info{kind: :edge}} <- by_id,
+              String.ends_with?(id, "->blk_ll_root/end/abandon"),
+              do: id
+
+        assert Enum.sort(abandon_edges) ==
+                 Enum.sort(for(g <- abandoning, do: "#{g}->blk_ll_root/end/abandon")),
+               key
+
+        for g <- abandoning do
+          edge = by_id["#{g}->blk_ll_root/end/abandon"]
+          assert %Info{kind: :edge, title: "Finish"} = edge, "#{key}: #{g}"
+
+          assert edge.sentence ==
+                   "When an interrupt rule abandons #{group}, the document finishes: abandon",
+                 "#{key}: #{g}"
+
+          assert fact(edge, "Outcome") == "abandon", "#{key}: #{g}"
+          assert fact(edge, "Interrupt rules") == Map.fetch!(rules, g), "#{key}: #{g}"
+          assert edge.explanation == finish_explanation, "#{key}: #{g}"
+        end
+      end
+    end
+
     # The start dot and its edge: where the document starts, in the map's
     # own sentence, and the step that runs first. The loan's events are not
     # the edge's: the idle description lists them as what it listens for.
