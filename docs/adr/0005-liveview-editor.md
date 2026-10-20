@@ -14725,7 +14725,7 @@ Filed with `sb-9bpd`.
 
 ## Amendment (2026-10-19): an `advisories` assign, a host's function the editor asks for per-block advisories on every rebuild
 
-**Status: proposed (2026-10-19, bead `sb-cco0`, which also carries the
+**Status: accepted (2026-10-19, statifier_blocks 0.44.0); proposed (2026-10-19, bead `sb-cco0`, which also carries the
 implementation; the seam ruled by the operator, 2026-10-19).** A decision
 record merges at proposed and is flipped to accepted by a separate request
 through the same `docs/adr/` gate once the code that implements it has
@@ -14924,7 +14924,7 @@ Filed with `sb-cco0`.
 
 ## Amendment (2026-10-19): decision 11e at publish, an undeclared datamodel path is an `:error` when the document declares its own datamodel roots
 
-**Status: proposed (2026-10-19, bead `sb-oavx`, which also carries the
+**Status: accepted (2026-10-19, statifier_blocks 0.44.0); proposed (2026-10-19, bead `sb-oavx`, which also carries the
 implementation; the rule ruled by the operator, 2026-10-19).** A decision
 record merges at proposed and is flipped to accepted by a separate request
 through the same `docs/adr/` gate once the code that implements it has
@@ -15077,3 +15077,89 @@ beside it:
   editor still draws `:info` where the publish entry answers `:error`.
 
 Filed with `sb-oavx`.
+
+## Note (2026-10-19): the two Amendments of 2026-10-19, the `advisories` assign and decision 11e at publish, are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it
+are the two Amendments' own status lines (`:14728` and `:14927`), where the
+status word `accepted` with its date and the version leads and the original
+`proposed (2026-10-19, ...` text stays as written. Everything else is this
+Note, at the foot of the file, so no line another record cites moves. The
+head `Status:` line at `:3` is not extended.
+
+The code both Amendments record shipped in statifier_blocks 0.44.0,
+published on Hex from the `v0.44.0` tag at `49c6b5b`
+(`49c6b5b471e2ef17b14611b347d57b3c2c66db46`) by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/39369630593 (the job
+"Verify, gate and publish", every step green, the step "Publish to Hex"
+included), whose `CHANGELOG.md` section (`:14`) carries the assign under
+Added (`:38`) and the publish severity under Changed (`:45`). Both are
+flipped to accepted on 2026-10-19 after 0.44.0 shipped.
+
+Every claim both Amendments make was re-verified against `main` at
+`49c6b5b`. Every cite below was read there and is written anchor first, line
+second.
+
+### The `advisories` assign (`:14726`)
+
+It merged in `1295aea`. After it, nothing changed the files it cites, and
+this file gained only the Amendment on 11e below.
+
+| Claim | Read at `49c6b5b` |
+|---|---|
+| The Context: `agrees?/3` had no caller, and a validator is handed the document alone | `def agrees?(declarations, fields, expected)` (`lib/statifier_blocks/block_type.ex:1056`); the `@callback validate_document` (`lib/statifier_blocks/document_validator.ex:124`), whose `@doc` leaves a rule needing more to the host "evaluated before it builds the palette or after it reads `on_change`" (`:121`) |
+| The assign, `nil` by default, with its moduledoc row and section | the editor's mount sets `advisories: nil` (`lib/statifier_blocks/editor.ex:867`); the assigns table's `advisories` row (`:687`); the section "A host's own advisories (`advisories`)" (`:442`) |
+| `findings_count/3` takes the option, with the same default | `def findings_count` (`editor.ex:1055`) passes `Keyword.get(opts, :advisories)` to the same private `view_model/7` the editor uses; its doc names the option (`:1051`) |
+| Called with the document on every rebuild | `defp rebuild/1` (`editor.ex:3630`) reads the assign and hands it with the document to `defp view_model/7` (`:3953`), which calls `ViewModel.advisory_findings/2` |
+| Read through the validator's normalizer, `:lint` at `:warning` | `def advisory_findings` (`lib/statifier_blocks/view_model.ex:1591`) pipes the function's answer into `defp normalize_specs/3` with `:lint` and `:warning`; a value that is not a one-argument function answers `[]` (`:1595`); a non-list answers `[]` (`:1609`); `defp anchor?/1` admits the `:block`, `:slot` and `:config` anchors only (`:1655-1658`); `advisory_findings/2` is `@doc false`, and nothing in it rescues |
+| Through the caller-findings seam, last | `view_model/7` (`editor.ex:3953`) hands `ViewModel.build/3` `findings ++ advisories ++ disagreements ++ host_advisories` |
+| A host that passes nothing | the test "the editor draws exactly what it drew before the assign existed" (`test/statifier_blocks/editor/host_advisories_test.exs:235`) |
+| The first use and its four steps | that module's `agreement_advisories/4` (`:113`) reads the declarations with `Declarations.from_document/1`, resolves the child's root with `Palette.resolve/2`, reads `BlockType.donedata_type/2`, asks `BlockType.agrees?/3` only where `collect_type` is a shape, and answers one advisory on `collect_type` for `{:missing, names}` or `:not_assignable`; the tests "a disagreeing pair raises exactly one :warning advisory on collect_type" (`:203`), "an agreeing pair raises none" (`:221`), "an author's edit is asked about on the next render" (`:263`) and "findings_count/3 counts the advisory the drawer shows" (`:295`) |
+| What it does not decide: the publish side | `StatifierBlocks.Graph`'s moduledoc, "The three checks" (`lib/statifier_blocks/graph.ex:26`), item 3, still leaves type agreement to `agrees?/3`; `Publish.findings/3` takes no advisories function |
+| Consequences: `ADR-0013`'s dated Note | `docs/adr/0013-typed-fan-out-child-summary.md`, "Note (2026-10-19): decision 4's editor advisory is raised through the editor's `advisories` assign" (`:1156`) |
+
+### Decision 11e at publish (`:14925`)
+
+It merged in `784587f`. After it, nothing changed the files it cites.
+
+| Claim | Read at `49c6b5b` |
+|---|---|
+| The advisory is built in one place, at `:info` | `defp advisory/5` (`lib/statifier_blocks/datamodel.ex:909`) builds `{:config, block_id, key}`, source `:lint`, severity `:info`; `def findings/4` (`:355`) is what the editor and the publish entry both call |
+| "Declares its own roots", by the rule `document_roots/1` reads | `defp document_roots/1` (`datamodel.ex:784`) keeps an entry's `id` when `declared_path?/1` holds, a non-empty binary (`:936`); `Publish`'s private `declares_roots?/1` (`lib/statifier_blocks/publish.ex`, below `at_publish/2`) applies the same test |
+| The raise is the publish entry's, only the severity moves | `defp at_publish/2` (`publish.ex:173`) maps each advisory to `%Finding{f \| severity: :error}` when the document declares roots and leaves the list as it was otherwise; `defp editor_findings/4` applies it to `Datamodel.findings/4`'s answer before `ViewModel.build/3`, in the same position |
+| The editor is unchanged | the editor's `view_model/7` (`editor.ex:3953`) calls `Datamodel.findings/4` with no raise; `Datamodel`'s moduledoc names `Publish.findings/3` as the one reader that raises (`datamodel.ex:122`) |
+| A datamodel only the host declares, and nothing declared | `at_publish/2` reads only the document's own `datamodel` key, so a host's `:datamodel` or `:declare` roots can clear a path through 11k and never raise one; with nothing declared, `Datamodel.findings/4` produces nothing to raise |
+| `Publish`'s moduledoc states the three cases | the section "An undeclared datamodel path" (`publish.ex:61`) |
+| The worked example and the tests | `test/statifier_blocks/publish_test.exs`, describe "an undeclared datamodel path where the document declares its roots" (`:122`), builds it with the root `patron` and a `core.assign` writing `patorn.email` (`:129`), `patron.email` (`:181`) and a path the host's datamodel declares (`:160`); "an undeclared datamodel path is the editor's :info advisory, not a refusal" (`:94`) and "the host's :declare roots alone keep the :info advisory" (`:197`) pin the unchanged cases; `test/statifier_blocks/editor/publish_equality_test.exs`, "where the document declares its roots, the editor shows :info and publish :error" (`:91`), pins the one difference and that `findings_count/3` is still the list's length |
+| The record cites | `:1462`, `:1759` and `:3796-3798` of this file; `docs/adr/0004-compiler-provenance.md:3993-3997` and `:4034-4037`; `docs/adr/0001-block-document-schema.md:809-811`; and `docs/adr/0006-datamodel-document.md:247-252`, each read as the Amendment quotes it |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- Each Amendment's status line says "proposed (2026-10-19 ..."; each is
+  flipped by one word above, with the date and the version ahead of it.
+- Each status line says its drafting request "also carries the
+  implementation". That implementation is on `main`; the tables above are
+  where it reads.
+- Each Amendment says a decision record "merges at proposed and is flipped
+  to accepted by a separate request through the same `docs/adr/` gate once
+  the code that implements it has shipped in a published version". This is
+  that request, for both, and 0.44.0 is that version.
+- Each says the head `Status:` line at `:3` is not extended, and this Note
+  does not extend it either.
+
+### Sentences that no longer hold as written
+
+None reverses what either Amendment decides.
+
+- **The `advisories` Amendment's first Consequences bullet, "The next
+  release's changelog names the assign (`changelog.d/sb-cco0.md`)", and the
+  11e Amendment's first, "The next release's changelog says so
+  (`changelog.d/sb-oavx.md`)".** Each fragment was the changelog's form
+  before a release. `changelog.d/README.md` says that at release the
+  fragments are assembled into a single version section and deleted, and
+  the release commit `49c6b5b` did that: the same lines are `CHANGELOG.md`'s
+  0.44.0 Added entry (`:38`) and Changed entry (`:45`), and the fragments
+  are gone. The next release the bullets name is 0.44.0.
