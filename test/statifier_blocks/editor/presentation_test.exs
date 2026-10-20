@@ -1443,6 +1443,164 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    defmodule HoldWithDeadline do
+      @moduledoc """
+      A library composite with a pass-through slot: a hold placed at a
+      shelf, and the steps that follow it in the slot labelled "Then". It is
+      the shape the card-face captures were taken on - a container card whose
+      chips run past the cap, with a slot label directly under it - written
+      in the library loan domain.
+      """
+
+      use StatifierBlocks.Composite,
+        name: "library.hold_with_deadline",
+        params: [
+          %{key: "shelf", type: :string, label: "Shelf", required?: true, default: ""}
+        ],
+        slots: [%{name: "body", to: {"then", "body"}, label: "Then"}],
+        sentence: "Hold at {shelf}",
+        palette_entry: %{label: "Hold with a deadline", group: "Structure"},
+        version: 1
+
+      alias StatifierBlocks.Block
+
+      # The second chip is 40 graphemes against the cap of 32, so the card
+      # carries one presentation-cap finding as well as the host's.
+      @impl StatifierBlocks.BlockType
+      def summary(config),
+        do: [config["shelf"], "notify the patron when the hold is ready"]
+
+      @impl StatifierBlocks.Composite
+      def subtree(params) do
+        [
+          Block.new("core.assign",
+            id: "hold",
+            config: %{"path" => "loan.hold_shelf", "value" => params["shelf"]}
+          ),
+          Block.new("core.group", id: "then", slots: %{"body" => []})
+        ]
+      end
+    end
+
+    describe "a container card's face finding is the card's, never its slot's" do
+      @hold_message "The hold shelf closes before the pickup deadline."
+
+      # A face finding on a container card is a child of that card's chrome,
+      # so it is laid out inside the card's border and padding and reads
+      # before the slot label under the card. Outside the chrome it would sit
+      # in the node box between the card and its "Then" label, the line that
+      # read as belonging to the slot.
+      # Sabotage: move the face-finding `<p :for=...>` out of `.sb-node__chrome`
+      # in `block_node.ex` to just after it - red on the first assertion.
+      test "the finding is inside the card and ahead of the slot label", %{conn: conn} do
+        html = hold_html(conn)
+        doc = LazyHTML.from_fragment(html)
+
+        assert [_one] =
+                 doc
+                 |> LazyHTML.query(
+                   ~s([data-block-id="blk_hold"] > .sb-node__chrome > .sb-finding)
+                 )
+                 |> Enum.to_list()
+
+        chrome = LazyHTML.query(doc, ~s([data-block-id="blk_hold"] > .sb-node__chrome))
+        assert LazyHTML.text(chrome) =~ @hold_message
+        refute LazyHTML.text(chrome) =~ "summary chip"
+
+        # Every finding the card's node box draws is its chrome's: none is a
+        # direct child of the node box and none is inside the slots.
+        assert doc |> LazyHTML.query(~s([data-block-id="blk_hold"] .sb-finding)) |> Enum.count() ==
+                 1
+
+        assert doc |> LazyHTML.query(~s([data-block-id="blk_hold"] > .sb-finding)) |> Enum.count() ==
+                 0
+
+        assert [label] =
+                 doc
+                 |> LazyHTML.query(
+                   ~s([data-block-id="blk_hold"] > .sb-node__slots .sb-slot__label)
+                 )
+                 |> Enum.to_list()
+
+        assert LazyHTML.text(label) =~ "Then"
+
+        # In the card's own markup, the finding comes before its slot label.
+        card = doc |> LazyHTML.query(~s([data-block-id="blk_hold"])) |> LazyHTML.to_html()
+        {finding_at, _} = :binary.match(card, @hold_message)
+        {label_at, _} = :binary.match(card, ~s(class="sb-slot__label"))
+        assert finding_at < label_at
+      end
+
+      # The composite's controls are the strip's children, so the strip's
+      # reserved column is what they take: "steps" and the `x` sit beside the
+      # title, not over its last word.
+      # Sabotage: move the Expand button out of `.sb-node__strip` in
+      # `block_node.ex` to a direct child of the chrome - red.
+      test "the composite's controls are in the reserved strip", %{conn: conn} do
+        doc = conn |> hold_html() |> LazyHTML.from_fragment()
+
+        for class <- [".sb-node__expand", ".sb-node__fold", ".sb-node__remove"] do
+          strip = ~s([data-block-id="blk_hold"] > .sb-node__chrome > .sb-node__strip > #{class})
+          bare = ~s([data-block-id="blk_hold"] > .sb-node__chrome > #{class})
+
+          assert doc |> LazyHTML.query(strip) |> Enum.count() == 1, "#{class} is not in the strip"
+          assert doc |> LazyHTML.query(bare) |> Enum.count() == 0, "#{class} is outside the strip"
+        end
+      end
+
+      # The card face is the card line: its title and its chips, and no
+      # sentence. The composite's sentence reads in the description region
+      # under the canvas once the card is selected.
+      # Sabotage: draw `@node.sentence` in a `<p>` inside the card's chrome in
+      # `block_node.ex` - red on the refute.
+      test "the composite's sentence reads in the description region, not on the card",
+           %{conn: conn} do
+        {:ok, view, _html} = mount_hold(conn)
+        select_card(view, "blk_hold")
+        doc = view |> render() |> LazyHTML.from_fragment()
+
+        chrome = LazyHTML.query(doc, ~s([data-block-id="blk_hold"] > .sb-node__chrome))
+        refute LazyHTML.text(chrome) =~ "Hold at front desk"
+
+        assert doc
+               |> LazyHTML.query(".sb-editor__description .sb-map__description-sentence")
+               |> LazyHTML.text() =~ "Hold at front desk"
+      end
+
+      defp hold_html(conn) do
+        {:ok, view, _html} = mount_hold(conn)
+        render(view)
+      end
+
+      defp mount_hold(conn) do
+        document =
+          Document.new(
+            Block.new("core.sequence",
+              id: "blk_loan_root",
+              slots: %{
+                "body" => [
+                  Block.new("library.hold_with_deadline",
+                    id: "blk_hold",
+                    config: %{"shelf" => "front desk"},
+                    slots: %{"body" => []}
+                  )
+                ]
+              }
+            ),
+            id: "doc_loan_hold"
+          )
+
+        palette =
+          Palette.new(
+            Map.put(Palette.core_types(), "library.hold_with_deadline", HoldWithDeadline)
+          )
+
+        finding = Finding.new({:block, "blk_hold"}, :lint, @hold_message, severity: :warning)
+
+        mount_editor(conn, document: document, palette: palette, findings: [finding])
+      end
+    end
+
     defp rule_body!(css, regex) do
       match = Regex.run(regex, css)
       assert match, "the scan actually found #{inspect(regex.source)}"

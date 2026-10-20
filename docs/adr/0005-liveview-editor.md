@@ -14637,3 +14637,85 @@ this one answers that the session commits it without asking its type. It adds
 no README row and flips no status line.
 
 Filed with `sb-qy9y`.
+
+## Note (2026-10-19): a composite card's face is the card line, and its sentence reads in the description region
+
+A dated Note, not an amendment: it carries no `Status:` line, edits no line
+above it and changes no code. It records a ruling by the operator,
+2026-10-19, on what a composite card's face draws, and reads it against the
+code. Every code cite below is by anchor, read at `987ce0b`.
+
+### The ruling
+
+A composite card's face draws no sentence. It keeps its chips, under the
+presentation cap. The block's sentence reads in the editor's description
+region. The card face and the Map follow one rule for which text goes
+where.
+
+This is item 3 of the Note of 2026-09-08 ("The card draws no sentence"),
+read for the composite card, and it holds for a composite whose
+pass-through slot makes its card a container as well as for one drawn as a
+leaf.
+
+### What the card face draws
+
+`StatifierBlocks.Editor.BlockNode.block_node/1`
+(`lib/statifier_blocks/editor/block_node.ex`) draws a card's chrome: the
+title, the type subtitle or the summary chip row, the invoke line, the face
+findings and the control strip. Nothing in the chrome draws a sentence.
+
+The chips are `summary/1`'s, every one of them: no declared chip is left
+out. A summary chip over the cap of 32 (`@presentation_cap` in
+`lib/statifier_blocks/block_type.ex`) is drawn clipped with an ellipsis, and
+its full text is on the chip's `title`. That is `ADR-0002`'s Amendment of
+2026-09-08 on `B3`'s length arm, which this ruling does not change. The
+finding that says a chip was clipped draws in the drawer's Findings tab and
+not on the card face (`defp presentation_finding?/1` in `block_node.ex`, the
+filter `defp face_findings/1` applies). Item 2 of the Note of 2026-09-08
+ruled that. So the question this ruling answered, whether the cap truncates
+or drops a chip, has the answer the code already gives: a summary chip is
+clipped and never dropped. A badge over the cap is still dropped
+(`BlockType.badge/1`).
+
+A face finding that does draw on the face is a child of the card's chrome.
+It sits inside the card's border and before the slot label under the card
+(the stylesheet rule `.sb-node__chrome > .sb-finding` in
+`assets/css/statifier_blocks.css`). The composite's controls are the control
+strip's children, in the strip's reserved column beside the title (the
+`.sb-node__chrome > .sb-node__strip` rule). The render tests under the
+describe "a container card's face finding is the card's, never its slot's"
+in `test/statifier_blocks/editor/presentation_test.exs` pin both on a
+composite with a pass-through slot.
+
+### Where the sentence reads
+
+The sentence is the block's `ViewModel.Node.sentence`. In the editor it
+reads in the description region under the canvas, the region the Amendment
+of 2026-09-29 on the shell arrangement placed there, once the card is
+selected. `StatifierBlocks.Map.Info` builds each block's description and
+fills its `sentence` from `StatifierBlocks.Map.Phrasing.sentence/2` (`defp block/2` in
+`lib/statifier_blocks/map/info.ex`). It leaves the field `nil` where the
+sentence would only repeat the title. The function that draws the
+description, `StatifierBlocks.Editor.MapRegions.description_region/1`
+(`lib/statifier_blocks/editor/map_regions.ex`), puts the sentence in the
+`.sb-map__description-sentence` paragraph.
+
+### The one text-tier rule
+
+The rule the card face shares with the Map is `ADR-0017`'s decision 4,
+"What a renderer draws from each". That decision names three tiers of text:
+the card line on every box, the sentence on a container's header and in a
+detail panel, and the type's explanation in a description region. The
+editor's card face is the first tier only, a container card's included. In
+the editor the sentence and the explanation both read in the description
+region, which is the editor's detail panel. A renderer that draws a
+document from the outline draws all three, as decision 4 says.
+
+### What this Note does not do
+
+It changes no code and no `@doc`. It amends no clause of decision 10 and
+takes no length ruling: the cap, the clip and the badge's drop stand as
+`ADR-0002`'s Amendment of 2026-09-08 and item 2 of the Note of 2026-09-08
+record them. It adds no README row and flips no status line.
+
+Filed with `sb-9bpd`.
