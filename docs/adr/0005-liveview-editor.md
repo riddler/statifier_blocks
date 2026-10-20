@@ -14921,3 +14921,159 @@ advisory appears on the next render.
   host's function is where they are both in hand.
 
 Filed with `sb-cco0`.
+
+## Amendment (2026-10-19): decision 11e at publish, an undeclared datamodel path is an `:error` when the document declares its own datamodel roots
+
+**Status: proposed (2026-10-19, bead `sb-oavx`, which also carries the
+implementation; the rule ruled by the operator, 2026-10-19).** A decision
+record merges at proposed and is flipped to accepted by a separate request
+through the same `docs/adr/` gate once the code that implements it has
+shipped in a published version. Additive: no text above this line is
+edited, no line above it is removed, and the head `Status:` line at `:3` is
+not extended. Decision 11's source enum, severity enum, anchor union and
+routing table stand as printed, and so do 11e's anchor, source and message
+and 11k to 11m's declared set.
+
+**Why this is an Amendment and not a Note.** It changes what
+`StatifierBlocks.Publish.findings/3` answers for one finding, and so what a
+host's publish step refuses. 11e, 11c and 11m say the advisory changes no
+verdict; a reader of those clauses alone would reach the opposite of what
+follows. By this directory's README that is an Amendment.
+
+Code cites below that name code already on `main` were read at `1295aea`
+and carry their anchors; the code this Amendment adds is cited by anchor
+alone. Re-locate by anchor, not by number.
+
+### Context
+
+11e makes a config path the declared set does not declare an `:info`
+finding with source `:lint`, anchored `{:config, block_id, key}`; 11c says
+an `:info` changes no verdict; and 11m, widening what counts as declared to
+the union of the host's datamodel, the compile call's `:declare` roots and
+the document's own `datamodel` key, says again that "the severity is still
+`:info`" and that "11c's rule that this changes no verdict holds as it did".
+The finding is built in one place, `defp advisory/5` in
+`lib/statifier_blocks/datamodel.ex`, and `def findings/4` beside it is what
+both the editor and the publish entry call.
+
+`StatifierBlocks.Publish.findings/3` composes the editor's list for a host's
+publish step (`ADR-0004`'s Amendment of 2026-09-22, G4), and the host
+refuses on an `:error` from it. Until this Amendment, the advisory reached
+that list at `:info` and refused nothing; the moduledoc of
+`lib/statifier_blocks/publish.ex` said so in one sentence at `1295aea`: "An
+undeclared datamodel path is the editor's `:info` advisory, never a
+refusal." A path under a root nothing declares was then met only when a run
+reached it.
+
+The family's rule for checks of this kind is the one this package's records
+already follow: what a host can check before publish, its publish step
+judges, and the engine's behaviour at run time stays the backstop
+(`ADR-0014`'s Context; `ADR-0008`'s Amendment of 2026-09-22, A4). The
+operator ruled, 2026-10-19: an undeclared datamodel path is a publish
+finding when the document declares a datamodel; the editor's `:info`
+advisory stays for documents with no declaration.
+
+### Decision
+
+**11e at publish. Where the document declares its own datamodel roots,
+`Publish.findings/3` answers each undeclared-path advisory at `:error`.**
+"The document declares its own datamodel roots" means the document's
+`datamodel` key (`ADR-0001` decision 11) holds at least one entry, read by
+the rule `defp document_roots/1` in `lib/statifier_blocks/datamodel.ex`
+reads it: an entry whose `id` is a non-empty string. Which paths are
+undeclared is unchanged: the advisory's own check over 11k's union, matched
+by 11l's two rules. Only the severity moves. The anchor, the source `:lint`
+and the message stay the advisory's, and the finding keeps its place in the
+list, so the host's publish step refuses the document on it. `:lint` at
+`:error` is the pairing 11i already admits.
+
+The raise is the publish entry's, in `defp at_publish/2` in
+`lib/statifier_blocks/publish.ex`, applied to `Datamodel.findings/4`'s
+answer before it is handed to `ViewModel.build/3`. `Datamodel.findings/4`
+itself still answers `:info`.
+
+**The editor is unchanged.** The editor shows the advisory at `:info` in
+every case, as 11e, 11c and 11m say. A document that declares its roots is
+therefore the one case in which the publish entry's list and the editor's
+differ, by that severity alone.
+
+**A datamodel only the host declares is unchanged.** When the document's
+`datamodel` key is empty, the advisory stays `:info` at publish whatever
+the host supplies: a `:datamodel`, `:declare` roots, or both. When the
+document declares a root, the host's datamodel and roots still count as
+declared under 11k, so they can clear a path and never refuse one: a path
+the host's datamodel holds whole, or whose root the host declares, produces
+no advisory to raise.
+
+**Nothing declared anywhere is unchanged.** 11f as 11m widens it: no
+advisory is produced, and so nothing is raised.
+
+Worked example, patron registration. The document declares the root
+`patron` and a `core.assign` writes to `patorn.email`. The editor anchors
+one `:info` finding on the block's `path` field saying the path is not
+declared; `Publish.findings/3` answers the same finding at `:error`, and
+the host refuses the publish. Change the block to write `patron.email` and
+neither reports anything, because the root is declared. Remove the
+document's root and supply the host datamodel `["patron.email"]` instead,
+writing `patron.card_number`: the advisory is `:info` in both, and the
+publish is not refused.
+
+### The sentences this reaches
+
+Each is left as printed and is read, from this date, with this Amendment
+beside it:
+
+- **11c**, "It changes no verdict" (`:1462`), **11e**, "per 11c it changes
+  no verdict" (`:1759`), and **11m**, "the severity is still `:info`" and
+  "11c's rule that this changes no verdict holds as it did" (`:3796-3798`):
+  they hold in the editor and for `Datamodel.findings/4`, and at publish in
+  every case but the one decided above.
+- **`ADR-0004`'s Amendment of 2026-09-22, G4**, the equality "byte for
+  byte, order included" (`docs/adr/0004-compiler-provenance.md:3993-3997`):
+  it holds except for that one severity, and `Editor.findings_count/3` is
+  still the list's length, since no finding is added or dropped. The same
+  Amendment's "What this amendment does not decide" bullet, "A read of a
+  datamodel path the host does not declare stays the editor's `:info`
+  advisory ... nothing here raises it" (`:4034-4037`), is a statement about
+  G4, and this Amendment is where the raise is decided.
+- **`ADR-0001` decision 11's 11h**, "It produces no finding about an
+  undeclared path, ever. The strongest advisory anything may produce about
+  one remains ADR-0005's 11e `:info`" (`docs/adr/0001-block-document-schema.md:809-811`):
+  the key still produces no finding; its presence decides the severity the
+  publish entry gives a finding 11e produces.
+- **`ADR-0006` decision 9**, "Advisory, never a gate", whose "Any future
+  refusal ... is its own record's claim, argued there"
+  (`docs/adr/0006-datamodel-document.md:247-252`) this Amendment answers:
+  the refusal is the block document's own declaration's. A host's datamodel
+  document still never refuses anything, since it can only declare a path.
+
+### What this does not decide
+
+- **Whether a datamodel only the host declares should refuse at publish.**
+  It does not here; the advisory stays `:info` in that case, and the
+  question is open.
+- **A path the host's datamodel declares under a root no surface
+  declares.** 11k counts it declared, so there is no advisory to raise, and
+  that is unchanged.
+- **The editor's severity.** A document that declares its roots still shows
+  the advisory at `:info` at edit time.
+- **The engine's behaviour at run time**, which stays the backstop.
+
+### Consequences
+
+- **A host whose publish step refuses on `:error` now refuses a document
+  that declares its datamodel roots and writes or reads a path none of the
+  declaring surfaces declares.** The next release's changelog says so
+  (`changelog.d/sb-oavx.md`).
+- **A host that supplies a datamodel or `:declare` roots for a document that
+  declares none sees what it saw before.**
+- **The moduledoc of `StatifierBlocks.Publish`** states the three cases in
+  its section *An undeclared datamodel path*, and the moduledoc of
+  `StatifierBlocks.Datamodel` names `Publish.findings/3` as the one reader
+  that raises the advisory.
+- **The tests**: `test/statifier_blocks/publish_test.exs` pins the raise
+  and both unchanged cases headless, and
+  `test/statifier_blocks/editor/publish_equality_test.exs` pins that the
+  editor still draws `:info` where the publish entry answers `:error`.
+
+Filed with `sb-oavx`.

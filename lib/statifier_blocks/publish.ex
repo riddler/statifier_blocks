@@ -39,25 +39,52 @@ defmodule StatifierBlocks.Publish do
        `StatifierBlocks.ViewModel.build/3` handed the adapted list, then
        `StatifierBlocks.Datamodel.findings/4`'s advisories, then
        `StatifierBlocks.ViewModel.outcome_findings/3`'s disagreements. The
-       view model's own derived findings come first.
+       view model's own derived findings come first. When the document
+       declares its own datamodel roots, the advisories are raised to
+       `:error` before they are handed on (see *An undeclared datamodel
+       path* below).
 
   Step 4 is the editor's list for the same document, palette and context
   when the editor is handed the adapted list as its `findings`, in the same
   order, and `StatifierBlocks.Editor.findings_count/3` over the same inputs
-  is its length. A config refusal can appear twice in it, once derived by
-  the view model and once from the compile's Config stage, exactly as the
-  editor shows it when a host hands it the compile's refusal; nothing here
-  de-duplicates.
+  is its length. The one difference is the severity of an undeclared-path
+  advisory in a document that declares its own roots: `:error` here,
+  `:info` in the editor, with the same anchor, source and message. A config
+  refusal can appear twice in the list, once derived by the view model and
+  once from the compile's Config stage, exactly as the editor shows it when
+  a host hands it the compile's refusal; nothing here de-duplicates.
 
   Nothing here emits, so an Emit-stage or Chart-stage refusal is the
   compile's to report, and the checks a compile's `:entry_type` option
   drives are too: `context` does not carry it.
 
-  An undeclared datamodel path is the editor's `:info` advisory, never a
-  refusal.
+  ## An undeclared datamodel path
+
+  A config path no declaring surface declares is
+  `StatifierBlocks.Datamodel.findings/4`'s advisory: anchored on the field,
+  source `:lint`, severity `:info` (ADR-0005 decision 11e, with the
+  declared set 11k widens). What this function answers for it depends on
+  who declared:
+
+    * **The document declares a datamodel root** (its own `datamodel` key
+      holds at least one entry): the advisory is answered at `:error`, so
+      the host's publish step refuses the document. The document has said
+      what storage it reads and writes, and a path outside it is the
+      mistake a run would otherwise meet only at run time. The host's
+      datamodel and `:declare` roots still count as declared, so either
+      can only clear a path, never refuse one.
+    * **Only the host declares** (a `:datamodel`, or `:declare` roots, with
+      the document declaring none): the advisory stays `:info`, as the
+      editor shows it, and refuses nothing.
+    * **Nothing is declared anywhere**: no advisory is produced (11f, as
+      11m widens it).
+
+  The editor's own list is unchanged: it shows the advisory at `:info` in
+  every case. The rule is ADR-0005's Amendment of 2026-10-19 on 11e.
   """
 
   alias StatifierBlocks.{Compiler, Datamodel, Document, Finding, Palette, ViewModel}
+  alias StatifierBlocks.Document.DatamodelEntry
 
   @typedoc """
   The same inputs the editor takes, as a map. Every key is optional, and an
@@ -121,12 +148,13 @@ defmodule StatifierBlocks.Publish do
   @spec editor_findings(Document.t(), Palette.t(), [Finding.t()], context()) :: [Finding.t()]
   defp editor_findings(document, palette, caller_findings, context) do
     advisories =
-      Datamodel.findings(
-        document,
+      document
+      |> Datamodel.findings(
         palette,
         Map.get(context, :datamodel),
         Map.get(context, :declare, [])
       )
+      |> at_publish(document)
 
     disagreements =
       ViewModel.outcome_findings(document, palette, Map.get(context, :chart_outcomes, %{}))
@@ -135,5 +163,29 @@ defmodule StatifierBlocks.Publish do
       ViewModel.build(document, palette, caller_findings ++ advisories ++ disagreements)
 
     findings
+  end
+
+  # The undeclared-path advisories as the publish step reads them: refusals
+  # when the document declares its own roots, the editor's `:info`
+  # otherwise. Only the severity moves, so the anchor, source, message and
+  # position in the list stay the editor's.
+  @spec at_publish([Finding.t()], Document.t()) :: [Finding.t()]
+  defp at_publish(advisories, document) do
+    if declares_roots?(document) do
+      Enum.map(advisories, &%Finding{&1 | severity: :error})
+    else
+      advisories
+    end
+  end
+
+  # The document's own `datamodel` key, read by the rule
+  # `StatifierBlocks.Datamodel` reads it by: an entry whose `id` is a
+  # non-empty string declares a root.
+  @spec declares_roots?(Document.t()) :: boolean()
+  defp declares_roots?(%Document{datamodel: entries}) do
+    Enum.any?(entries, fn
+      %DatamodelEntry{id: id} -> is_binary(id) and id != ""
+      _other -> false
+    end)
   end
 end
