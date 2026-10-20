@@ -1069,7 +1069,7 @@ Filed with `sb-qiox`.
 
 ## Amendment (2026-10-19): a `core.map` `collect_type` name that a supplied `:datamodel` does not declare is reported unchecked too
 
-**Status: proposed (2026-10-19, bead `sb-z0j3`, which also carries the
+**Status: accepted (2026-10-19, statifier_blocks 0.44.0); proposed (2026-10-19, bead `sb-z0j3`, which also carries the
 implementation).** A decision record merges at proposed and is flipped to
 accepted by a separate request through the same `docs/adr/` gate once the
 code that implements it has shipped in a published version. Additive: no
@@ -1298,3 +1298,71 @@ names takes the first listed outcome's path" in
 `test/statifier_blocks/graph_test.exs` pins each of those steps.
 
 Filed with `sb-ckm8`.
+
+## Note (2026-10-19): the Amendment of 2026-10-19 on an undeclared `collect_type` name is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's own status line (`:1072`), where the status word `accepted`
+with its date and the version leads and the original `proposed (2026-10-19,
+...` text stays as written. Everything else is this Note, at the foot of the
+file and after the dated Note of 2026-10-19 on the unconditioned arm, so no
+line another record cites moves. The head `Status:` line at `:3` is not
+extended.
+
+The code the Amendment records shipped in statifier_blocks 0.44.0, published
+on Hex from the `v0.44.0` tag at `49c6b5b`
+(`49c6b5b471e2ef17b14611b347d57b3c2c66db46`) by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/39369630593 (the job
+"Verify, gate and publish", every step green, the step "Publish to Hex"
+included), whose `CHANGELOG.md` section (`:14`) carries the change under
+Changed (`:47`). It is flipped to accepted on 2026-10-19 after 0.44.0
+shipped.
+
+Every claim the Amendment makes was re-verified against `main` at `49c6b5b`.
+The Amendment merged in `995aea1`. After it, `lib/statifier_blocks/compiler.ex`
+was changed only by the release's version bump, `lib/statifier_blocks/graph.ex`
+and `lib/statifier_blocks/compiled.ex` not at all, and
+`test/statifier_blocks/graph_test.exs` and this file by the dated Note of
+2026-10-19 on the unconditioned arm, which adds a test and a foot Note and
+removes no line. Every cite below was read at `49c6b5b` and is written anchor
+first, line second.
+
+| Claim | Read at `49c6b5b` |
+|---|---|
+| The Context's cites, read at `453cad5` | the private `interface/2` (`lib/statifier_blocks/compiler.ex:3269`), `reference/3`'s `FanOut` clause (`:3314`), `required_members/2`'s name clause (`:3346`) and `unresolved/2` (`:3364`), and `Graph`'s `check/2` (`lib/statifier_blocks/graph.ex:128`), `consumers_broken/2` (`:167`) and `pair/3` (`:195`), are where the Context names them, at the lines printed here; the Context describes the code before this Amendment |
+| V1, a name a supplied `:datamodel` does not declare is marked | `defp unresolved/2` (`compiler.ex:3364`) answers `nil` for a blank name and otherwise asks `defp unresolved_reason/2`, which answers `{name, :no_datamodel}` under `:no_datamodel` (`:3375`), `nil` when `StatifierDatamodel.Declarations.fetch/2` finds the name and `{name, :not_declared}` when it does not (`:3377`); `reference/3`'s `FanOut` clause merges `unresolved` and `unresolved_reason` only when it answers; `required_members/2` answers `[]` for a name the declarations do not hold (`:3346`) |
+| V1, the key is optional and typed | `optional(:unresolved_reason) => unresolved_reason()` (`lib/statifier_blocks/compiled.ex:99`), its doc (`:83`), and `@type unresolved_reason :: :no_datamodel \| :not_declared` (`:109`) |
+| V2, U3's `:warning` in both directions, on U3's anchor or the composite's | `pair/3` (`graph.ex:195`) builds one finding with `severity: :warning` in place of the key rule for every reference whose `unresolved` is a binary, through `defp finding/4` (`:237`), whose `anchor/2` gives the composite's chrome for a reference carrying `expanded_from` (`:247`, `ADR-0004`'s Amendment of 2026-10-19) |
+| V2, the two messages | `forward_message/3`'s `:unchecked` clause keeps "names a type that is not resolvable without :datamodel" and its `:undeclared` clause (`:268`) says "names a type the supplied :datamodel does not declare"; the reverse messages (`:288`) say the same and name the parent |
+| V3, a reference without the reason reads as U2's | `defp unchecked/1` (`graph.ex:224`) answers `:undeclared` only for `unresolved_reason: :not_declared` and `:unchecked` for anything else (`:225`) |
+| The worked example | `test/statifier_blocks/graph_test.exs` builds it: the parent from `defp registration/1` with `cards: "library.card_receipt"`, the block `blk_CARDS`, the child `library_card_issue`, the parent id `patron_registration`, and `@loan_receipt_datamodel` (`:224`), which declares `library.loan_receipt` |
+| The tests | "a collect_type name a supplied :datamodel does not declare is marked unresolved, with its reason" (`:391`), "a read the supplied :datamodel does not declare is a warning that says so" (`:621`), "a read left unchecked without :datamodel keeps its message in both directions" (`:645`), "a reference stored without unresolved_reason reads as having had no :datamodel" (`:669`) and "a read the supplied :datamodel does not declare is a warning paired with the parent" (`:828`) |
+| The record cites | `:580`, `:687-697`, `:890-891`, `:902-905`, `:914-916`, `:924-926` and `:964-966` of this file read as the Amendment quotes them |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The Amendment's status line says "proposed (2026-10-19 ..."; it is flipped
+  by one word above, with the date and the version ahead of it.
+- The Amendment's status line says its drafting request "also carries the
+  implementation". That implementation is on `main`; the table above is
+  where it reads.
+- The Amendment says a decision record "merges at proposed and is flipped to
+  accepted by a separate request through the same `docs/adr/` gate once the
+  code that implements it has shipped in a published version". This is that
+  request, and 0.44.0 is that version.
+- The Amendment says the head `Status:` line at `:3` is not extended, and
+  this Note does not extend it either.
+
+### Sentences that no longer hold as written
+
+None reverses what the Amendment decides.
+
+- **The last Consequences bullet, "`changelog.d/sb-z0j3.md`, under
+  "Changed", records the change for a host".** The fragment was the
+  changelog's form before a release. `changelog.d/README.md` says that at
+  release the fragments are assembled into a single version section and
+  deleted, and the release commit `49c6b5b` did that: the same line is
+  `CHANGELOG.md`'s 0.44.0 Changed entry (`:47`), and the fragment is gone.

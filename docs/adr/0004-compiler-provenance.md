@@ -4696,7 +4696,7 @@ Filed with `sb-2g62`.
 
 ## Amendment (2026-10-19): E3 reaches a graph finding on a reference a composite's expansion placed
 
-**Status: proposed (2026-10-19, bead `sb-ti1o`).** A decision record merges
+**Status: accepted (2026-10-19, statifier_blocks 0.44.0); proposed (2026-10-19, bead `sb-ti1o`).** A decision record merges
 at proposed and is flipped to accepted by a separate request through the
 same `docs/adr/` gate once the code that implements it has shipped in a
 published version. Additive: no text above this line is edited, no line
@@ -4821,3 +4821,65 @@ placed, and the reference still says which member carries the `<invoke>`.
   a composite's expansion is answered here; that record is not edited.
 
 Filed with `sb-ti1o`.
+
+## Note (2026-10-19): the Amendment of 2026-10-19 on E3 and a graph finding on an expanded reference is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's own status line (`:4699`), where the status word `accepted`
+with its date and the version leads and the original `proposed (2026-10-19,
+...` text stays as written. Everything else is this Note, at the foot of the
+file, so no line another record cites moves. The head `Status:` line at `:3`
+is not extended.
+
+The code the Amendment records shipped in statifier_blocks 0.44.0, published
+on Hex from the `v0.44.0` tag at `49c6b5b`
+(`49c6b5b471e2ef17b14611b347d57b3c2c66db46`) by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/39369630593 (the job
+"Verify, gate and publish", every step green, the step "Publish to Hex"
+included), whose `CHANGELOG.md` section (`:14`) carries the change under
+Changed (`:46`). It is flipped to accepted on 2026-10-19 after 0.44.0
+shipped.
+
+Every claim the Amendment makes was re-verified against `main` at `49c6b5b`.
+The Amendment merged in `b173930`. After it, `lib/statifier_blocks/compiler.ex`
+was changed by the Expand gesture's current-version stamp, by the Amendment
+of 2026-10-19 on `ADR-0008` (an undeclared `collect_type` name) and by the
+release's version bump; `lib/statifier_blocks/graph.ex` and
+`lib/statifier_blocks/compiled.ex` by that `ADR-0008` Amendment;
+`lib/statifier_blocks/composite.ex` by the stamp; and
+`test/statifier_blocks/graph_test.exs` by both, and by the dated Note of
+2026-10-19 on `ADR-0008`. None of them changes what this Amendment decides.
+Every cite below was read at `49c6b5b` and is written anchor first, line
+second.
+
+| Claim | Read at `49c6b5b` |
+|---|---|
+| The Context's cites, read at `173705c` | `defp interface/2` (`lib/statifier_blocks/compiler.ex:3269`), `defp reference/3` (`:3301`), `@typep expansion` (`:655`), `defp reanchor/2` (`:1203`) and `defp anchor/2` (`:1260`) are where the Amendment names them, at the lines printed here; "The ids the subtree mints" (`lib/statifier_blocks/composite.ex:55`) still states `composite_id <> "_" <> local_id`; `Graph`'s `defp finding/4` (`lib/statifier_blocks/graph.ex:237`) now builds every anchor through `anchor/2`, as K2 says |
+| K1, the outermost composite and `expanded_from` | the success clause of `defp reanchor/2` (`compiler.ex:1205`) maps every interface reference through `defp reanchor_reference/2` (`:1241`), which, when `anchor/2`'s walk to the outermost composite answers, puts `:block_id` to that composite and `:expanded_from` to the member's id, and otherwise answers the reference unchanged; the clause for an empty index (`:1203`) answers the result as it was |
+| K1, the key is optional on `t:child_reference/0` | `optional(:expanded_from) => Block.id()` (`lib/statifier_blocks/compiled.ex:100`), with its doc (`:87`) |
+| K2, `{:block, composite_id}` for every rule, both directions | `Graph`'s private `anchor/2` (`graph.ex:247`) answers `{:block, composite_id}` for a reference carrying `expanded_from` and `{:config, block_id, key}` otherwise (`:250`); `defp finding/4` is the only builder, and the unpublished child, the outcome rule, the key rule and the unchecked `:warning` all go through it, from `check/2` (`:128`) and `consumers_broken/2` (`:167`) alike |
+| K2, message, severity and source unchanged | `finding/4` passes its message and options through to `Finding.new/4` with source `:graph`; only the anchor depends on `expanded_from` |
+| K3, no finding on an expanded block | no clause of `Graph`'s `anchor/2` answers the member's id |
+| Consequences, one changed answer | `CHANGELOG.md` 0.44.0, Changed (`:46`), states it as the Amendment does |
+| The tests | `test/statifier_blocks/graph_test.exs`, describe "a reference a composite's expansion placed (ADR-0004's Amendment of 2026-10-19)" (`:852`): the recorded reference (`:859`), the forward finding (`:885`), the unresolvable child (`:904`), the reverse finding (`:913`), the outermost composite (`:931`) and a pass-through child keeping its own anchor (`:954`) |
+| The record cites | `:2926`, `:2975`, `:3129` and `:3318` of this file, and `docs/adr/0008-durable-subchart-handler.md:846-853`, read as the Amendment quotes them |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- The Amendment's status line says "proposed (2026-10-19 ..."; it is flipped
+  by one word above, with the date and the version ahead of it.
+- The Amendment says a decision record "merges at proposed and is flipped to
+  accepted by a separate request through the same `docs/adr/` gate once the
+  code that implements it has shipped in a published version". This is that
+  request, and 0.44.0 is that version.
+- The Amendment says the head `Status:` line at `:3` is not extended, and
+  this Note does not extend it either.
+
+### Sentences that no longer hold as written
+
+None. Each claim holds at `49c6b5b` as written. The Context's line numbers
+were read at `173705c`, before the Amendment's own code moved them; the
+Amendment says to re-locate by anchor, and the table above does.
