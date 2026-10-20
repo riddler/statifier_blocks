@@ -919,9 +919,9 @@
  * that is visible - a container draws no box - but `Connectors` measures
  * those boxes, and an interrupt channel offset from the right edge of one is
  * then drawn straight through the contents it is escaping, which is the one
- * thing the channel exists to prevent. Measured on the `card_processing`
- * fixture, the validation group's body box was 386px wide around 811px of
- * content, so its channel turned down 425px inside its own body.
+ * thing the channel exists to prevent. Measured on one of the package's test
+ * fixture documents, the validation group's body box was 386px wide around
+ * 811px of content, so its channel turned down 425px inside its own body.
  *
  * At `max-content` every box is as wide as what it encloses and the channel
  * turns down just clear of it - which, with the body anchor the interrupt
@@ -1744,10 +1744,10 @@
  * ragged"). It reads well and it does not survive nesting. `1fr` is a share
  * of the row's own width, not a request for room: an arm holding a nested
  * arrangement needs more than one track and gets one anyway, so it overflows
- * to the right, INTO its siblings' x band. Measured on the card_processing
- * fixture, a three-arm branch inside one lane made that lane's content 769px
- * wide in a 240px track, which put two of its arms underneath the two lanes
- * beside it. No two cards collide, so the page still looks plausible - but a
+ * to the right, INTO its siblings' x band. Measured on one of the package's
+ * test fixture documents, a three-arm branch inside one lane made that
+ * lane's content 769px wide in a 240px track, which put two of its arms
+ * underneath the two lanes beside it. No two cards collide, so the page still looks plausible - but a
  * rejoin edge dropping down its own lane's band to reach the join marker then
  * crosses cards that were never in that lane, which is what `Connectors`
  * draws and what the eye reads as a line straight through a card. A ragged
