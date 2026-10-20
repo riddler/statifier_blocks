@@ -159,8 +159,9 @@ defmodule StatifierBlocks.Map.Info do
                  "the rules that watch it, or the step that runs when it fails. A dashed " <>
                  "box saying \"#{BlockMap.empty_text()}\" is a place no step fills yet. " <>
                  "A branch's box lists its arms in the order it tries them, each with its " <>
-                 "condition. A one-line caption, on a branch's band or under a group's " <>
-                 "rules column, says what that kind of step does. The selected step's box " <>
+                 "condition. A caption on a branch's band, or under a group's rules column " <>
+                 "with its explanation beneath, says what that kind of step does. The " <>
+                 "selected step's box " <>
                  "is outlined, and on a page that can edit, a \"+\" at a box's lower right " <>
                  "corner is where a step can be added right after it. The key beside the " <>
                  "drawing says what each of its other marks means. " <>
