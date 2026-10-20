@@ -14664,17 +14664,20 @@ leaf.
 title, the type subtitle or the summary chip row, the invoke line, the face
 findings and the control strip. Nothing in the chrome draws a sentence.
 
-The chips are `summary/1`'s, every one of them: no declared chip is left
-out. A summary chip over the cap of 32 (`@presentation_cap` in
-`lib/statifier_blocks/block_type.ex`) is drawn clipped with an ellipsis, and
-its full text is on the chip's `title`. That is `ADR-0002`'s Amendment of
-2026-09-08 on `B3`'s length arm, which this ruling does not change. The
-finding that says a chip was clipped draws in the drawer's Findings tab and
-not on the card face (`defp presentation_finding?/1` in `block_node.ex`, the
-filter `defp face_findings/1` applies). Item 2 of the Note of 2026-09-08
-ruled that. So the question this ruling answered, whether the cap truncates
-or drops a chip, has the answer the code already gives: a summary chip is
-clipped and never dropped. A badge over the cap is still dropped
+The chips are `summary/1`'s, and no declared chip is left out for its
+length. A chip that `BlockType.summary/2` refuses (a non-string, an empty
+or all-whitespace string, one carrying a newline, carriage return or tab)
+is still dropped, and its siblings survive. A summary chip over the cap of
+32 (`@presentation_cap` in `lib/statifier_blocks/block_type.ex`) is drawn
+clipped with an ellipsis, and its full text is on the chip's `title`. That
+is `ADR-0002`'s Amendment of 2026-09-08 on `B3`'s length arm, which this
+ruling does not change. The finding that says a chip was clipped draws in
+the drawer's Findings tab and not on the card face
+(`defp presentation_finding?/1` in `block_node.ex`, the filter
+`defp face_findings/1` applies). Item 2 of the Note of 2026-09-08 ruled
+that. So the question this ruling answered, whether the cap truncates
+or drops a chip, has the answer the code already gives: an over-cap summary
+chip is clipped and never dropped. A badge over the cap is still dropped
 (`BlockType.badge/1`).
 
 A face finding that does draw on the face is a child of the card's chrome.
