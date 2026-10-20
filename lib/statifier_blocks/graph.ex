@@ -55,7 +55,14 @@ defmodule StatifierBlocks.Graph do
 
   Every finding is a `StatifierBlocks.Finding` with source `:graph`,
   anchored `{:config, block_id, key}` on the parent's referencing block,
-  under the field its author would change. The anchor has no document arm,
+  under the field its author would change. A `core.subchart` or `core.map`
+  that a composite's expansion placed is not a block the author's stored
+  document holds, so the compile records its reference under the outermost
+  composite block, with the expanded member's id as `expanded_from`, and a
+  finding about it is anchored `{:block, composite_id}` on that composite's
+  chrome: the field the rule names is the member's, and no field on the
+  composite's form is to blame (ADR-0004's Amendment of 2026-10-19). The
+  anchor has no document arm,
   so `consumers_broken/2` returns each finding paired with the parent's
   document id, and its message names that document.
 
@@ -104,7 +111,10 @@ defmodule StatifierBlocks.Graph do
       `:datamodel` to resolve, so its keys are unchecked - anchored
       `{:config, block_id, "collect_type"}`.
 
-  `block_id` is always the parent's referencing block. A resolver answering
+  `block_id` is always the parent's referencing block. A reference a
+  composite's expansion placed is recorded under the composite block and
+  carries `expanded_from`, and each finding about it is anchored
+  `{:block, block_id}` instead of on a field. A resolver answering
   anything else breaks its contract, and the call raises rather than
   guessing what the host meant.
   """
@@ -139,8 +149,9 @@ defmodule StatifierBlocks.Graph do
   order given and each parent's findings in its document order. Each
   finding is source `:graph`, anchored on the parent's referencing block -
   `{:config, block_id, "outcomes"}` for an outcome, `{:config, block_id,
-  "collect_type"}` for a done-data key - and its message names the parent
-  document. Each is severity `:error`, except a `:warning` on
+  "collect_type"}` for a done-data key, or `{:block, block_id}` for a
+  reference a composite's expansion placed - and its message names the
+  parent document. Each is severity `:error`, except a `:warning` on
   `"collect_type"` for a reference whose `collect_type` names a type the
   parent was compiled with no `:datamodel` to resolve, so its keys are
   unchecked. The resolver plays no part: both sides are in hand.
@@ -209,8 +220,19 @@ defmodule StatifierBlocks.Graph do
 
   @spec finding(Compiled.child_reference(), String.t(), String.t(), keyword()) :: Finding.t()
   defp finding(reference, key, message, opts \\ []) do
-    Finding.new({:config, reference.block_id, key}, :graph, message, opts)
+    Finding.new(anchor(reference, key), :graph, message, opts)
   end
+
+  # ADR-0004's Amendment of 2026-10-19: a reference a composite's expansion
+  # placed is recorded under the composite block, and the field a rule
+  # names is the expanded member's, which is not on the composite's form.
+  # The finding goes on the composite's chrome instead, as E3 reports a
+  # compile finding no param is blamed for.
+  @spec anchor(Compiled.child_reference(), String.t()) :: Finding.anchor()
+  defp anchor(%{expanded_from: _member_id, block_id: composite_id}, _key),
+    do: {:block, composite_id}
+
+  defp anchor(%{block_id: block_id}, key), do: {:config, block_id, key}
 
   @typep message ::
            (Compiled.child_reference(), :outcome | :key | :unchecked, String.t() -> String.t())
