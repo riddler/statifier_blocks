@@ -635,7 +635,7 @@ defmodule StatifierBlocks.Environment do
         %{name: "note", type: "string", required?: false}
       ]}
 
-      iex> StatifierBlocks.Environment.inline_shape("cards.settlement")
+      iex> StatifierBlocks.Environment.inline_shape("registration.patron")
       :unknown
   """
   @spec inline_shape(term()) :: type_expr()
@@ -1226,7 +1226,7 @@ defmodule StatifierBlocks.Environment do
   # field carrying `expects` and no `writes` is a **read**: it says what the
   # block needs at the path, not what it leaves there, and treating it as a
   # write would blank the very type it was declared to check - the record's
-  # own worked shape has a settle step read the subject and expects the
+  # own worked shape has a later step read the subject and expects the
   # subject to still be typed for the step after it.
   @spec writes?(BlockType.field_decl()) :: boolean()
   defp writes?(%{type: {:path, %{writes: _written}}}), do: true

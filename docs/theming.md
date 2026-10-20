@@ -44,10 +44,10 @@ or on a selector that reaches that element:
 
 ```text
 /* No: the editor's own declarations win over anything inherited. */
-[data-theme="cardpay"] { --sb-bg: #1a1f27; }
+[data-theme="library"] { --sb-bg: #1a1f27; }
 
 /* Yes: the same element the package declares its defaults on. */
-[data-theme="cardpay"] .sb-editor { --sb-bg: #1a1f27; }
+[data-theme="library"] .sb-editor { --sb-bg: #1a1f27; }
 ```
 
 Load your stylesheet after the package's, so a tie in specificity goes your
@@ -139,7 +139,7 @@ A palette entry may declare `accent_token`: the **name** of a `--sb-*` custom
 property, never a colour.
 
 ```text
-%{type: "myapp:authorize", label: "Authorize", accent_token: "--sb-accent-myapp-authorize"}
+%{type: "myapp.check_details", label: "Check details", accent_token: "--sb-accent-myapp-check-details"}
 ```
 
 The renderer stamps that name onto the block's card and its palette row as a
@@ -167,9 +167,9 @@ card carries - painted on all of them it would say nothing, an undeclared type
 resolving to the editor's own accent. The **tile** is on every card either
 way, which is why a type that declares nothing still has a coloured icon.
 
-Group the names to get grouping for free: below, `myapp:authorize` and
-`myapp:capture` both resolve through `--sb-accent-myapp`, so the family reads
-as one, and the theme can still pull one of them out.
+Group the names to get grouping for free: below, `myapp.check_details`
+resolves through `--sb-accent-myapp`, so the family reads as one, and the theme
+still pulls `myapp.librarian_review` out of it with a colour of its own.
 
 ## Icons are markup, and a theme does not touch them
 
@@ -195,7 +195,7 @@ expected to paper over:
   up around the label. A type that declared nothing is not missing something.
 - **a name the shipped set does not have gets a neutral mark** - three dots, in
   the tile, with the name in `data-icon`. A host block type declaring
-  `icon: "credit-card"` gets a chip that reads as deliberate. The right fix is
+  `icon: "identification"` gets a chip that reads as deliberate. The right fix is
   to pass your own `icon` component, which wins on every tile on both surfaces;
   the mark is what the editor looks like until you do.
 
@@ -204,20 +204,20 @@ see one, you are looking at a font, not at this package.
 
 ## A complete host theme
 
-A credit-card processing host, dark, brand accent, two block types with
+A library's patron registration host, dark, brand accent, two block types with
 identities of their own. It restates every colour token the package declares
 plus the scheme, and it declares nothing else. That is the file the audit
 holds to the rule.
 
 ```css
 /*
- * cardpay: an example host theme for StatifierBlocks.Editor.
+ * library: an example host theme for StatifierBlocks.Editor.
  *
  * Every declaration is a `--sb-*` custom property. If a restyle needs
  * anything else, that is a hole in the token surface upstream.
  */
 
-[data-theme="cardpay"] .sb-editor {
+[data-theme="library"] .sb-editor {
   /* Tier 3 first, because it is the one that gets forgotten: the browser's
    * own chrome inside the editor's subtree. */
   --sb-color-scheme: dark;
@@ -289,10 +289,10 @@ holds to the rule.
 
   /* Per-type identity. These are ours, not the package's: a name a palette
    * entry points at is defined by whoever writes the theme. The family reads
-   * as one, and the type that moves money is pulled out of it. */
+   * as one, and the step that waits on a librarian is pulled out of it. */
   --sb-accent-myapp: #4da3ff;
-  --sb-accent-myapp-authorize: var(--sb-accent-myapp);
-  --sb-accent-myapp-capture: #e8b551;
+  --sb-accent-myapp-check-details: var(--sb-accent-myapp);
+  --sb-accent-myapp-review: #e8b551;
 }
 ```
 

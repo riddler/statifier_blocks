@@ -70,7 +70,7 @@ for a set of names it has never seen is alphabetical - which is an order about
 spelling, not about work. So the list you write is the reading order you get:
 
 ```elixir
-palette_groups: ["Authorization", "Timing", "Structure"]
+palette_groups: ["Registration", "Timing", "Structure"]
 ```
 
 draws those three headings in that order, whatever their names sort as. The
@@ -106,7 +106,7 @@ it; `drawer_tabs: []` leaves a drawer with an empty strip.
 
 ## A minimal mount
 
-Operations staff investigating settlement documents need the canvas, the
+Librarians checking patron registration documents need the canvas, the
 findings and the fixture runs, and have no business inserting blocks:
 
 ```elixir

@@ -702,7 +702,7 @@ defmodule StatifierBlocks.ThemeAuditTest do
     # out of a style attribute. It cannot know whether the name it accepts is
     # DEFINED anywhere - and an undefined one degrades silently to the editor's
     # accent, so the block type just quietly loses its identity.
-    # Sabotage: renaming `--sb-accent-myapp-capture` in the example's theme
+    # Sabotage: renaming `--sb-accent-myapp-review` in the example's theme
     # block - the registry below still points at it and this goes red, which is
     # the mistake a screenshot cannot show you.
     test "every name the documented registry points at is defined by the theme", %{
@@ -907,8 +907,8 @@ defmodule StatifierBlocks.ThemeAuditTest do
   # promises to define.
   defp documented_registry do
     [
-      %{type: "myapp:authorize", accent_token: "--sb-accent-myapp-authorize"},
-      %{type: "myapp:capture", accent_token: "--sb-accent-myapp-capture"},
+      %{type: "myapp.check_details", accent_token: "--sb-accent-myapp-check-details"},
+      %{type: "myapp.librarian_review", accent_token: "--sb-accent-myapp-review"},
       %{type: "core.step"}
     ]
   end

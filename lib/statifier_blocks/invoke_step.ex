@@ -7,28 +7,28 @@ defmodule StatifierBlocks.InvokeStep do
   facts - the invoke type it names, what its answer produces, and how the
   palette draws it - wrapped in the same hundred lines every time. This
   module is those hundred lines, written once: `use
-  StatifierBlocks.InvokeStep, invoke_type: "myapp:authorize"` declares the
-  behaviour and fills in every callback, and the type overrides only the
+  StatifierBlocks.InvokeStep, invoke_type: "myapp:check_details"` declares
+  the behaviour and fills in every callback, and the type overrides only the
   rows where it differs.
 
-      defmodule MyApp.Blocks.Authorize do
+      defmodule MyApp.Blocks.CheckDetails do
         use StatifierBlocks.InvokeStep,
-          invoke_type: "myapp:authorize",
-          produces: "myapp.authorization",
+          invoke_type: "myapp:check_details",
+          produces: "myapp.details_check",
           fields: [
             %{
               key: "assign_to",
               type: {:path, %{}},
-              label: "Write the decision to",
+              label: "Write the result to",
               required?: true,
-              default: "cards.authorization"
+              default: "registration.details_check"
             }
           ],
           palette: %{
-            label: "Authorize card",
-            group: "Card processing",
-            description: "Authorizes the transaction against the card network.",
-            icon: "credit-card",
+            label: "Check details",
+            group: "Registration",
+            description: "Checks the visitor's details before the patron record is made.",
+            icon: "identification",
             order: 0
           }
       end
@@ -118,9 +118,9 @@ defmodule StatifierBlocks.InvokeStep do
 
   # `label`, `group`, `icon` and `accent_token` are deliberately not among
   # the defaults. Which heading a step files under is the host domain's
-  # fact, and a shared default would quietly file a signup step under card
-  # processing; an invented label reads worse than the type name the editor
-  # already falls back to.
+  # fact, and a shared default would quietly file a registration step under
+  # another host's heading; an invented label reads worse than the type name
+  # the editor already falls back to.
   @palette_defaults %{layout: :stack, keywords: []}
 
   @doc """
