@@ -210,7 +210,7 @@ defmodule StatifierBlocks.AssetsTest do
     # The Map hook is not in it: it has its own entry point, so a host that
     # never mounts the Map never bundles elkjs.
     # Sabotage: dropping `StatifierBlocksMeasure` from the default export of
-    # assets/js/statifier_blocks.js - the one-line registration in the README
+    # assets/js/statifier_blocks.js - the one-line registration in the guide
     # silently goes back to registering the drag hook alone, and this goes red.
     # Sabotage: adding `StatifierBlocksMap` to it - every host bundles the
     # layout library whether or not it draws a map - and this goes red.
@@ -218,7 +218,7 @@ defmodule StatifierBlocks.AssetsTest do
       assert default_export(@hook_source) == ["StatifierBlocksDrag", "StatifierBlocksMeasure"],
              """
              A host registers hooks from the default export
-             (`hooks: { ...StatifierBlocks }`, README "Embedding the editor"), so a
+             (`hooks: { ...StatifierBlocks }`, docs/guides/embed-the-editor.md), so a
              hook missing from it is a hook no host registers. `StatifierBlocksMeasure`
              is what feeds the server the geometry `connector_layer.ex` draws from:
              without it the editor renders stacked rows with no connectors and no
@@ -230,16 +230,17 @@ defmodule StatifierBlocks.AssetsTest do
              """
     end
 
-    # The README is the page hexdocs shows and the one a host copies from, so
-    # the shape it teaches is part of this contract rather than prose beside it.
-    # Sabotage: reverting the README to `hooks: { StatifierBlocksDrag }` - the
+    # The embedding guide is the page hexdocs shows and the one a host copies
+    # from, so the shape it teaches is part of this contract rather than prose
+    # beside it.
+    # Sabotage: reverting the guide to `hooks: { StatifierBlocksDrag }` - the
     # copied snippet registers one hook again and this goes red.
-    test "the README teaches the shape that registers both" do
-      readme = File.read!("README.md")
+    test "the embedding guide teaches the shape that registers both" do
+      guide = File.read!("docs/guides/embed-the-editor.md")
 
-      assert readme =~ "import StatifierBlocks from \"statifier_blocks\";"
-      assert readme =~ "hooks: { ...StatifierBlocks }"
-      assert readme =~ "StatifierBlocksMeasure"
+      assert guide =~ "import StatifierBlocks from \"statifier_blocks\";"
+      assert guide =~ "hooks: { ...StatifierBlocks }"
+      assert guide =~ "StatifierBlocksMeasure"
     end
 
     # The corroborator: a scan over a hard-coded file list says nothing about
