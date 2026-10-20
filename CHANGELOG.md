@@ -11,6 +11,18 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.43.1] 2026-10-19
+
+0.43.1 widens the `predicator` requirement so that it admits 9.5: a host
+moving to a `statifier` that requires `predicator` 9.5 takes this release.
+No function answers differently from 0.43.0, except that a compiled
+record carries the new package version as its compiler version, and the
+package gains no Hex dependency.
+
+### Changed
+
+- The `predicator` requirement now admits 9.5 (`~> 9.4 and >= 9.4.1`), keeping the 9.4.1 floor and the 9.x cap, so a host that moves to a `statifier` requiring `predicator` 9.5 can resolve this package beside it.
+
 ## [0.43.0] 2026-10-10
 
 0.43.0 changes what the Map draws and says, so that a reader can follow a
@@ -3874,6 +3886,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.43.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.1
 [0.43.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.0
 [0.42.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.1
 [0.42.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.0
