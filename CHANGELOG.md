@@ -11,6 +11,63 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.44.1] 2026-10-20
+
+Docs release: 0.44.1 changes documentation only. The README is cut to a
+short introduction with a Basic usage block and a Documentation map, the
+guides and reference pages that map links are published on HexDocs, and
+the teaching examples are re-cut to patron registration. No function
+body, typespec or option changes; in `lib/` and the stylesheet only
+`@moduledoc` and `@doc` text, doctest literals and comments change, so a
+host that changes nothing sees every answer 0.44.0 gave. The package
+gains no Hex dependency.
+
+### Added
+
+- New how-to pages: build a block document and compile it to a chart,
+  register your own block types, publish a document, validate a document
+  against the schema from any language, embed the editor in a LiveView
+  host, and mount the Map. Each is in the HexDocs "How-to guides" group.
+- New reference pages: the config fields and the handlers this package
+  ships, and the editor assigns and host seams. The seam table also
+  lists `Edit.Targets.admits_at?/5` and `accepted_types_at/5`,
+  `Edit.Session.refusal/1`, the 32-character cap on badges and summary
+  chips, and the `event` attr on `config_form/1`.
+- A cheatsheet for the calls a host makes (the document, the palette,
+  compile, publish and the editor mount), in the "Reference" group.
+- An explanation page on documents, revisions, charts and executions, and
+  why a document of blocks compiles to a chart, in the "Explanation"
+  group.
+- The existing pages for flow patterns, migrating documents from 0.27 to
+  0.34, host validators, profiles, theming, typing a palette and the
+  block-level flow graph are now published on HexDocs, in groups, and the
+  package carries them.
+
+### Changed
+
+- The README is now an introduction: what the package is, why it exists,
+  how to install it, one executed Basic usage block, and a Documentation
+  map that links every page under four questions (learn, do, look up,
+  understand). The sections it held moved to the pages above, with the
+  design records folded into the map's Understand list.
+- The publish page corrects what it moved from the README: it names the
+  compile stages step 1 runs, says why a refused document is not
+  compiled, says the blank await event's `:error` appears twice in the
+  list, names `Graph.consumers_broken/2` as the call that pairs each
+  finding with the parent's document id, says an undeclared datamodel
+  path is `:error` when the document declares its own datamodel roots and
+  `:info` when only the host declares, and names the release that added
+  `check_accepts/2`.
+- The describing-a-document page opens with a small patron registration
+  document and takes the rewording of one edge by its endpoints.
+- The host validators, theming, profiles and typing-a-palette pages, and
+  the `InvokeStep` moduledoc and `Environment` doctests, teach in patron
+  registration instead of card processing. The typing-a-palette page also
+  carries the field-signature snippet and the `StatifierDatamodel.Types.satisfies/3`
+  read check.
+- The `StatifierBlocks` moduledoc points to the build-and-compile guide
+  instead of the README's worked example.
+
 ## [0.44.0] 2026-10-19
 
 0.44.0 adds two optional surfaces and checks more before publish. Under
@@ -3928,6 +3985,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.44.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.44.1
 [0.44.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.44.0
 [0.43.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.1
 [0.43.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.0
