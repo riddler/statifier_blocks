@@ -99,9 +99,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     region. The region then renders without its hover layer and without
     its store, which only the Map's hook reads, and the document's idle
     description leaves out its explanation, the paragraph on how to read
-    the map, and its "Legend" fact, the lines of the map's key; the name, the
-    description, what starts it and the counts stay. A selected block's description is unchanged. The default,
-    `map={true}`, renders the region exactly as a host's page has it.
+    the map, and its "Legend" fact, the lines of the map's key; the name,
+    the description, what starts it and the counts stay. A selected
+    block's description is unchanged. The default, `map={true}`, renders
+    the region exactly as a host's page has it.
 
     ## A document it cannot describe
 

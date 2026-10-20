@@ -342,13 +342,18 @@ export function timersOf(laid) {
 // the room the fork mark and the caption need. Answers
 // `{x, y, width, height, fork: {x, y}, caption: {x, y} | null}` in the
 // coordinates `node` is in (absolute, for a box out of `boxes`), or null
-// for a node with no band or no arm.
+// for a node with no band or no arm. The key lists the fork mark for any
+// node the server marks `band` (`node_marks/1` in `StatifierBlocks.Map`),
+// so the two conditions are kept together: a band node always has an arm
+// slot, and a test on each side fails if they part.
 const BAND_HEIGHT = 16
 const BAND_GAP = 4
 // The fork mark's room at the band's left, before the caption: the same
 // 26px the server's `caption_width` counts.
 const FORK_ROOM = 26
 
+// The band needs `band` and an arm slot; the server's key lists the fork
+// for `band` alone (`node_marks/1`), see the note above.
 export function bandOf(node) {
   if (node.band !== true) return null
   const arms = (node.children || []).filter((c) => c.kind === "slot" && c.style === "arm")

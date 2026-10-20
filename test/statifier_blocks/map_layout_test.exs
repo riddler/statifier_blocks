@@ -1128,6 +1128,36 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
+    # The key lists the fork mark for any node the server marks `band`, so
+    # the hook must draw a band over every such node; and the hook draws
+    # one only where the node has an arm slot (`bandOf`), which is why
+    # `StatifierBlocks.Map` banded nodes always have one (the Map test
+    # "every node that carries a band has an arm slot, and a key lists the
+    # fork"). Here: a band is drawn over exactly the nodes that carry
+    # `band`, and a banded node whose arms are taken away draws none.
+    #
+    # Sabotage: made bandOf answer null for every node; this went red on
+    # the bands of both fixtures. Made bandOf drop its arm check; this went
+    # red on the armless branch. Each reverted from a copy.
+    test "the key's fork is drawn exactly where a banded node has an arm", %{tmp_dir: dir} do
+      for key <- MapFixtures.keys() do
+        graph = library_graph(key)
+        banded = for %{"band" => true, "id" => id} <- walk(graph), do: id
+
+        assert banded != [], key
+        assert "fork" in Enum.map(graph["legend"], & &1["mark"]), key
+
+        %{"drawn" => "map", "bands" => bands} = run(dir, key, graph)
+        assert Enum.sort(Map.keys(bands)) == Enum.sort(banded), key
+
+        [branch | _] = banded
+        armless = without_arms(graph, branch)
+
+        %{"drawn" => "map", "bands" => armless_bands} = run(dir, "#{key}-armless", armless)
+        assert Enum.sort(Map.keys(armless_bands)) == Enum.sort(banded -- [branch]), key
+      end
+    end
+
     # The key stands at the drawing's top right: beside the drawing, to
     # the right of every box the layout placed and level with the top,
     # inside the SVG, which is widened to hold it, and clear of every box,
@@ -2077,6 +2107,15 @@ defmodule StatifierBlocks.MapLayoutTest do
     do: BlockMap.graph(MapFixtures.view_model!(key), phrase: &MapFixtures.phrase/1)
 
   defp find(graph, id), do: Enum.find(walk(graph), &(&1["id"] == id))
+
+  # `graph` with the arms (and the edges among them) of the node `id` taken
+  # away, the node itself still carrying its `band`.
+  defp without_arms(%{"id" => id} = node, id), do: %{node | "children" => [], "edges" => []}
+
+  defp without_arms(%{"children" => children} = node, id),
+    do: %{node | "children" => Enum.map(children, &without_arms(&1, id))}
+
+  defp without_arms(node, _id), do: node
 
   # `graph` with the leaf `id` held `more` pixels taller than the server
   # holds it.

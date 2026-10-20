@@ -1404,6 +1404,28 @@ defmodule StatifierBlocks.MapTest do
                ~w(start end end-abandon arrow fork join interrupt wait clock timer)
     end
 
+    # The key lists the fork for any node that carries `band`, and the
+    # hook draws a band only over a node that carries `band` and has an
+    # arm slot, so every banded node must have one. The hook's half is
+    # pinned in the layout test "the key's fork is drawn exactly where a
+    # banded node has an arm".
+    #
+    # Sabotage: made put_band/2 band a group as well as a branch; a group
+    # has no arm slot and this went red. Reverted from a copy.
+    test "every node that carries a band has an arm slot, and a key lists the fork" do
+      for key <- MapFixtures.keys() do
+        graph = graph(key)
+        banded = for %{"band" => true} = node <- walk(graph), do: node
+
+        refute banded == [], key
+        assert "fork" in legend_marks(graph), key
+
+        for %{"children" => children, "id" => id} <- banded do
+          assert Enum.any?(children, &(&1["kind"] == "slot" and &1["style"] == "arm")), id
+        end
+      end
+    end
+
     # A drawing with fewer marks has a shorter key: one step and no
     # branch, group or timer draws the dot, the done end and solid
     # arrows; a root with no step yet draws no end at all.
