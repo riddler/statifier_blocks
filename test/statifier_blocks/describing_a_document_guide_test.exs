@@ -1,9 +1,10 @@
 defmodule StatifierBlocks.DescribingADocumentGuideTest do
   @moduledoc """
-  `docs/describing-a-document.md` and the README's `## Validating and
-  describing a document` section are executed, not trusted.
+  `docs/describing-a-document.md` and
+  `docs/guides/validate-a-document-against-the-schema.md` are executed, not
+  trusted.
 
-  Each document's `elixir` code blocks are concatenated in reading order -
+  Each page's `elixir` code blocks are concatenated in reading order -
   they are one program, and later blocks use names earlier ones bound - and
   evaluated once. Every `#=>` claim sits under a statement that binds a
   name, so each claim is asserted twice: the name's value in the program's
@@ -11,9 +12,9 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
   against that value's `inspect/2`. The second half is what catches an
   output that drifted in the prose while the code kept working.
 
-  The guide's module is namespaced `MyApp.Describing.*` and the README's is
-  `MyApp.LoanPhrasing`, so neither evaluation redefines what the other
-  bound. The README's schema example runs `ex_json_schema`, a test-only
+  The describing page's modules are namespaced `MyApp.Describing.*`, and the
+  validation page defines none, so neither evaluation redefines what the
+  other bound. The validation page runs `ex_json_schema`, a test-only
   dependency of this package; nothing here needs LiveView, so the module
   runs in the headless tree too.
   """
@@ -21,132 +22,143 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
   use ExUnit.Case, async: false
 
   @guide Path.join([__DIR__, "..", "..", "docs", "describing-a-document.md"]) |> Path.expand()
-  @readme Path.join([__DIR__, "..", "..", "README.md"]) |> Path.expand()
+  @schema_guide Path.join([
+                  __DIR__,
+                  "..",
+                  "..",
+                  "docs",
+                  "guides",
+                  "validate-a-document-against-the-schema.md"
+                ])
+                |> Path.expand()
   @external_resource @guide
-  @external_resource @readme
+  @external_resource @schema_guide
 
-  @readme_heading "Validating and describing a document"
-
-  @loan_default_lines [
-    "Run its steps in order",
-    "Send loan.checked_out",
-    "Wait for loan.returned, giving up after 21d",
-    "The steps start with Send loan.checked_out",
-    "After Send loan.checked_out (done), Wait for loan.returned, giving up after 21d",
-    "Wait for loan.returned, giving up after 21d (received, timed_out) ends the steps"
-  ]
-
-  # In claim order: every `#=>` line of the README section, the name the
+  # In claim order: every `#=>` line of the validation page, the name the
   # statement above it binds, and the value it claims.
-  @readme_claims [
+  @schema_claims [
     same_file: true,
     draft: "http://json-schema.org/draft-07/schema#",
     checked: :ok,
     refused: true,
     typed: :ok,
     root_admits: :ok,
-    palette_refuses: true,
-    lines: @loan_default_lines,
-    edge_kinds: [:entry, :sequence, :exit],
-    reworded: List.replace_at(@loan_default_lines, 4, "Once the book is out, wait for its return")
+    palette_refuses: true
   ]
 
-  # The same for the guide.
+  # The same for the describing page.
   @guide_claims [
-    identity: {"bdoc_library_loan", 1},
+    identity: {"bdoc_patron_registration", 1},
     nodes: [
-      {"loan", nil, :step},
-      {"fines", "loan", :step},
-      {"notice", "fines", :arm},
-      {"paid", "fines", :arm},
-      {"checkout", "loan", :step},
-      {"lending", "loan", :step},
-      {"returned", "lending", :step},
-      {"renewed", "lending", :rail},
-      {"lost", "lending", :rail},
-      {"close", "loan", :step}
+      {"registration", nil, :step},
+      {"verify", "registration", :step},
+      {"reminder", "verify", :arm},
+      {"verified", "verify", :arm},
+      {"submit", "registration", :step},
+      {"review", "registration", :step},
+      {"approved", "review", :step},
+      {"corrected", "review", :rail},
+      {"withdrawn", "review", :rail},
+      {"close", "registration", :step}
     ],
     await_outcomes: ["received", "timed_out"],
     interrupts: [
-      {"loan.renewed", {:body, "lending"}, :shallow},
-      {"loan.reported_lost", {:exit, "lending"}, nil}
+      {"registration.corrected", {:body, "review"}, :shallow},
+      {"registration.withdrawn", {:exit, "review"}, nil}
     ],
     arms: [
-      {"patron.fines_owed > 0", {:block, "notice"}},
-      {:otherwise, {:exit, "fines"}}
+      {"email_verified == false", {:block, "reminder"}},
+      {:otherwise, {:exit, "verify"}}
     ],
     node_lines: [
       "Run its steps in order",
-      ~s(Decide: When "owes", otherwise \(one of\)),
-      "Send loan.fines_notice",
-      "Wait for fines.paid",
-      "Send loan.checked_out",
+      ~s(Decide: When "unverified", otherwise \(one of\)),
+      "Send registration.verify_reminder",
+      "Wait for registration.email_verified",
+      "Send registration.submitted",
       "Resumable group",
-      "Wait for loan.returned, giving up after 21d",
-      "When loan.renewed, resume",
-      "When loan.reported_lost, abandon",
-      "Send loan.closed"
+      "Wait for registration.approved, giving up after 14d",
+      "When registration.corrected, resume",
+      "When registration.withdrawn, abandon",
+      "Send registration.closed"
     ],
     interrupt_lines: [
-      "On loan.renewed, When loan.renewed, resume resumes the group at shallow history",
-      "On loan.reported_lost, When loan.reported_lost, abandon abandons the group"
+      "On registration.corrected, When registration.corrected, resume resumes the group at shallow history",
+      "On registration.withdrawn, When registration.withdrawn, abandon abandons the group"
     ],
     reworded_lines: [
-      "A renewal",
-      "A report that the book is lost",
-      "A renewal restarts the wait for the return"
+      "A correction",
+      "A withdrawal",
+      "A correction restarts the wait for the approval"
     ],
-    lost_line: "On loan.reported_lost, When loan.reported_lost, abandon abandons the group",
+    withdrawn_line:
+      "On registration.withdrawn, When registration.withdrawn, abandon abandons the group",
+    submit_line: "Once the application is in, wait for the librarian",
     same_count?: true
   ]
 
   setup_all do
     guide = File.read!(@guide)
-    readme_section = section(File.read!(@readme), @readme_heading)
+    schema_guide = File.read!(@schema_guide)
 
     guide_blocks = elixir_blocks(guide)
-    readme_blocks = elixir_blocks(readme_section)
+    schema_blocks = elixir_blocks(schema_guide)
 
     refute guide_blocks == [], "no elixir code blocks found in docs/describing-a-document.md"
 
-    refute readme_blocks == [],
-           ~s(no elixir code blocks under "## #{@readme_heading}" in README.md)
+    refute schema_blocks == [],
+           "no elixir code blocks found in docs/guides/validate-a-document-against-the-schema.md"
 
-    # Evaluated once for the whole module: both documents define a module,
-    # and evaluating either per test would redefine it.
+    # Evaluated once for the whole module: the describing page defines
+    # modules, and evaluating it per test would redefine them.
     {_result, guide_binding} =
       guide_blocks |> Enum.join("\n\n") |> Code.eval_string([], file: @guide)
 
-    {_result, readme_binding} =
-      readme_blocks |> Enum.join("\n\n") |> Code.eval_string([], file: @readme)
+    {_result, schema_binding} =
+      schema_blocks |> Enum.join("\n\n") |> Code.eval_string([], file: @schema_guide)
 
     %{
       guide: guide,
-      readme_section: readme_section,
+      schema_guide: schema_guide,
       guide_binding: guide_binding,
-      readme_binding: readme_binding
+      schema_binding: schema_binding
     }
   end
 
-  # Sabotage: changed the README's stored document's `"type_version": 1` to
+  # Sabotage: changed the page's stored document's `"type_version": 1` to
   # `"type_version": "1"` - red here (`checked` was an error list, not
   # `:ok`), restored from a copy, re-ran green (verified).
-  test "the README section's program binds the values it claims", ctx do
-    for {name, expected} <- @readme_claims do
-      assert Keyword.fetch!(ctx.readme_binding, name) == expected, "README binding #{name}"
+  test "the validation page's program binds the values it claims", ctx do
+    for {name, expected} <- @schema_claims do
+      assert Keyword.fetch!(ctx.schema_binding, name) == expected, "validation binding #{name}"
     end
   end
 
-  # Sabotage: edited the README's `edge_kinds` claim to `[:entry, :exit]` -
-  # red (the claim lists differed on that row), restored from a copy, re-ran
+  # Sabotage: edited the validation page's `refused` claim to `false` - red
+  # (the claim lists differed on that row), restored from a copy, re-ran
   # green (verified).
-  test "every output the README section claims is the one it produces", ctx do
-    assert claims(ctx.readme_section) == Enum.map(@readme_claims, &inspect_claim/1)
+  test "every output the validation page claims is the one it produces", ctx do
+    assert claims(ctx.schema_guide) == Enum.map(@schema_claims, &inspect_claim/1)
   end
 
-  # Sabotage: in the guide's phrasing module, answered the renewal interrupt
-  # with a line carrying a tab - red (`reworded_lines` lost its third row
-  # to the default line), restored from a copy, re-ran green (verified).
+  # Each heading names a goal a reader has, which is what keeps the page a
+  # how-to.
+  test "the validation page keeps its goal-shaped headings", ctx do
+    assert headings(ctx.schema_guide) == [
+             "Hand the schema file to your service",
+             "Check a stored document",
+             "Know what the schema admits that the decoder refuses",
+             "Ask for a stricter schema for your palette",
+             "Check your palette before taking a stricter package version"
+           ]
+
+    assert ctx.schema_guide =~ "# How to validate a document against the schema from any language"
+  end
+
+  # Sabotage: in the describing page's phrasing module, answered the
+  # correction interrupt with a line carrying a tab - red (`reworded_lines`
+  # lost its third row to the default line), restored from a copy, re-ran
+  # green (verified).
   test "the guide's program binds the values it claims", ctx do
     for {name, expected} <- @guide_claims do
       assert Keyword.fetch!(ctx.guide_binding, name) == expected, "guide binding #{name}"
@@ -165,9 +177,7 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
   # restored from a copy, re-ran green (verified). Each heading names a goal
   # a reader has, which is what keeps the page a how-to.
   test "the guide keeps its goal-shaped headings", ctx do
-    headings = Regex.scan(~r/^## (.+)$/m, ctx.guide) |> Enum.map(fn [_all, h] -> h end)
-
-    assert headings == [
+    assert headings(ctx.guide) == [
              "Before you start",
              "Outline a document",
              "Read the edges the containers draw",
@@ -175,6 +185,11 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
              "Reword lines with a phrasing module",
              "Know what a phrasing module cannot change"
            ]
+  end
+
+  @spec headings(binary()) :: [binary()]
+  defp headings(markdown) do
+    Regex.scan(~r/^## (.+)$/m, markdown) |> Enum.map(fn [_all, h] -> h end)
   end
 
   @spec inspect_claim({atom(), term()}) :: binary()
@@ -186,14 +201,6 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
     markdown
     |> then(&Regex.scan(~r/^\s*#=> (.+)$/m, &1))
     |> Enum.map(fn [_whole, claim] -> claim end)
-  end
-
-  # The text between `## <heading>` and the next `## ` heading.
-  @spec section(binary(), binary()) :: binary()
-  defp section(markdown, heading) do
-    markdown
-    |> String.split("\n## ")
-    |> Enum.find("", &String.starts_with?(&1, heading <> "\n"))
   end
 
   # Every ```elixir block in the text, in reading order.
