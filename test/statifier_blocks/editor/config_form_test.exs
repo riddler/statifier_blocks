@@ -780,6 +780,54 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the class attr on both branches" do
+      defp root_class(html) do
+        ~r/\A\s*<(?:form|div)\b[^>]*?\bclass="([^"]*)"/ |> Regex.run(html) |> List.last()
+      end
+
+      # Sabotage: dropped `| List.wrap(@class)` from the read-only branch's
+      # class list -> this test went red on the passed-class assertion alone,
+      # with the editing branch's assertion still green (verified).
+      test "a read-only form renders the class a host passes beside its own two" do
+        html =
+          render_component(&ConfigForm.config_form/1,
+            node: composed_node(),
+            read_only: true,
+            class: "plan-layout"
+          )
+
+        assert root_class(html) == "sb-form sb-form--readonly plan-layout"
+      end
+
+      # The parity half: the editing branch already rendered it, and this pins
+      # that both branches answer the same way.
+      #
+      # Sabotage: made the editing branch's list ignore `@class` -> this test
+      # went red, and so did the whole-tag test above it (verified).
+      test "an editable form renders the class a host passes" do
+        html =
+          render_component(&ConfigForm.config_form/1,
+            node: composed_node(),
+            class: "plan-layout"
+          )
+
+        assert root_class(html) == "sb-form plan-layout"
+      end
+
+      # Sabotage: replaced the read-only list with
+      # `["sb-form sb-form--readonly", @class]` -> a trailing space appeared
+      # and this test went red (verified).
+      test "a read-only form with no class passed renders its two classes as before" do
+        html =
+          render_component(&ConfigForm.config_form/1,
+            node: composed_node(),
+            read_only: true
+          )
+
+        assert html =~ ~s(class="sb-form sb-form--readonly")
+      end
+    end
+
     # A `core.send` whose delay the author edits. `core.send` is the block
     # type that already reads both stored spellings, so it is where a
     # predicator string can be committed without waiting on `core.wait`.
