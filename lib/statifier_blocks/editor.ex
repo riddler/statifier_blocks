@@ -2265,7 +2265,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       with {:ok, block, module} <- fetch_composite(palette, document, id),
            {:ok, target} <- composite_target(document, id),
-           {:ok, members} <- expanded_members(block, module),
+           {:ok, members} <- expanded_members(palette, block, module),
            {:ok, inserts} <- expansion_inserts(palette, document, target, members) do
         # 3E selects the first expanded block AFTER the compound commits, and
         # it does so through the one path a selection is written on from
@@ -2364,11 +2364,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # The `case` is deliberately over `{:error, _}` and not over one named
     # reason: every refusal the declaration can produce - today's five and any
     # a later amendment adds - refuses the gesture the same way.
-    @spec expanded_members(Block.t(), module()) :: {:ok, [Block.t()]} | {:error, term()}
-    defp expanded_members(%Block{} = block, module) do
+    #
+    # The members are written at each one's type's CURRENT version
+    # (`ADR-0002`'s Note of 2026-09-07, item 2). `Composite.expand/2` mints
+    # every member at `Block.new/2`'s default of `1`, because an expansion
+    # carries no palette; this function holds one, and stamps the minted
+    # members through `Composite.at_current_version/3`, the same function the
+    # compiler's Resolve stamps the members it splices with. Unstamped, a
+    # member whose type is past version 1 would be stored as though authored
+    # at version 1, and the next compile would migrate the declaration's own
+    # literal - the document after Expand would then compile to a different
+    # chart than the composite did. A pass-through child the author placed is
+    # not in the param map, so it keeps its own stored version.
+    @spec expanded_members(Palette.t(), Block.t(), module()) ::
+            {:ok, [Block.t()]} | {:error, term()}
+    defp expanded_members(palette, %Block{} = block, module) do
       case Composite.expand(block, module) do
-        {:ok, {members, _param_map}} ->
-          {:ok, members}
+        {:ok, {members, param_map}} ->
+          {:ok, Enum.map(members, &Composite.at_current_version(palette, &1, param_map))}
 
         {:error, why} ->
           {:error, {:composite_expansion_failed, block.id, why}}
@@ -3923,7 +3936,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # document. The region reads `Describe.outline/3`, which expands every
     # composite to learn its outcomes, and a composite whose declaration
     # cannot expand raises there. The canvas draws such a document and the
-    # expand gesture refuses it (`expanded_members/2`), so the region is left
+    # expand gesture refuses it (`expanded_members/3`), so the region is left
     # out for it rather than taking the editor down: a document the editor
     # can draw is never refused for what its description would say.
     #

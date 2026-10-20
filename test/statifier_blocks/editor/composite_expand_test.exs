@@ -34,6 +34,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use StatifierBlocks.EditorLiveCase
 
     alias StatifierBlocks.{Compiler, Composite}
+    alias StatifierBlocks.Core.Send
 
     # -- the record's own worked example, in the card-processing domain -----
 
@@ -247,6 +248,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # -- a member whose type is past version 1 -----------------------------
+
+    defmodule ReturnReminder do
+      @moduledoc """
+      A library loan's return reminder: one `core.send`, which is one of the
+      two core types past version 1, so the member Expand writes is the case
+      `ADR-0002`'s Note of 2026-09-07, item 2 rules on - an expansion is at
+      each member's current version.
+      """
+
+      use StatifierBlocks.Composite,
+        name: "library.return_reminder",
+        params: [
+          %{key: "event", type: :string, label: "Send this event", required?: true, default: ""},
+          %{key: "delay", type: :duration, label: "After", required?: false, default: ""}
+        ],
+        sentence: "Send {event} after {delay}",
+        palette_entry: %{label: "Return reminder", group: "Structure"},
+        version: 1
+
+      alias StatifierBlocks.Block
+
+      @impl StatifierBlocks.Composite
+      def subtree(params) do
+        [
+          Block.new("core.send",
+            id: "remind",
+            config: %{"event" => params["event"], "delay" => params["delay"]}
+          )
+        ]
+      end
+    end
+
     describe "1E-3E: one compound, one undo entry" do
       # Sabotage: dropped the `{:remove, id}` from the head of the compound -
       # red at the first assertion, because the composite is then still in the
@@ -380,6 +414,118 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {members, _param_map} = Composite.expand!(guarded_step("blk_GS"), GuardedStep)
 
         assert body(expanded) == members ++ [tail()]
+      end
+    end
+
+    describe "E4: a member past version 1 is written at its type's current version" do
+      # `ADR-0004`'s E4 over a member whose type is past version 1, in each
+      # duration spelling. `core.send` is at version 2 and `Block.new/2`
+      # defaults `:type_version` to 1, so a member the gesture wrote unstamped
+      # would be stored as though authored at version 1 and reach
+      # `core.send`'s `migrate_config/2` the next time the document compiled.
+      #
+      # Sabotage: dropped the stamp from `expanded_members/3` - red at the
+      # version assertion, because the stored member is then at version 1.
+      test "the accepted spelling: stored at version 2, and the bytes agree", %{conn: conn} do
+        before = reminder_document("1h")
+        {:ok, view, _html} = mount_editor(conn, document: before, palette: palette())
+
+        expand(view, "blk_RR")
+        assert_receive {:document, expanded}
+
+        assert [%Block{type: "core.send", id: "blk_RR_remind"} = member, _tail] = body(expanded)
+        assert member.type_version == Send.current_version()
+        assert member.config == %{"event" => "loan.return_due", "delay" => "1h"}
+
+        assert {:ok, composed} = Compiler.compile(before, palette())
+        assert {:ok, after_expand} = Compiler.compile(expanded, palette())
+
+        assert composed.scxml == after_expand.scxml
+        assert composed.provenance == after_expand.provenance
+      end
+
+      # The retired spelling has no chart on either side to compare: the
+      # composite path refuses it by name (the compiler stamps the member it
+      # mints), so E4's byte-identity is not reachable here. What is pinned is
+      # that the two paths answer the same refusal. The member is written with
+      # the author's value at version 2, so the expanded document refuses on
+      # the same field with the same message, blamed on the member it now
+      # holds rather than on the composite that is gone.
+      #
+      # Sabotage: dropped the stamp from `expanded_members/3` - red at the
+      # version assertion; with that assertion removed, red at the expanded
+      # compile, which then migrates the value and succeeds.
+      test "the retired spelling: both paths refuse the same field", %{conn: conn} do
+        before = reminder_document("PT1H")
+        {:ok, view, _html} = mount_editor(conn, document: before, palette: palette())
+
+        expand(view, "blk_RR")
+        assert_receive {:document, expanded}
+
+        assert [%Block{id: "blk_RR_remind"} = member, _tail] = body(expanded)
+        assert member.type_version == Send.current_version()
+        assert member.config["delay"] == "PT1H"
+
+        assert {:error, [composed]} = Compiler.compile(before, palette())
+        assert {:error, [after_expand]} = Compiler.compile(expanded, palette())
+
+        assert composed.block_id == "blk_RR"
+        assert after_expand.block_id == "blk_RR_remind"
+
+        for finding <- [composed, after_expand] do
+          assert finding.stage == :config
+          assert finding.reason == {:invalid_config, "delay"}
+          assert finding.message == "must be a duration like 30s or 1h30m - or empty to send now"
+        end
+      end
+
+      # The stamp is over the members the expansion MINTS. A child the author
+      # placed in a pass-through slot arrived from the document at its own
+      # stored version, so a `core.send` stored at version 1 in the retired
+      # spelling is still a stored block: Expand leaves it at version 1, and
+      # it migrates on both paths alike.
+      #
+      # Sabotage: made `Composite.at_current_version/3` stamp every block, not
+      # only the ones the param map holds - red at the version assertion,
+      # because the placed child is then written at version 2.
+      test "a child placed in a pass-through slot keeps its stored version", %{conn: conn} do
+        child =
+          Block.new("core.send",
+            id: "blk_notice",
+            type_version: 1,
+            config: %{"event" => "loan.overdue_notice", "delay" => "PT1H"}
+          )
+
+        before =
+          Document.new(
+            Block.new("core.sequence",
+              id: "blk_ROOT",
+              slots: %{
+                "body" => [
+                  Block.new("myapp.guarded_section",
+                    id: "blk_GX",
+                    config: %{"invoke_type" => "library:check_holds"},
+                    slots: %{"body" => [child]}
+                  ),
+                  tail()
+                ]
+              }
+            ),
+            id: "bdoc_EXPAND"
+          )
+
+        {:ok, view, _html} = mount_editor(conn, document: before, palette: palette())
+
+        expand(view, "blk_GX")
+        assert_receive {:document, expanded}
+
+        assert Enum.find(Document.blocks(expanded), &(&1.id == "blk_notice")) == child
+
+        assert {:ok, composed} = Compiler.compile(before, palette())
+        assert {:ok, after_expand} = Compiler.compile(expanded, palette())
+
+        assert composed.scxml == after_expand.scxml
+        assert composed.scxml =~ ~s(delay="1h")
       end
     end
 
@@ -687,6 +833,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           "myapp.guarded_section" => GuardedSection,
           "myapp.broken_subtree" => BrokenSubtree,
           "myapp.broken_mapping" => BrokenMapping,
+          "library.return_reminder" => ReturnReminder,
           "signup.confirm_contact" => ConfirmContact
         })
       )
@@ -745,6 +892,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         Block.new("core.sequence",
           id: "blk_ROOT",
           slots: %{"body" => [guarded_step("blk_GS"), tail()]}
+        ),
+        id: "bdoc_EXPAND"
+      )
+    end
+
+    defp reminder_document(delay) do
+      Document.new(
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [
+              Block.new("library.return_reminder",
+                id: "blk_RR",
+                config: %{"event" => "loan.return_due", "delay" => delay}
+              ),
+              tail()
+            ]
+          }
         ),
         id: "bdoc_EXPAND"
       )
