@@ -147,9 +147,10 @@ author by hand. This package is the authoring layer above both:
 
 The document model, the `core.*` vocabulary, the compiler and its provenance
 map, the edit algebra and view model, and the LiveView editor shell are all
-built. The README's worked example runs the whole path and is executed by
-`test/statifier_blocks/readme_test.exs` on every build - a README snippet that
-stops compiling against the real API fails the gate rather than the reader.
+built. The worked example in `docs/guides/build-and-compile.md` runs the
+whole path and is executed by `test/statifier_blocks/readme_test.exs` on every
+build - a documented snippet that stops compiling against the real API fails
+the gate rather than the reader.
 
 Always refer to state machines as **state charts**, as statifier-ex does.
 
