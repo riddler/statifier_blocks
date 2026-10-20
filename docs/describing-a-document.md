@@ -25,6 +25,62 @@ needs LiveView either.
 The examples below are one program: later blocks use names earlier ones
 bound.
 
+## Describe a small document first
+
+`Describe.outline/3` reads a document under a palette, and `Describe.render/2`
+writes one line of English per node and then one per edge. This one is two
+steps: the application is submitted, then the registration waits up to 14 days
+for approval.
+
+```elixir
+alias StatifierBlocks.{Block, Describe, Document, Palette}
+alias StatifierBlocks.Describe.Edge
+
+small =
+  Block.new("core.sequence",
+    id: "registration",
+    slots: %{
+      "body" => [
+        Block.new("core.send", id: "submit", config: %{"event" => "registration.submitted"}),
+        Block.new("core.await",
+          id: "approved",
+          config: %{"event" => "registration.approved", "timeout" => "14d"}
+        )
+      ]
+    }
+  )
+
+small_outline =
+  small |> Document.new(id: "bdoc_patron_registration") |> Describe.outline(Palette.core(), [])
+
+small_lines = Describe.render(small_outline, [])
+#=> ["Run its steps in order", "Send registration.submitted", "Wait for registration.approved, giving up after 14d", "The steps start with Send registration.submitted", "After Send registration.submitted (done), Wait for registration.approved, giving up after 14d", "Wait for registration.approved, giving up after 14d (received, timed_out) ends the steps"]
+
+small_edge_kinds = Enum.map(small_outline.edges, & &1.kind)
+#=> [:entry, :sequence, :exit]
+```
+
+The outline is data as well as lines: each `StatifierBlocks.Describe.Node`
+carries the block's id, parent, depth, sentence and declared outcomes, and
+each `StatifierBlocks.Describe.Edge` its kind and endpoints. A phrasing module
+rewords one line without touching the outline. This one rewords the edge that
+leaves `submit`:
+
+```elixir
+defmodule MyApp.Describing.SmallPhrasing do
+  @behaviour StatifierBlocks.Describe.Phrasing
+
+  @impl true
+  def sequence(%Edge{from: {:block, "submit"}}, _default), do: "Once the application is in, wait for approval"
+  def sequence(%Edge{}, _default), do: :default
+end
+
+small_reworded = Describe.render(small_outline, phrasing: MyApp.Describing.SmallPhrasing)
+#=> ["Run its steps in order", "Send registration.submitted", "Wait for registration.approved, giving up after 14d", "The steps start with Send registration.submitted", "Once the application is in, wait for approval", "Wait for registration.approved, giving up after 14d (received, timed_out) ends the steps"]
+```
+
+The rest of this page works on a larger document.
+
 ## Outline a document
 
 Build or load the document, then ask for its outline under your palette. This one is patron registration: a visitor whose email address is not

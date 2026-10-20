@@ -46,8 +46,21 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
     palette_refuses: true
   ]
 
+  @small_default_lines [
+    "Run its steps in order",
+    "Send registration.submitted",
+    "Wait for registration.approved, giving up after 14d",
+    "The steps start with Send registration.submitted",
+    "After Send registration.submitted (done), Wait for registration.approved, giving up after 14d",
+    "Wait for registration.approved, giving up after 14d (received, timed_out) ends the steps"
+  ]
+
   # The same for the describing page.
   @guide_claims [
+    small_lines: @small_default_lines,
+    small_edge_kinds: [:entry, :sequence, :exit],
+    small_reworded:
+      List.replace_at(@small_default_lines, 4, "Once the application is in, wait for approval"),
     identity: {"bdoc_patron_registration", 1},
     nodes: [
       {"registration", nil, :step},
@@ -179,6 +192,7 @@ defmodule StatifierBlocks.DescribingADocumentGuideTest do
   test "the guide keeps its goal-shaped headings", ctx do
     assert headings(ctx.guide) == [
              "Before you start",
+             "Describe a small document first",
              "Outline a document",
              "Read the edges the containers draw",
              "Write the outline as lines",
