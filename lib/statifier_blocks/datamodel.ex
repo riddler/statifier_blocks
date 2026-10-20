@@ -118,7 +118,10 @@ defmodule StatifierBlocks.Datamodel do
 
   It changes no verdict. A document whose only findings are these compiles
   exactly as it did before (11c), and any consumer gating on findings gates
-  on `:error` as it always has.
+  on `:error` as it always has. The one reader that raises them is
+  `StatifierBlocks.Publish.findings/3`: where the document declares its own
+  roots it answers these at `:error`, so a host's publish step refuses, and
+  this function and the editor still answer `:info`.
 
   It is also not `validate_config/1`'s job and cannot be:
   `StatifierBlocks.Core.Assign`'s moduledoc says why - that callback is

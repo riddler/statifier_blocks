@@ -13,7 +13,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     document, palette and context when the editor is handed the adapted
     `Compiler.structure_findings/3` list as its caller findings - finding for
     finding, order included - and `Editor.findings_count/3` over the same
-    inputs is its length.
+    inputs is its length. The one difference is the severity of an
+    undeclared-path advisory in a document that declares its own datamodel
+    roots: `:error` in the publish entry, `:info` in the editor (ADR-0005's
+    Amendment of 2026-10-19 on 11e).
 
     The editor's list is read off the page, not recomputed: every row of the
     drawer's Findings tab carries the whole anchor (`data-anchor`), the
@@ -31,6 +34,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     use StatifierBlocks.EditorLiveCase
 
     alias StatifierBlocks.{Compiler, CoreFixtures, DocumentFixtures, Editor, Publish}
+    alias StatifierBlocks.Document.DatamodelEntry
 
     @datamodel %{
       "version" => 1,
@@ -73,6 +77,31 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert editor_list(conn, document, context) == published
         assert [%Finding{severity: :info, source: :lint}] = published
+      end
+
+      # The one place the two lists differ (ADR-0005's Amendment of
+      # 2026-10-19 on 11e): the document declares the root `patron`, the note
+      # writes under a root nothing declares, and the publish entry answers
+      # the editor's advisory at `:error`. The editor still draws it at
+      # `:info`, and the lists agree in every other field and in length.
+      #
+      # Sabotage: made `Datamodel.findings/4`'s advisory `:error` whenever a
+      # root is declared, so the raise reaches the editor too - the editor's
+      # row reads `:error` and the first assertion goes red (verified).
+      test "where the document declares its roots, the editor shows :info and publish :error",
+           %{conn: conn} do
+        document =
+          patron_registration()
+          |> Map.put(:datamodel, [%DatamodelEntry{id: "patron"}])
+          |> with_note("patorn.email")
+
+        published = Publish.findings(document, CoreFixtures.palette(), %{})
+
+        assert [%Finding{severity: :info, source: :lint} = shown] =
+                 editor_list(conn, document, %{})
+
+        assert published == [%{shown | severity: :error}]
+        assert findings_count(document, %{}) == length(published)
       end
     end
 

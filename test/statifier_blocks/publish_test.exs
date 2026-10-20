@@ -7,9 +7,10 @@ defmodule StatifierBlocks.PublishTest do
   `StatifierBlocks.Editor.PublishEqualityTest`'s. What is asserted here is
   the part a headless host relies on: the Document-stage refusal comes back
   alone and anchored on the document, a structure refusal reaches the list
-  adapted, an undeclared datamodel path is the editor's `:info` advisory and
-  nothing more, and the function is total on a document whose tree is not a
-  tree.
+  adapted, an undeclared datamodel path is a refusal when the document
+  declares its own roots and the editor's `:info` advisory when only the
+  host declares, and the function is total on a document whose tree is not
+  a tree.
   """
 
   use ExUnit.Case, async: true
@@ -18,11 +19,14 @@ defmodule StatifierBlocks.PublishTest do
     Block,
     Compiler,
     CoreFixtures,
+    Datamodel,
     Document,
     DocumentFixtures,
     Finding,
     Publish
   }
+
+  alias StatifierBlocks.Document.DatamodelEntry
 
   # A datamodel document declaring the patron's email and nothing else.
   @datamodel %{
@@ -79,10 +83,14 @@ defmodule StatifierBlocks.PublishTest do
     end
 
     # The advisory is the editor's (11e), and a host refuses on `:error`
-    # only. The block names a datamodel path the datamodel does not declare.
+    # only. The block names a datamodel path the datamodel does not declare,
+    # and the document declares no root of its own, so only the host has
+    # declared anything and the advisory refuses nothing.
     #
     # Sabotage: made `findings/3` drop `Datamodel.findings/4` from step 4 -
     # the advisory is gone and the first assertion goes red (verified).
+    # Sabotage: made `at_publish/2` raise the advisories whatever the
+    # document declares - the severity assertion goes red (verified).
     test "an undeclared datamodel path is the editor's :info advisory, not a refusal" do
       document = with_note(patron_registration(), "patron.card_number")
       findings = Publish.findings(document, CoreFixtures.palette(), %{datamodel: @datamodel})
@@ -111,7 +119,99 @@ defmodule StatifierBlocks.PublishTest do
     end
   end
 
+  describe "an undeclared datamodel path where the document declares its roots" do
+    # The document declares the root `patron`, and the note writes under a
+    # misspelt root no surface declares.
+    #
+    # Sabotage: made `at_publish/2`'s condition false - the finding stays
+    # `:info` and the severity match goes red (verified).
+    test "is an :error finding, so the host's publish step refuses" do
+      document = patron_registration() |> with_roots(["patron"]) |> with_note("patorn.email")
+      findings = Publish.findings(document, CoreFixtures.palette(), %{})
+
+      assert [refusal] = Enum.filter(findings, &(&1.anchor == {:config, "blk_PNOTE", "path"}))
+      assert %Finding{severity: :error, source: :lint} = refusal
+      assert refusal.message =~ "patorn.email"
+    end
+
+    # The anchor, source and message are the editor's advisory's; only the
+    # severity moves.
+    #
+    # Sabotage: made `at_publish/2` also rewrite the message - the list
+    # equality goes red (verified).
+    test "is the editor's advisory raised to :error, the rest of it unchanged" do
+      document = patron_registration() |> with_roots(["patron"]) |> with_note("patorn.email")
+      findings = Publish.findings(document, CoreFixtures.palette(), %{})
+
+      assert [advisory] = Datamodel.findings(document, CoreFixtures.palette(), nil, [])
+
+      assert Enum.filter(findings, &(&1.anchor == advisory.anchor)) == [
+               %{advisory | severity: :error}
+             ]
+    end
+
+    # The host's datamodel and the document's roots are one declared set
+    # (11k), so a path the host declares is no refusal: the host's datamodel
+    # only ever clears a path.
+    #
+    # Sabotage: made step 4 hand `Datamodel.findings/4` `nil` for the
+    # datamodel - `loan.due_on` is undeclared and the first refute goes red
+    # (verified).
+    test "a path the host's datamodel declares is not refused" do
+      datamodel = ["loan.due_on"]
+
+      document =
+        patron_registration()
+        |> with_roots(["patron"])
+        |> with_note("loan.due_on")
+
+      findings = Publish.findings(document, CoreFixtures.palette(), %{datamodel: datamodel})
+
+      refute Enum.any?(findings, &(&1.anchor == {:config, "blk_PNOTE", "path"}))
+      refute Enum.any?(findings, &(&1.severity == :error))
+    end
+
+    # A path under a declared root is declared (11l), so there is nothing
+    # to refuse.
+    #
+    # Sabotage: made `Datamodel`'s `declared?/3` ignore the declared roots -
+    # the path is flagged, raised to `:error`, and the refute goes red
+    # (verified).
+    test "a path under the document's own root is not refused" do
+      document = patron_registration() |> with_roots(["patron"]) |> with_note("patron.email")
+
+      refute Enum.any?(
+               Publish.findings(document, CoreFixtures.palette(), %{}),
+               &(&1.severity == :error)
+             )
+    end
+  end
+
+  describe "an undeclared datamodel path where only the host declares" do
+    # The compile call's `:declare` roots are the host's too, and they do
+    # not make the document's advisory a refusal.
+    #
+    # Sabotage: made step 4 hand `at_publish/2` the document with the
+    # `:declare` roots added to its own - the advisory is raised and the
+    # severity match goes red (verified).
+    test "the host's :declare roots alone keep the :info advisory" do
+      document = with_note(patron_registration(), "patorn.email")
+      findings = Publish.findings(document, CoreFixtures.palette(), %{declare: [{"patron", nil}]})
+
+      assert [%Finding{severity: :info, source: :lint}] =
+               Enum.filter(findings, &(&1.anchor == {:config, "blk_PNOTE", "path"}))
+
+      refute Enum.any?(findings, &(&1.severity == :error))
+    end
+  end
+
   # -- helpers -------------------------------------------------------------
+
+  # The document's own `datamodel` key, declaring each root with no initial
+  # value.
+  defp with_roots(%Document{} = document, ids) do
+    %{document | datamodel: Enum.map(ids, &%DatamodelEntry{id: &1})}
+  end
 
   defp patron_registration do
     {:ok, document} = Document.from_json(DocumentFixtures.patron_registration_json())
