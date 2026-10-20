@@ -59,7 +59,7 @@ defmodule StatifierBlocks.FlowPatternsComposedTest do
     # Sabotage: in the fixture, the deadline's send moved out of the group
     # to just ahead of it in the branch arm - red here: the send is no
     # longer inside the group (verified).
-    test "each pattern's timers and interrupt transitions are the guide's own lines" do
+    test "the bounded step and the park carry the guide's own lines; the optional arms carry this document's" do
       assert {:ok, compiled} = Compiler.compile(composed(), palette())
 
       # The bounded step, inside the confirm lane's group: the guide's
