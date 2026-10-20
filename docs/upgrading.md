@@ -1,7 +1,7 @@
-# Upgrading a host from 0.31 to 0.43
+# Upgrading a host from 0.31 to 0.44
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.43.0, one minor at a time. A host here is the code that embeds the package:
+0.44.0, one minor at a time. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
@@ -10,9 +10,9 @@ about it, and says **NONE** where the answer is nothing.
 Take the minors in order, and move the pin with each one, as the README
 recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`,
 `"~> 0.34.0"`, `"~> 0.35.0"`, `"~> 0.36.0"`, `"~> 0.37.0"`, `"~> 0.38.0"`,
-`"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"`, `"~> 0.42.0"` and
-`"~> 0.43.0"`. A patch release rides its minor's pin, so each section below
-covers the patches of the minor it moves to.
+`"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"`, `"~> 0.42.0"`, `"~> 0.43.0"`
+and `"~> 0.44.0"`. A patch release rides its minor's pin, so each section
+below covers the patches of the minor it moves to.
 
 One value moves at every release, a patch included, and the sections below
 do not repeat it: the compiler version. `StatifierBlocks.Compiler.compiler_version/0`
@@ -400,3 +400,103 @@ and the `StatifierBlocksMap` hook draws the first layout where it drew the
 error pane when a second layout fails, draws a resume edge clear of its own
 rule's box, and holds the SVG wide enough for a timer edge between two
 steps of one column.
+
+The 0.43.1 patch, which the `"~> 0.43.0"` pin takes, widens the `predicator`
+requirement to admit 9.5 (`~> 9.4 and >= 9.4.1`), so a host moving to a
+`statifier` that requires `predicator` 9.5 can resolve this package beside
+it: **NONE**, beyond the compiler version every release moves (see the top
+of this page).
+
+## 0.43 to 0.44
+
+**NONE** for a host that mounts neither the editor nor the Map
+(`map_region/1` and `description_region/1`), reads none of the Map's
+answers itself (`StatifierBlocks.Map.graph/2` and the descriptions
+`StatifierBlocks.Map.Info` answers), reads no compiled `interface`, pins
+or refuses on none of the findings `StatifierBlocks.Publish.findings/3` or
+`StatifierBlocks.Graph` answers, and stores no `core.await` with a
+`capture` key: nothing needs migrating, no stored document has to change,
+and the package gains no dependency. A host that mounts the
+editor gets the capture rows on `core.await` with nothing to pass for them,
+and may pass the new `advisories` assign. A host that does read those
+answers reads the bullets below.
+
+- **If your publish step refuses on the `:error` findings
+  `StatifierBlocks.Publish.findings/3` answers**, it now refuses a document
+  that declares its own datamodel roots (its `datamodel` key holds an
+  entry) and holds a config path no declaring surface declares: there the
+  undeclared-path advisory is answered at `:error`, with the advisory's
+  anchor, `:lint` source and message. Declaring the path, or correcting it,
+  lets the document publish. A document that declares no roots is
+  unchanged: with only your `:datamodel` or `:declare` roots the advisory
+  stays `:info` and refuses nothing, and with nothing declared anywhere
+  there is none. The editor and `StatifierBlocks.Datamodel.findings/4`
+  still answer it at `:info`.
+- **If you read the compiled `interface`'s `references`, or match the
+  findings `StatifierBlocks.Graph.check/2` and `consumers_broken/2`
+  answer**, read the new values.
+  - A `core.subchart` or `core.map` that a composite's expansion placed is
+    recorded under the composite block the stored document holds: its
+    `block_id` is the outermost composite's id, and a new `expanded_from`
+    key carries the expanded member's id, which the stored document does
+    not hold. A finding about it is anchored `{:block, composite_id}` on
+    the composite, where it was anchored on the member's field.
+  - A `core.map` whose `collect_type` names a type the compile's
+    `:datamodel` does not declare is now marked `unresolved`, and its
+    done-data read is reported unchecked with the same `:graph` `:warning`
+    on `collect_type` a compile without `:datamodel` gets, its message
+    saying the supplied datamodel does not declare the name; before, the
+    read passed with no finding. It is a `:warning`, so a publish step that
+    refuses on an `:error` refuses nothing new. Passing a `:datamodel` that
+    declares the name, or writing the `collect_type` inline, lets the keys
+    be checked.
+  - A reference that is `unresolved` carries a new `unresolved_reason`,
+    `:no_datamodel` or `:not_declared`. A reference recorded before the key
+    existed, with `unresolved` set and no reason, reads as `:no_datamodel`,
+    the only case that set `unresolved` then.
+- **If you build or store documents whose `core.await` blocks carry a
+  `capture` key**, it now compiles: `core.await` takes an optional
+  `capture` map with `core.on_event`'s semantics, each pair an assign on the
+  transition the awaited event selects, and a malformed map is refused
+  where the key used to be ignored. An await with no `capture`, or an empty
+  one, compiles to the same bytes as before.
+- **If your page mounts the editor and stores the config it posts**, the
+  first time its form posts an edit to an await that holds no `capture`,
+  the block's config gains an empty `capture` map, since the form now draws
+  the capture rows for every await. It compiles to the same bytes as an
+  absent one; a host that compares stored configs key for key sees the new
+  key.
+- **If you want the editor to show advisories only your host can raise**,
+  pass the new optional `advisories` assign to `StatifierBlocks.Editor`: a
+  one-argument function the editor calls with the document on every
+  rebuild, returning `{anchor, message}` or `{anchor, message, opts}` as a
+  `StatifierBlocks.DocumentValidator` does. Each becomes a `:lint` finding
+  at `:warning` unless its `opts` say otherwise, drawn where its anchor
+  routes it. Pass the same function to
+  `StatifierBlocks.Editor.findings_count/3` as its `:advisories` option so
+  your count agrees with the drawer's. With the assign unset the editor
+  draws what it drew before.
+- **If you match or pin the descriptions `StatifierBlocks.Map.Info`
+  answers, or the `legend` `StatifierBlocks.Map.graph/2` answers**, read
+  the new wording.
+  - `idle/4`'s `explanation`, the paragraph on how to read the map, says
+    "A caption on a branch's band, or under a group's rules column with its
+    explanation beneath, says what that kind of step does." in place of the
+    sentence that called it "a one-line caption".
+  - The abandon end's explanation in `elements/6`, and the key's
+    dashed-ring line (the graph's `end-abandon` `legend` entry, and so the
+    "Legend" fact `idle/4` answers), say an interrupt rule abandons "a group
+    at the end of its flow" where they said "its last step".
+  - The Finish edge's explanation in `elements/6` reads "The arrow into a
+    final mark: the document's last step, or a group at the end of its
+    flow, is behind it, so when control leaves it this way, the document
+    finishes with the outcome it names."
+
+The release's fixes need nothing from a host: a face finding on a selected
+card spans the card's width below its title row; the editor's Expand
+gesture writes each member a composite mints at its block type's current
+version; `StatifierBlocks.Editor.ConfigForm.config_form/1` renders a `class`
+you pass on its read-only form as well as on the editable one, so a rule
+of yours on that class now reaches the read-only form too; and the
+`StatifierBlocksMap` hook leaves the drafts drawer out and draws the path
+when the drafts shelf alone fails to lay out.
