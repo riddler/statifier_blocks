@@ -14722,3 +14722,202 @@ takes no length ruling: the cap, the clip and the badge's drop stand as
 record them. It adds no README row and flips no status line.
 
 Filed with `sb-9bpd`.
+
+## Amendment (2026-10-19): an `advisories` assign, a host's function the editor asks for per-block advisories on every rebuild
+
+**Status: proposed (2026-10-19, bead `sb-cco0`, which also carries the
+implementation; the seam ruled by the operator, 2026-10-19).** A decision
+record merges at proposed and is flipped to accepted by a separate request
+through the same `docs/adr/` gate once the code that implements it has
+shipped in a published version. Additive: no text above this line is
+edited, no line above it is removed, and the head `Status:` line at `:3` is
+not extended. Decision 11's source enum, severity enum, anchor union and
+routing table stand as printed, and so do clauses `11p` to `11t`.
+
+**Why this is an Amendment and not a Note.** It adds an assign to the
+editor's mount and an option to `StatifierBlocks.Editor.findings_count/3`,
+and it says what the editor does with the function a host passes there.
+That is a new host-facing surface, so by this directory's README it is an
+Amendment.
+
+Code cites below that name code already on `main` were read at `8710dbe`
+and carry their anchors; the code this Amendment adds is cited by anchor
+alone. Re-locate by anchor, not by number.
+
+### Context
+
+`ADR-0013` decision 4 checks a `core.map`'s `collect_type` against the
+answer its child chart declares, and the check needs both documents. A
+`core.map` names its child chart by document id, and the editor is mounted
+over one document, so nothing in the editor holds the child. The check
+shipped as `StatifierBlocks.BlockType.agrees?/3`
+(`lib/statifier_blocks/block_type.ex`, `def agrees?(declarations, fields,
+expected)`) with no caller in this package, and decision 4's editor
+advisory was left unbuilt.
+
+Three host seams were already there, and none of them carries it:
+
+- **A palette validator** (`11p` to `11t`) is a module implementing
+  `StatifierBlocks.DocumentValidator`'s `validate_document/1`, handed the
+  document and nothing else (`11q`). The callback's `@doc` leaves a rule
+  that needs more than the document to the host, "evaluated before it
+  builds the palette or after it reads `on_change`"
+  (`lib/statifier_blocks/document_validator.ex`, the `@callback
+  validate_document`). A module is not a value a host builds per mount, so
+  it cannot close over the child documents a host has loaded beside this
+  one.
+- **The `findings` assign** takes finished findings. A host can compute the
+  advisory there, but it recomputes it after each `on_change` and passes it
+  back, and until it does, the list describes the document as it stood
+  before the edit.
+- **The `chart_outcomes` assign** is data about one question, a child's
+  finals, compared by `StatifierBlocks.ViewModel.outcome_findings/3`.
+
+The operator ruled, 2026-10-19: an opt-in seam, a host callback returning
+per-block advisories, off by default, recorded here. The seam is general: a
+host may say anything per block through it, and decision 4's agreement
+check is its first use.
+
+### The assign
+
+The editor gains one assign, `advisories`: `nil` (the default) or a
+one-argument function. The editor's `mount/1` sets it to `nil`, and the
+assigns table in `StatifierBlocks.Editor`'s moduledoc carries its row and
+the section *A host's own advisories* that explains it.
+`StatifierBlocks.Editor.findings_count/3` gains the option of the same
+name, with the same default, so the host's number and the drawer's stay one
+number. That is the property the moduledoc's *findings number a host may
+show* section exists for.
+
+### What the function is handed, and when
+
+It is called with the document as it stands: the document the view model
+is being built from, after every edit. The editor calls it each time it
+rebuilds its view model (`defp rebuild/1` in
+`lib/statifier_blocks/editor.ex`), so an author's edit is asked about on
+the next render with nothing done by the host, and `findings_count/3`
+calls it once. It is handed the document and nothing else, `11q`'s
+argument for the same reason: the host built the palette, and the view
+model is what is being built. Whatever else the function needs, such as
+the child documents, a datamodel or a palette, it holds from when the host
+built it. Because it is called on every rebuild, a host does its loading
+before it builds the function and keeps the call cheap.
+
+### What it returns, and how it is read
+
+It returns the list a validator returns,
+`t:StatifierBlocks.DocumentValidator.finding_spec/0`: `{anchor, message}`
+or `{anchor, message, opts}`, with decision 11's anchor and `:severity` the
+one option. The package says which source. Each member becomes a
+`StatifierBlocks.Finding` with source `:lint`, at `:warning` unless its
+`opts` name another severity. It is read through the normalizer a
+validator's return is read through (`defp normalize_specs/3` in
+`lib/statifier_blocks/view_model.ex`), so every rule of `11r` and `11s`
+holds unchanged:
+
+- A return that is not a list, and a member of neither shape, is no
+  finding. So is an anchor outside the three `11s` admits; the `:document`
+  anchor of `11v` is not admitted, as it is not for a validator
+  (`defp anchor?/1`). An anchor naming a block the document does not hold
+  lands in `orphan_findings`, as `11s` records.
+- A raise inside the host's function is not rescued. It is the host's bug,
+  and `11r`'s reason holds: swallowing it would hide it at the only moment
+  it is visible. Errors are values on the package's side of the seam; this
+  is not a leaf rescued to a default.
+- A value in the assign that is not a one-argument function says nothing,
+  as a `chart_outcomes` entry that is not a list says nothing.
+
+`ViewModel.advisory_findings/2` is the one place this happens. It is
+public only so the LiveView component reaches it, and it is `@doc false`:
+the contract is the assign and the option, not that function.
+
+### Where it runs, and where its advisories render
+
+The advisories go in through the caller-findings seam the datamodel
+advisories and the subchart disagreements already use: the editor's
+private `view_model/7` concatenates them last onto the findings it hands
+`ViewModel.build/3`. `build/3` routes them by decision 11's table, the
+drawer's Findings tab lists them, and `findings_count/3` counts them. No
+route, source, severity or anchor is added. A `:config` advisory renders
+under its field, a `:slot` one on the slot's header and a `:block` one on
+the block's chrome, which is where a finding from any other source with
+the same anchor renders.
+
+It differs from a validator in the one way it exists for: a validator is
+a module on the palette, and this is a function value on the mount. Both
+may be in use at once, and both findings are emitted, as `11t` emits a
+validator's beside a `singleton`'s.
+
+### A host that passes nothing
+
+`nil` calls nothing and adds nothing: the editor builds the view model it
+built before the assign existed, and `findings_count/3` without the option
+returns the number it returned. The test `the editor draws exactly what it
+drew before the assign existed`, in
+`test/statifier_blocks/editor/host_advisories_test.exs`, holds that for a
+document whose child would disagree if anything asked.
+
+### The first use: ADR-0013 decision 4
+
+A host that holds a parent document and the child documents its `core.map`
+blocks name passes a function that, for each `core.map` whose child it
+holds:
+
+1. reads the parent's declarations with
+   `StatifierDatamodel.Declarations.from_document/1`, from the datamodel
+   document the host already has;
+2. resolves the child's root block through the palette
+   (`StatifierBlocks.Palette.resolve/2`) and reads what it declares with
+   `StatifierBlocks.BlockType.donedata_type/2`;
+3. asks `BlockType.agrees?/3` with the parent's declarations, those fields
+   and the `collect_type` as stored; and
+4. answers one advisory anchored `{:config, block_id, "collect_type"}` when
+   the answer is `{:missing, names}` or `:not_assignable`, and none when it
+   is `:covers`, `:identical` or `:unknown`. The message is the host's,
+   written from `statifier_datamodel`'s reason.
+
+As decision 4 says, the advisory is raised only where the `collect_type` is
+a shape: an inline member list, or a name whose declaration is of kind
+`shape`. A name of kind `record` is `:not_assignable` whatever the child
+declares, and decision 4 declines to render it, so the function does not
+ask about it.
+
+The package ships no such function. Every step above is a public function
+already on `main`, and the host is what holds the child, so a function in
+this package would take the host's loaded documents as an argument and do
+no more than these four steps do. The test module
+`StatifierBlocks.Editor.HostAdvisoriesTest` writes the host's function,
+`agreement_advisories/4`, in the library loan world: a round that runs an
+overdue-notice chart per overdue loan and collects each answer as a shape
+requiring two members. With a child that declares one member, the drawer
+lists exactly one `:lint` `:warning` on the map's `collect_type`; with a
+child that declares both, it lists none. A third test points an agreeing
+map at a child that answers less, through the config form, and the
+advisory appears on the next render.
+
+### What this does not decide
+
+- **Whether the package ships an agreement function.** It does not, for the
+  reason above. A request that wants one adds it beside this seam.
+- **A `:document` anchor for a host's advisory.** It is not admitted here,
+  as it is not for a validator; the question `11v` left open stays open.
+- **Decision 4's check at publish.** `StatifierBlocks.Graph.check/2` checks
+  that each done-data key the parent reads is declared, and leaves whether
+  its type agrees to `agrees?/3` (the moduledoc of
+  `lib/statifier_blocks/graph.ex`, "The three checks", item 3). This
+  Amendment is the editor's side only, and it changes no publish finding.
+- **Caching.** The editor does not memoize the function's answer; a host
+  that needs to keeps what it loads outside the function.
+
+### Consequences
+
+- **A host that passes nothing sees nothing new.** The next release's
+  changelog names the assign (`changelog.d/sb-cco0.md`).
+- **`ADR-0013` decision 4's editor advisory is raised through this seam**,
+  by a host's function; that record's dated Note of 2026-10-19 says so, and
+  no line of it is edited.
+- **`agrees?/3` keeps its `@doc`.** It is still not a compile finding and
+  still answers only where both documents are in hand. With this seam, a
+  host's function is where they are both in hand.
+
+Filed with `sb-cco0`.

@@ -1,0 +1,3 @@
+### Added
+
+- `StatifierBlocks.Editor` takes an optional `advisories` assign: a one-argument function the editor calls with the document on every rebuild, returning `{anchor, message}` or `{anchor, message, opts}` as a `DocumentValidator` does, and each becomes a `:lint` finding at `:warning` unless its `opts` say otherwise, so a host that holds a `core.map`'s child chart can raise a `:warning` on `collect_type` when `BlockType.agrees?/3` says the pair disagrees; `findings_count/3` takes the same function as its `:advisories` option. With the assign unset the editor draws exactly what it drew before.

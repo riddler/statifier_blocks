@@ -439,6 +439,49 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     different number than the drawer is a bug in the host; a host showing
     none is fine.
 
+    ## A host's own advisories (`advisories`)
+
+    Some of what an author should be told about a block is only knowable by
+    the host. A `core.map` names its child chart by document id, so whether
+    the child's answer is the shape the parent's `collect_type` expects
+    (ADR-0013 decision 4) can be asked only where both documents are in
+    hand - and the host is what holds the second one. `advisories` is where
+    the host says such things: a one-argument function, called with the
+    document as it stands on every rebuild of the view model, returning the
+    same list a `StatifierBlocks.DocumentValidator` returns -
+    `{anchor, message}` or `{anchor, message, opts}`, anchored on the block,
+    slot or field the advisory is about.
+
+        children = MyApp.Charts.load_children(document)
+
+        advisories = fn document ->
+          document
+          |> StatifierBlocks.Document.blocks()
+          |> Enum.filter(&(&1.type == "core.map"))
+          |> Enum.flat_map(&MyApp.Charts.answer_advisories(&1, children))
+        end
+
+    where `answer_advisories/2` returns
+    `[{{:config, block.id, "collect_type"}, message}]` for a pair that
+    disagrees and `[]` for one that agrees.
+
+    The package says which source: every advisory is `:lint`, at `:warning`
+    unless its `opts` say otherwise, and it renders where decision 11
+    routes its anchor, is listed in the drawer's Findings tab and is counted
+    by `findings_count/3`, which takes the function as its `:advisories`
+    option and calls it once. A return that is not a list, and a member
+    of neither shape, is read as no finding; a raise inside the function is
+    the host's and is not rescued (ADR-0005 clause `11r`, which this seam
+    reads its return value under). `nil` (the default) calls nothing and
+    draws exactly what the editor drew before the assign existed.
+
+    It differs from a palette's `validators` in one way, and that way is the
+    reason it exists: a validator is a module handed the document and
+    nothing else, while this is a function value the host builds per mount,
+    so it can close over what the host has loaded beside the document. It is
+    called on every rebuild, so a host keeps it cheap and does its loading
+    before it builds the function, not inside it.
+
     ## The insert mode, and the pick that lands nowhere
 
     `palette_position` is a mode, and every visible part of it hangs off that
@@ -641,6 +684,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     | `field_candidates` | no | the values a host offers for one field, keyed `{type_name, field_key}`: `[{value, label}]` for a closed list, which a `:string` field draws as a `<select>`, or `{:open, [{value, label}]}` for an open one, drawn as a `<datalist>`. A `{:path, opts}` and an `:expression` field read it too and draw either spelling as a `<datalist>`, ahead of the declared datamodel paths, because the value stays typed by the control. `%{}` (the default) offers none, and a field it does not name renders exactly as it did. It draws a control and decides nothing: `validate_config/1` is still the only authority on a value, and a stored value a closed list does not offer is drawn rather than rewritten |
     | `invoke_types` | no | the invoke types the host is prepared to answer; suggestions on an `invoke_type` field, never a constraint, and `[]` (the default) means *no list supplied* |
     | `chart_outcomes` | no | what the host says each of its stored documents finishes with, `%{document id => [outcome]}`; offered as candidates on a `core.subchart`'s `outcomes` field and compared against what that block declares (`StatifierBlocks.ViewModel.outcome_findings/3`). `%{}` (the default) says nothing about any chart, and a chart the map does not name is *unknown*, which is not disagreement |
+    | `advisories` | no | `nil` (the default) or a one-argument function called with the document on every rebuild, returning `StatifierBlocks.DocumentValidator`'s `finding_spec/0` list; each becomes a `:lint` finding, `:warning` unless it says otherwise, routed by its anchor. See *A host's own advisories* above |
     | `active_marks` | no | the block ids a run has activated; held as editor state, and cleared when the host opens a different document |
     | `invoke_mark` | no | the block a run is calling out to and how the call came back - `{block_id, outcome}`, a bare `block_id` for no answer yet, or `nil` for no call at all |
     | `run` | no | a run to watch over this document: statifier-ui's `StatifierUI.Live.State`, live or persisted, or `nil` (the default) for no run. It seats the canvas in a run pane, decides the marks outright while it is there, and puts the run's held values beside the declared ones in the Datamodel tab. Held as editor state behind the same guard the marks use, and cleared when the host opens a different document |
@@ -820,6 +864,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          debounce: nil,
          invoke_types: [],
          chart_outcomes: %{},
+         advisories: nil,
          value_candidates: %{},
          field_candidates: %{},
          theme: %{},
@@ -1003,6 +1048,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * `:chart_outcomes` - what the host says its stored documents finish
         with, `%{}` by default, which says nothing about any chart and so
         reports no subchart disagreement.
+      * `:advisories` - the host's own advisories function, `nil` by
+        default, which calls nothing and adds nothing.
     """
     @spec findings_count(Document.t(), Palette.t(), keyword()) :: non_neg_integer()
     def findings_count(%Document{} = document, %Palette{} = palette, opts \\ []) do
@@ -1013,7 +1060,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           Keyword.get(opts, :findings, []),
           Keyword.get(opts, :datamodel),
           Keyword.get(opts, :declare, []),
-          Keyword.get(opts, :chart_outcomes, %{})
+          Keyword.get(opts, :chart_outcomes, %{}),
+          Keyword.get(opts, :advisories)
         )
 
       Shell.findings_count(findings)
@@ -3586,11 +3634,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         findings: findings,
         declared_paths: declared_paths,
         host_roots: host_roots,
-        chart_outcomes: chart_outcomes
+        chart_outcomes: chart_outcomes,
+        advisories: host_advisories
       } = socket.assigns
 
       view_model =
-        view_model(document, palette, findings, declared_paths, host_roots, chart_outcomes)
+        view_model(
+          document,
+          palette,
+          findings,
+          declared_paths,
+          host_roots,
+          chart_outcomes,
+          host_advisories
+        )
 
       selected = selected_node(socket, view_model)
 
@@ -3888,14 +3945,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # supplied finding uses, so `ViewModel.build/3` needs no notion of a
     # datamodel and the routing is the one already tested. `datamodel` is
     # whatever the host handed over or the already-normalized set the
-    # component keeps - `Datamodel.findings/3` normalizes either.
-    @spec view_model(Document.t(), Palette.t(), [Finding.t()], term(), term(), term()) ::
+    # component keeps - `Datamodel.findings/3` normalizes either. The host's
+    # own `advisories` function rides the same seam, last, after everything
+    # the package reads off a host value itself.
+    @spec view_model(Document.t(), Palette.t(), [Finding.t()], term(), term(), term(), term()) ::
             ViewModel.t()
-    defp view_model(document, palette, findings, datamodel, declare, chart_outcomes) do
+    defp view_model(document, palette, findings, datamodel, declare, chart_outcomes, host) do
       advisories = Datamodel.findings(document, palette, datamodel, declare)
       disagreements = ViewModel.outcome_findings(document, palette, chart_outcomes)
+      host_advisories = ViewModel.advisory_findings(document, host)
 
-      ViewModel.build(document, palette, findings ++ advisories ++ disagreements)
+      ViewModel.build(
+        document,
+        palette,
+        findings ++ advisories ++ disagreements ++ host_advisories
+      )
     end
 
     # The fields the author has typed that the document does not hold.

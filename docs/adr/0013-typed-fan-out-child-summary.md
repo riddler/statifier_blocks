@@ -1152,3 +1152,36 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`.
+
+## Note (2026-10-19): decision 4's editor advisory is raised through the editor's `advisories` assign
+
+A dated Note, not an amendment: it carries no `Status:` line, edits no line
+above it and changes no decision of this record. Code cites are by anchor,
+read at `8710dbe`; the code `ADR-0005`'s Amendment of 2026-10-19 adds is
+cited by anchor alone.
+
+Decision 4 checks the pair "wherever both documents are in hand", and its
+editor advisory was not built: the editor is mounted over one document, and
+a `core.map` names its child by document id. `ADR-0005`'s Amendment of
+2026-10-19 gives the editor an `advisories` assign, a host's one-argument
+function called with the document on every rebuild of the view model, whose
+answer is read as a palette validator's is, `:lint` at `:warning`. A host
+that holds the child documents is where both documents are in hand, so the
+advisory is raised there: the host's function asks
+`StatifierBlocks.BlockType.agrees?/3` (`lib/statifier_blocks/block_type.ex`,
+`def agrees?(declarations, fields, expected)`) for each `core.map` whose
+child it holds and answers one advisory on the block's `collect_type` field
+for a pair that disagrees. That Amendment's section "The first use" lists
+the steps.
+
+What decision 4 decides holds as written. The parent's declaration still
+wins for typing, the check is still not a compile finding and still moves no
+compiled byte, and a `collect_type` naming a declaration of kind `record` is
+still declined: the host's function asks only where the `collect_type` is a
+shape. The package ships no agreement function of its own. The host's
+function is written in
+`test/statifier_blocks/editor/host_advisories_test.exs`, whose tests show one
+`:warning` on `collect_type` for a child that declares less than the shape
+requires and none for a child that declares all of it.
+
+Filed with `sb-cco0`.

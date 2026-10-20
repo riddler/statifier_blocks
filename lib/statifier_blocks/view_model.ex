@@ -1570,6 +1570,30 @@ defmodule StatifierBlocks.ViewModel do
     end)
   end
 
+  # The editor's `advisories` assign (ADR-0005's Amendment of 2026-10-19):
+  # a host's one-argument function, handed the document as it stands and
+  # answering in the validators' `finding_spec/0` vocabulary, read through
+  # the same normalizer and stamped the same `:lint` at the same default
+  # `:warning`. It is a separate pass rather than part of `build/3` for
+  # `outcome_findings/3`'s reason: the function is the host's input, not the
+  # document's, and the projection stays a function of the document plus
+  # the palette. The editor concatenates the result onto the caller
+  # findings it hands `build/3`, so there is one routing path.
+  #
+  # Public only so the LiveView component reaches it from its own module;
+  # the contract a host codes against is the assign and `findings_count/3`'s
+  # option of the same name, not this function. `nil` (the default) and a
+  # value that is not a one-argument function say nothing, as a
+  # `chart_outcomes` value that is not a list says nothing. A raise inside
+  # the host's function is not rescued, for `11r`'s reason.
+  @doc false
+  @spec advisory_findings(Document.t(), term()) :: [Finding.t()]
+  def advisory_findings(%Document{} = document, advisories) when is_function(advisories, 1) do
+    document |> advisories.() |> normalize_specs(:lint, :warning)
+  end
+
+  def advisory_findings(%Document{}, _not_a_function), do: []
+
   # Decision 10's normalizer discipline, applied to a rule's return value
   # (`11r`): a term that is not a list, and a member that is neither
   # `{anchor, message}` nor `{anchor, message, opts}`, is read as NO finding.
