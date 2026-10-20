@@ -624,6 +624,11 @@ defmodule StatifierBlocks.Map do
     own ++ Enum.flat_map(Map.get(graph_node, "children", []), &drawn_marks/1)
   end
 
+  # The fork is listed for a node that carries `band`; the hook draws the
+  # band (and its fork) for a node that carries `band` and has an arm
+  # slot (`bandOf` in `statifier_blocks_map.js`). The two agree because
+  # `put_band/2` is the only place `band` is set, on a container branch,
+  # and a branch's drawn slots include an arm; a test on each side pins it.
   @spec node_marks(graph_node()) :: [String.t()]
   defp node_marks(%{"kind" => "start"}), do: ["start"]
   defp node_marks(%{"kind" => "end", "outcome" => @abandon}), do: ["end-abandon"]
