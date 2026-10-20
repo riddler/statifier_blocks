@@ -14566,3 +14566,74 @@ change is recorded in `ADR-0018`'s Note of 2026-10-10, "the key is
 titled Legend".
 
 Filed with `sb-c15x`.
+
+## Note (2026-10-19): an insert's config is not checked when the session commits it, and why
+
+A dated Note, not an amendment: it carries no `Status:` line and decides
+nothing. It says how decision 9's gate reads for an `:insert`. Every code cite
+below is by anchor, read at `e899e4c`.
+
+### What the code does
+
+`StatifierBlocks.Edit.check_config/3` (`lib/statifier_blocks/edit.ex`) asks a
+block's type about a config only for an `:update_config`, against the
+candidate config the command carries. Its clause for `{tag, _, _}` with `tag`
+in `[:insert, :move]` answers `:ok` without asking the type. That function is
+the first step of `Edit.History`'s one funnel (`defp apply_gated/3` in
+`lib/statifier_blocks/edit/history.ex`), and `Edit.Session.commit/2`
+(`lib/statifier_blocks/edit/session.ex`) commits through `History.commit/4`.
+So a block a palette pick or a drop inserts reaches the document whatever its
+type's `validate_config/1` answers about its config. A compound is checked leaf
+by leaf through the same function (`defp check_leaf/3`), so an `:insert` leaf in
+a recipe's compound passes in the same way.
+
+The function's `@doc` gives the reason for every leaf command but
+`:update_config` as "none of them touches a block's config". For an `:insert`
+that reads as: it changes no config already in the document. The inserted
+block brings its own config with it, and that config is not asked about.
+
+### Why it is not checked
+
+Decision 9's rule is about the author's edit of a config: "An `:update_config`
+command is applied to the document only when `validate_config/1` returns
+`:ok`." The Amendment of 2026-08-29, "decision 9, the `:duration` control",
+restates the rule in the same terms. No later Note or Amendment here names an
+inserted block's config as checked. The compound Amendment's sentence that
+"invalid config never reaches the document" holds for a composed edit "exactly
+as it holds for a single one" (the Amendment of 2026-09-05, "decision 2, a
+compound command, and a palette entry that names a recipe") reads with
+decision 9's scope: the config the gate refuses is an `:update_config`'s.
+
+An inserted block holds what `StatifierBlocks.Palette.new_block/2` builds: each
+declared field's `config_schema/1` default and nothing else (ADR-0011's Note of
+2026-10-19, "an inserted block does not start from its palette entry's
+`default_config`, and why the insert probe and the inserted block may differ",
+section 3). A type's own defaults can fail its own check. `core.send`'s `event`
+defaults to the empty string, and its `validate_config/1` answers a finding on
+`event` while it holds that (`check_event/2` in
+`lib/statifier_blocks/core/send.ex`). A gate on the insert would refuse that
+block, and an author could not place a send step from the palette at all.
+
+So the insert lands, and the block's findings tell the author what is still
+unfilled. The view model asks the block's type the same questions the gate
+asks (`defp config_findings/3` in `lib/statifier_blocks/view_model.ex`), and a
+resolvable card draws those findings on its face (`defp face_findings/1` in
+`lib/statifier_blocks/editor/block_node.ex`). Filling a field through the
+config form is an `:update_config`, which decision 9 gates.
+
+An inserted block whose config has a finding is neither a config draft nor a
+draft fragment, the two senses the section headed `The word "draft", which
+this record already uses for something else` keeps apart. A config draft never
+reaches the document, and a draft fragment sits in the drafts tray. An
+inserted block is a block in the document, and its own findings report on its
+config.
+
+### What this Note does not do
+
+It changes no code and no `@doc`, edits no line above it, and amends no clause
+of decision 9. It says from the commit side what ADR-0011's Note of 2026-10-19
+says from the insert side: that Note answers what an inserted block holds, and
+this one answers that the session commits it without asking its type. It adds
+no README row and flips no status line.
+
+Filed with `sb-qy9y`.
