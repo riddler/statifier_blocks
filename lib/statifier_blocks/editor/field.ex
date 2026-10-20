@@ -351,9 +351,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     is the same one either way and an author sees the difference in the
     findings beneath it. A `{:path, opts}` inside a `{:list, t}` is a list
     of paths: each row is a text input bound to one `<datalist>` of the
-    same candidates, drawn once for the field, and each row's value is
-    checked for the same `:info` advisory, anchored on the list field's
-    `key`. A row of any other type draws no suggestion markup.
+    declared datamodel paths (`path_candidates`), drawn once for the
+    field. A host's per-field `candidates` do not reach list rows; rows
+    read `path_candidates` only. Each row's value is checked for the same
+    `:info` advisory, anchored on the list field's `key`. A row of any
+    other type draws no suggestion markup.
 
     ## The `invoke_type` suggestion list
 

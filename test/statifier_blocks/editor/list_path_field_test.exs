@@ -108,8 +108,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       # Sabotage: made `row_path_candidates/2` answer the candidates for every
-      # inner type -> the `{:list, :string}` field gains a datalist and its
-      # row a `list` attribute, and this goes red.
+      # inner type -> the `{:list, :string}` field gains its `<datalist>`, and
+      # the `refute ... datalist#sb-field-shelves-paths` below goes red. The
+      # row-input refute before it stays green: a string row has no `list`
+      # attribute either way.
       test "a list of another type is offered nothing", %{conn: conn} do
         view = notice_view(conn, ["patron.email"], datamodel: @declared)
 
