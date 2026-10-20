@@ -1438,6 +1438,23 @@ defmodule StatifierBlocks.MapTest do
                |> Enum.find(&(&1["mark"] == "start"))
                |> Map.fetch!("lines")
     end
+
+    # The abandon end's key line names the group at the end of a flow, in
+    # the words ruled for it, and not the last step.
+    #
+    # Sabotage: made the end-abandon legend line read "its last step" in
+    # place of "a group at the end of its flow"; this went red. Reverted
+    # from a copy.
+    test "the abandon end's key line names a group at the end of its flow" do
+      line =
+        graph("patron_registration")["legend"]
+        |> Enum.find(&(&1["mark"] == "end-abandon"))
+        |> Map.fetch!("line")
+
+      assert line ==
+               "A dashed ring, reached by a dashed arrow, is where the document finishes " <>
+                 "when an interrupt rule abandons a group at the end of its flow"
+    end
   end
 
   describe "the drafts shelf" do

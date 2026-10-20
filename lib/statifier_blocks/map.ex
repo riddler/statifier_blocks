@@ -430,7 +430,7 @@ defmodule StatifierBlocks.Map do
        "last step finishes, the outcome named on the arrow into it"},
     {"end-abandon",
      "A dashed ring, reached by a dashed arrow, is where the document finishes when " <>
-       "an interrupt rule abandons its last step"},
+       "an interrupt rule abandons a group at the end of its flow"},
     {"arrow", "An arrow runs from a step to the one after it"},
     {"fork", "A band with a fork mark stands over a branch's arms"},
     {"join",

@@ -372,8 +372,9 @@ defmodule StatifierBlocks.Map.Info do
   @spec end_explanation(String.t()) :: String.t()
   defp end_explanation("abandon"),
     do:
-      "Where the document finishes when an interrupt rule abandons its last step, drawn " <>
-        "as a dashed ring: the rule leaves the group, and nothing comes after the group."
+      "Where the document finishes when an interrupt rule abandons a group at the end " <>
+        "of its flow, drawn as a dashed ring: the rule leaves the group, and nothing " <>
+        "comes after the group."
 
   defp end_explanation(_done),
     do:
@@ -832,9 +833,9 @@ defmodule StatifierBlocks.Map.Info do
       title: "Finish",
       sentence: "#{finishing(outcome, from, context)}, the document finishes: #{outcome}",
       explanation:
-        "The arrow into a final mark: the document's last step is behind it, so when " <>
-          "control leaves that step this way, the document finishes with the outcome " <>
-          "it names.",
+        "The arrow into a final mark: the document's last step, or a group at the end " <>
+          "of its flow, is behind it, so when control leaves it this way, the document " <>
+          "finishes with the outcome it names.",
       facts: [{"From", sentence_of(from, context)}, {"Outcome", outcome}] ++ rules
     }
   end

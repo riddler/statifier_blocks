@@ -491,11 +491,11 @@
       "mark": "end"
     },
     {
-      "line": "A dashed ring, reached by a dashed arrow, is where the document finishes when an interrupt rule abandons its last step",
+      "line": "A dashed ring, reached by a dashed arrow, is where the document finishes when an interrupt rule abandons a group at the end of its flow",
       "lines": [
         "A dashed ring, reached by a dashed arrow, is",
         "where the document finishes when an interrupt",
-        "rule abandons its last step"
+        "rule abandons a group at the end of its flow"
       ],
       "mark": "end-abandon"
     },
