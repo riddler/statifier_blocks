@@ -84,93 +84,13 @@ with a step that must finish within a bound or the flow continues - are in
   - [How to register your own block types](docs/guides/register-block-types.md) -
     write a block type, declare one from a base or a subtree, and build a
     palette from your own types beside the core vocabulary
+  - [How to type a palette](docs/typing-a-palette.md) - declare what each
+    block type reads and writes at a datamodel path, and check a document
+    against the records and shapes your host declares
 - Look up
   - [Config fields and the handlers this package ships](docs/reference/config-fields-and-handlers.md) -
     where a config field's value is stored, and the invoke handler the package
     ships for `core.subchart`
-
-## Typing a palette
-
-A block type can declare what it reads and writes at a datamodel path, and
-the walk that carries those declarations through a document is what lets the
-editor refuse a step that reads a path nothing put the right thing at.
-
-Both signatures are declared on a **field**, not on the block, so a finding
-anchors on the control an author has to change:
-
-```elixir
-alias StatifierBlocks.{BlockType, Environment}
-
-read = %{
-  key: "subject",
-  type: {:path, %{expects: "Settleable"}},
-  label: "Transaction",
-  required?: true,
-  default: "cards.current_txn"
-}
-
-write = %{
-  key: "assign_to",
-  type: {:path, %{writes: "cards.settlement"}},
-  label: "Write the settlement to",
-  required?: true,
-  default: "cards.settlement"
-}
-
-read_path = BlockType.value_path(read)
-#=> ["subject"]
-
-declarations =
-  StatifierDatamodel.Declarations.from_document(%{
-    "types" => [
-      %{
-        "name" => "cards.credit_txn",
-        "kind" => "record",
-        "label" => "Credit card transaction",
-        "fields" => [
-          %{"name" => "amount_minor", "type" => "integer", "required?" => true},
-          %{"name" => "currency", "type" => "string", "required?" => true}
-        ]
-      },
-      %{
-        "name" => "Settleable",
-        "kind" => "shape",
-        "label" => "Settleable",
-        "fields" => [
-          %{"name" => "amount_minor", "type" => "integer", "required?" => true},
-          %{"name" => "currency", "type" => "string", "required?" => true}
-        ]
-      }
-    ]
-  })
-
-satisfied = Environment.satisfies(declarations, "cards.credit_txn", "Settleable")
-#=> :covers
-
-label = Environment.type_label(declarations, "cards.credit_txn")
-#=> "Credit card transaction"
-
-write_signature = %{write.key => write.type}
-#=> %{"assign_to" => {:path, %{writes: "cards.settlement"}}}
-```
-
-A field declaring `expects` and no `writes` is a read and not also a write. A
-`{:path, opts}` field carrying neither - and a `:string` field carrying
-`datamodel_path?: true` - writes `:unknown`: the path becomes known without
-becoming typed. `io/1`'s `consumes` and `produces` are sugar for a read and a
-write at the document's subject path, which the entry block's palette entry
-names with `subject:`.
-
-The records and shapes themselves live in the datamodel document's `types`
-key, which `statifier_datamodel` owns, and the read check is that package's
-`StatifierDatamodel.Types.satisfies/3` - unknown is permissive both ways,
-identity is nominal, and a record satisfies a shape when it covers the
-shape's required fields. This package defines no second read check.
-
-[`docs/typing-a-palette.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/typing-a-palette.md)
-is the how-to: declaring records and shapes, naming the subject, projecting a
-host schema into the document with the scalar mapping table, and what a host
-re-resolves at publish.
 
 ## Document, revision, chart and execution
 
