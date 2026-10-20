@@ -1362,19 +1362,56 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     describe "a face finding is contained by its card (the Note of 2026-09-08, item 2)" do
       @stylesheet "assets/css/statifier_blocks.css"
 
-      # The containment is the PLACEMENT: the row is placed in the card's own
-      # text column, which it can only be as a child of the card element. On a
-      # container the card is the chrome and the node box around it is
-      # `max-content` wide, so the row placed outside drew a full-width tinted
-      # line between the card and the slot label under it.
-      # Sabotage: drop the rule - the row auto-places into column 1, under the
-      # icon tile, and the assertion goes red without waiting for a capture.
-      test "a face finding is placed in the card's own text column" do
+      # The row's measure on a selected card. With the strip's members
+      # revealed the strip column takes the widest member and the title
+      # column falls to its minimum, so a row confined to the title column
+      # is as narrow as that minimum, a few characters per line on a 14rem
+      # card. The row spans every column instead, which is the
+      # card's full inner width whatever the strip column has grown to, and
+      # `1 / -1` rather than a column count so a fifth column in the template
+      # cannot leave the row short of the card's edge.
+      # Sabotage: put the row back in `grid-column: 2` - red.
+      test "a face finding spans the card's full inner width, whatever the strip reveals" do
         css = File.read!(@stylesheet)
 
         body = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-finding\s*\{(.*?)\n\}/ms)
 
-        assert body =~ ~r/grid-column:\s*2/
+        assert declaration!(body, "grid-column") == "1 / -1"
+      end
+
+      # And nothing else in the cascade takes the span back: of every rule
+      # whose selector list names a face finding under the chrome, exactly one
+      # declares a `grid-column`, and it is the spanning one. A selected-state
+      # or later rule placing the row in a column again would put the squeeze
+      # back without touching the rule above.
+      # Sabotage: add `.sb-node--selected .sb-node__chrome > .sb-finding {
+      # grid-column: 2; }` after the rule - red.
+      test "no other rule places a face finding in a column" do
+        css = File.read!(@stylesheet)
+
+        placing =
+          ~r/([^{}]+)\{([^{}]*)\}/
+          |> Regex.scan(String.replace(css, ~r|/\*.*?\*/|s, ""))
+          |> Enum.filter(fn [_, selectors, body] ->
+            selectors
+            |> String.split(",")
+            |> Enum.any?(&(&1 =~ ~r/\.sb-node__chrome.*\.sb-finding\b/)) and
+              declared(body, "grid-column") != nil
+          end)
+          |> Enum.map(fn [_, _selectors, body] -> declared(body, "grid-column") end)
+
+        assert placing == ["1 / -1"]
+      end
+
+      # The span asks nothing of the flexible column: with an automatic
+      # minimum the row would size it to the row's longest word.
+      # Sabotage: drop `min-width: 0` - red.
+      test "the spanning row declares no automatic minimum width" do
+        css = File.read!(@stylesheet)
+
+        body = rule_body!(css, ~r/^\.sb-node__chrome > \.sb-finding\s*\{(.*?)\n\}/ms)
+
+        assert declaration!(body, "min-width") == "0"
       end
 
       # And the row wraps rather than widening the card, which is the other
