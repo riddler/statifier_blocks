@@ -625,16 +625,22 @@ defmodule StatifierBlocks.MapLayoutTest do
     end
 
     # The start comes first in reading order: the dot is drawn before any
-    # box, and the dot and its caption both sit above, or left of, every
-    # label a box carries - the root's title and sentence included, which
-    # the dot drawn inside the root's box sat under. A label's top is read
-    # as its baseline less one line.
+    # box, and the dot and its caption both sit above every label a box
+    # carries - the root's title and sentence included, which the dot drawn
+    # inside the root's box sat under. The layout prints no box for a label,
+    # only the text's start and baseline, so a label's box is rebuilt as the
+    # stylesheet draws it: 12px type, a 12px top above the baseline and
+    # about 3px of descender below. Only the vertical bound matters here,
+    # and it is read to the text, a little tighter than a whole line box.
+    # Above means the bottom edge is at or above that top; being left of a
+    # label on the same row is not enough.
     #
     # Sabotage: made put_start/2 put the dot back first among the root's
     # children, with its edge; the root's title stood above the dot and
     # this went red. Made put_start/2 put the dot after the root's box in
-    # the graph; the box was drawn before the dot and this went red. Each
-    # reverted from a copy.
+    # the graph; the box was drawn before the dot and this went red. Stood
+    # the dot level with "Sequence" and just left of it, which the earlier
+    # left-of allowance passed; this went red. Each reverted from a copy.
     test "both library fixtures draw the start dot and its caption above every box label",
          %{tmp_dir: dir} do
       for {key, root, first} <- @starts do
@@ -649,16 +655,23 @@ defmodule StatifierBlocks.MapLayoutTest do
                  Enum.filter(edges, &(&1["kind"] == "start"))
 
         labels =
-          for [_all, x, y, text] <- Regex.scan(@box_label, html),
-              do: {text, number(x), number(y) - 16}
+          for [_all, x, y, text] <- Regex.scan(@box_label, html) do
+            baseline = number(y)
 
-        assert {"Sequence", _x, _top} = List.keyfind(labels, "Sequence", 0), key
+            %{
+              "text" => text,
+              "x" => number(x),
+              "y" => baseline - 12,
+              "height" => 15
+            }
+          end
 
-        for {name, box} <- [{"the dot", dot}, {"its caption", caption}],
-            {text, x, top} <- labels do
-          assert box["y"] + box["height"] <= top or box["x"] + box["width"] <= x,
-                 "#{key}: #{name} at #{inspect(box)} is not above or left of " <>
-                   "#{inspect(text)} at (#{x}, #{top})"
+        assert Enum.any?(labels, &(&1["text"] == "Sequence")), key
+
+        for {name, box} <- [{"the dot", dot}, {"its caption", caption}], label <- labels do
+          assert box["y"] + box["height"] <= label["y"],
+                 "#{key}: #{name} at #{inspect(box)} is not above " <>
+                   "#{inspect(label["text"])} at #{inspect(label)}"
         end
 
         {dot_at, _length} = :binary.match(html, ~s(data-map-start="#{start}"))
