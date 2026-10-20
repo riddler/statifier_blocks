@@ -1242,7 +1242,14 @@ defmodule StatifierBlocks.Compiler do
   defp reanchor(result, expansion) when map_size(expansion) == 0, do: result
 
   defp reanchor({:ok, %Compiled{} = compiled}, expansion) do
-    {:ok, %{compiled | warnings: Enum.map(compiled.warnings, &reanchor_finding(&1, expansion))}}
+    references = Enum.map(compiled.interface.references, &reanchor_reference(&1, expansion))
+
+    {:ok,
+     %{
+       compiled
+       | warnings: Enum.map(compiled.warnings, &reanchor_finding(&1, expansion)),
+         interface: %{compiled.interface | references: references}
+     }}
   end
 
   defp reanchor({:error, findings}, expansion) do
@@ -1256,6 +1263,29 @@ defmodule StatifierBlocks.Compiler do
     case anchor(expansion, block_id) do
       nil -> finding
       {composite_id, config_key} -> %{finding | block_id: composite_id, config_key: config_key}
+    end
+  end
+
+  # The same rule for a reference the interface records, which a `:graph`
+  # finding is anchored on outside the compile (ADR-0004's Amendment of
+  # 2026-10-19). A `core.subchart` or `core.map` an expansion placed is
+  # recorded under the composite block, with the member id the compile
+  # emitted the `<invoke>` for kept as `expanded_from`. The param key is not
+  # carried: `StatifierBlocks.Graph` anchors such a reference on the
+  # composite's chrome, because the field it would blame is the member's,
+  # and the member is not on the author's form. A reference the author
+  # placed, a pass-through child's included, has no entry and is unchanged.
+  @spec reanchor_reference(Compiled.child_reference(), expansion()) ::
+          Compiled.child_reference()
+  defp reanchor_reference(%{block_id: block_id} = reference, expansion) do
+    case anchor(expansion, block_id) do
+      nil ->
+        reference
+
+      {composite_id, _config_key} ->
+        reference
+        |> Map.put(:block_id, composite_id)
+        |> Map.put(:expanded_from, block_id)
     end
   end
 

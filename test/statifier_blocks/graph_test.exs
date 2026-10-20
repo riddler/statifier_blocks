@@ -78,6 +78,89 @@ defmodule StatifierBlocks.GraphTest do
       do: StatifierBlocks.GraphTest.emit_finals(context, [{"done", ""}])
   end
 
+  defmodule ConfirmBorrower do
+    @moduledoc """
+    A composite a loan desk drops before a checkout: it runs the email
+    verification child named by its one param and routes on the child's
+    `verified` and `expired` outcomes. The `core.subchart` is an expansion
+    member, so the stored document never holds its id.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "library.confirm_borrower",
+      params: [
+        %{
+          key: "chart",
+          type: :string,
+          label: "Verification",
+          required?: true,
+          default: "email_verification"
+        }
+      ],
+      sentence: "Confirm the borrower through {chart}",
+      palette_entry: %{label: "Confirm borrower", group: "Loans"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params) do
+      [
+        Block.new("core.subchart",
+          id: "verify",
+          config: %{"chart" => params["chart"], "outcomes" => "verified\nexpired"}
+        )
+      ]
+    end
+  end
+
+  defmodule Checkout do
+    @moduledoc """
+    A composite whose expansion holds another composite: the checkout
+    confirms the borrower first, so the subchart is two expansions deep.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "library.checkout",
+      params: [],
+      sentence: "Check the item out",
+      palette_entry: %{label: "Checkout", group: "Loans"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(_params) do
+      [
+        Block.new("library.confirm_borrower",
+          id: "confirm",
+          config: %{"chart" => "email_verification"}
+        )
+      ]
+    end
+  end
+
+  defmodule LoanDesk do
+    @moduledoc """
+    A composite with one pass-through slot: whatever the author drops into
+    it runs inside the desk's group, with its own id.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "library.loan_desk",
+      params: [],
+      slots: [%{name: "body", to: {"desk", "body"}, label: "At the desk"}],
+      sentence: "At the loan desk",
+      palette_entry: %{label: "Loan desk", group: "Loans"},
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(_params),
+      do: [Block.new("core.group", id: "desk", slots: %{"body" => [], "interrupts" => []})]
+  end
+
   @doc false
   def emit_finals(context, outcomes) do
     finals =
@@ -93,7 +176,10 @@ defmodule StatifierBlocks.GraphTest do
     Palette.new(
       Map.merge(Palette.core_types(), %{
         "library.verify_email" => VerifyEmail,
-        "library:issue_card" => IssueCard
+        "library:issue_card" => IssueCard,
+        "library.confirm_borrower" => ConfirmBorrower,
+        "library.checkout" => Checkout,
+        "library.loan_desk" => LoanDesk
       })
     )
   end
@@ -613,6 +699,129 @@ defmodule StatifierBlocks.GraphTest do
     end
   end
 
+  describe "a reference a composite's expansion placed (ADR-0004's Amendment of 2026-10-19)" do
+    # The `core.subchart` is the composite's member `blk_CONFIRM_verify`,
+    # which the stored loan document does not hold: the reference is
+    # recorded under the composite block, the member kept beside it.
+    #
+    # sabotage: made `reanchor_reference/2` answer the reference unchanged -
+    # it is recorded under the member id and this goes red (verified)
+    test "is recorded under the composite block, the member kept as expanded_from" do
+      document = loan(confirm("blk_CONFIRM"))
+
+      assert %{references: [reference]} = compile!(document).interface
+
+      assert reference == %{
+               block_id: "blk_CONFIRM",
+               expanded_from: "blk_CONFIRM_verify",
+               document_id: "email_verification",
+               routes_on: ["verified", "expired"],
+               reads: [],
+               unresolved: nil
+             }
+
+      assert "blk_CONFIRM" in stored_ids(document)
+      refute "blk_CONFIRM_verify" in stored_ids(document)
+    end
+
+    # The renaming revision drops `verified`, which the member routes on.
+    # The finding names a block the stored document holds, on its chrome,
+    # with no config key: the member's `outcomes` field is not on the
+    # composite's form, and neither is the `chart` param's for an outcome.
+    #
+    # sabotage: made `Graph`'s `anchor/2` ignore `expanded_from` - the
+    # finding is anchored `{:config, "blk_CONFIRM", "outcomes"}` and this
+    # goes red (verified)
+    test "a forward finding on it is anchored on the composite block, with no config key" do
+      document = loan(confirm("blk_CONFIRM"))
+      resolver = resolver(%{published() | "email_verification" => stored_child(@child_next)})
+
+      assert [
+               %Finding{
+                 anchor: {:block, "blk_CONFIRM"},
+                 source: :graph,
+                 severity: :error,
+                 message: message
+               }
+             ] = Graph.check(compile!(document), resolver)
+
+      assert message =~ ~s("verified")
+      assert "blk_CONFIRM" in stored_ids(document)
+    end
+
+    # sabotage: made `Graph`'s `anchor/2` ignore `expanded_from` - the
+    # chart finding is anchored on a field and this goes red (verified)
+    test "an unresolvable child of it is anchored on the composite block too" do
+      resolver = resolver(Map.delete(published(), "email_verification"))
+
+      assert [%Finding{anchor: {:block, "blk_CONFIRM"}, source: :graph, severity: :error}] =
+               Graph.check(compile!(loan(confirm("blk_CONFIRM"))), resolver)
+    end
+
+    # sabotage: made `reanchor_reference/2` answer the reference unchanged -
+    # the reverse finding names the member id and this goes red (verified)
+    test "a reverse finding on it is anchored on the composite block and names the parent" do
+      parent = compile!(loan(confirm("blk_CONFIRM")))
+
+      assert [
+               {"book_checkout",
+                %Finding{anchor: {:block, "blk_CONFIRM"}, source: :graph, message: message}}
+             ] = Graph.consumers_broken(stored_child(@child_next), [parent])
+
+      assert message =~ ~s("book_checkout")
+    end
+
+    # Two expansions deep, the reference climbs to the outermost composite,
+    # the one the author placed, as E3's walk does for a compile finding.
+    #
+    # sabotage: made `reanchor_reference/2` take the expansion index entry
+    # one level up instead of `anchor/2`'s walk - the reference is recorded
+    # under the inner composite `blk_CHECKOUT_confirm` and this goes red
+    # (verified)
+    test "inside a nested composite it is recorded under the outermost composite" do
+      document = loan(Block.new("library.checkout", id: "blk_CHECKOUT"))
+
+      assert %{
+               references: [
+                 %{block_id: "blk_CHECKOUT", expanded_from: "blk_CHECKOUT_confirm_verify"}
+               ]
+             } = compile!(document).interface
+
+      resolver = resolver(%{published() | "email_verification" => stored_child(@child_next)})
+
+      assert [%Finding{anchor: {:block, "blk_CHECKOUT"}}] =
+               Graph.check(compile!(document), resolver)
+
+      assert "blk_CHECKOUT" in stored_ids(document)
+    end
+
+    # A `core.subchart` the author dropped into a pass-through slot keeps
+    # its own id (T3), so its reference and its findings are its own.
+    #
+    # sabotage: made `reanchor_reference/2`'s no-entry arm mark the
+    # reference `expanded_from` too - the author's subchart is anchored on
+    # its chrome and this goes red (verified)
+    test "a subchart the author placed in a pass-through slot keeps its own anchor" do
+      verify =
+        Block.new("core.subchart",
+          id: "blk_VERIFY",
+          config: %{"chart" => "email_verification", "outcomes" => "verified\nexpired"}
+        )
+
+      document =
+        loan(Block.new("library.loan_desk", id: "blk_DESK", slots: %{"body" => [verify]}))
+
+      assert %{references: [reference]} = compile!(document).interface
+      refute Map.has_key?(reference, :expanded_from)
+      assert reference.block_id == "blk_VERIFY"
+
+      resolver = resolver(%{published() | "email_verification" => stored_child(@child_next)})
+
+      assert [%Finding{anchor: {:config, "blk_VERIFY", "outcomes"}}] =
+               Graph.check(compile!(document), resolver)
+    end
+  end
+
   # -- documents ---------------------------------------------------------
 
   defp published do
@@ -674,6 +883,22 @@ defmodule StatifierBlocks.GraphTest do
       id: Keyword.get(opts, :id, "patron_registration")
     )
   end
+
+  # A checkout at the loan desk: one block, the composite under test.
+  defp loan(block) do
+    Document.new(Block.new("core.sequence", id: "blk_LOAN", slots: %{"body" => [block]}),
+      id: "book_checkout"
+    )
+  end
+
+  defp confirm(id),
+    do: Block.new("library.confirm_borrower", id: id, config: %{"chart" => "email_verification"})
+
+  # Every block id the stored document holds, before any expansion.
+  defp stored_ids(%Document{root: root}), do: block_ids(root)
+
+  defp block_ids(%Block{id: id, slots: slots}),
+    do: [id | Enum.flat_map(slots, fn {_name, blocks} -> Enum.flat_map(blocks, &block_ids/1) end)]
 
   defp card_map(collect_type) do
     Block.new("core.map",

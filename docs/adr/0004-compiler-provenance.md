@@ -4693,3 +4693,131 @@ They are met here, not edited.
 None.
 
 Filed with `sb-2g62`.
+
+## Amendment (2026-10-19): E3 reaches a graph finding on a reference a composite's expansion placed
+
+**Status: proposed (2026-10-19, bead `sb-ti1o`).** A decision record merges
+at proposed and is flipped to accepted by a separate request through the
+same `docs/adr/` gate once the code that implements it has shipped in a
+published version. Additive: no text above this line is edited, no line
+above it is removed, and the head `Status:` line at `:3` is not extended.
+Every decision above stands as printed except where this section says how
+E3 reads for a finding raised outside the compile. It adds clauses `K1` to
+`K3`.
+
+**Why this is an Amendment and not a Note.** E3 (`:2926`) decides where a
+finding inside an expansion is reported, and closes the question with "It is
+never reported against the expanded block. There is no third arm."
+(`:2975`). It was written for the findings the compile itself raises. A
+`:graph` finding is raised outside the compile, by
+`StatifierBlocks.Graph`, over the `interface` the compile records (H1, and
+`ADR-0008`'s Amendment of 2026-09-22, A5), and that Amendment names the gap
+in its own "Not decided by the Amendment" list: a reference placed by a
+composite's expansion "is recorded under its expansion member's block id",
+and "re-anchoring such a finding onto the composite block is not decided
+here" (`docs/adr/0008-durable-subchart-handler.md:846-853`). Saying where
+that finding is reported extends what E3 decides, so it is an Amendment.
+The arm it takes, the composite block with no config key, was decided by the
+conductor under a standing consent, 2026-10-19; the param arm was not taken,
+for the reason K2 gives.
+
+Code cites below that name code already on `main` were read at `173705c`
+and carry their anchors; the code this Amendment adds is cited by anchor
+alone. Re-locate by anchor, not by number.
+
+### Context
+
+At `173705c` the compile reads the resolved tree after expansion to build
+`interface` (`lib/statifier_blocks/compiler.ex:3277`, `defp interface/2`),
+so a `core.subchart` or `core.map` an expansion placed is recorded with the
+member's own id (`compiler.ex:3309`, `defp reference/3`). A member's id is
+minted from the composite's, `composite_id <> "_" <> local_id`
+(`lib/statifier_blocks/composite.ex:55`, "The ids the subtree mints"), and
+the stored document does not hold it. `StatifierBlocks.Graph` anchors every
+finding `{:config, block_id, key}` on that recorded id
+(`lib/statifier_blocks/graph.ex:211`, `defp finding/4`), so a `:graph`
+finding on such a reference names a block the author cannot see, select or
+edit: the case E3's last bullet rules out for a compile finding.
+
+E3's re-anchoring runs over the compile's own findings
+(`compiler.ex:1244`, `defp reanchor/2`), through the expansion index the
+Resolve stage builds (`compiler.ex:655`, `@typep expansion`) and the walk to
+the outermost composite (`compiler.ex:1269`, `defp anchor/2`; Correction 1
+of the Note of 2026-09-07, `:3129`). Before this Amendment it did not touch
+`interface`.
+
+### K1. The interface records an expanded reference under the outermost composite
+
+When the expansion index has an entry for a reference's block, the
+reference is recorded with `block_id` set to the composite block that
+`anchor/2`'s walk reaches, the outermost one, which the stored document
+holds. It gains one key, `expanded_from`, holding the member's id: the
+block the compile emitted the `<invoke>` for. Its other fields are what the
+member's reference always held.
+
+A reference whose block has no entry in the index is recorded exactly as
+before, with no `expanded_from` key. That is every block the stored
+document holds, a child the author placed in a pass-through slot included:
+T3 (`:3318`) leaves such a child's findings on that child, and its
+reference stays its own the same way.
+
+The rewrite runs where the index is in hand, after the Chart stage, in the
+success clause of `defp reanchor/2`, through `defp reanchor_reference/2`
+(`lib/statifier_blocks/compiler.ex`). The key is declared optional on
+`StatifierBlocks.Compiled`'s `t:child_reference/0`.
+
+### K2. A finding about such a reference is anchored on the composite block, with no config key
+
+`StatifierBlocks.Graph` anchors a finding about a reference that carries
+`expanded_from` as `{:block, block_id}`, on the composite block's chrome,
+for each of the three rules A5 names (an unresolvable child, an outcome the
+child does not declare, a done-data key the child does not declare) and for
+the unchecked read's `:warning`, in both `check/2` and
+`consumers_broken/2`. This is E3's second arm, "reported against the
+composite block with `config_key: nil`", applied to a `:graph` finding. The
+choice is made in `Graph`'s private `anchor/2`
+(`lib/statifier_blocks/graph.ex`), which `defp finding/4` calls.
+
+The first arm, the param the param map names, is not taken. A `:graph`
+rule names a field of the member (`chart`, `outcomes`, `collect_type`), and
+a finding on a minted member has no field the editor shows. The param map
+says which param fed a member what it was given; it does not say which
+param a rule about the member's child is to blame on, and an outcome the
+child stopped declaring is no param's doing. So the finding goes on the
+composite's chrome whether or not the param map names a param for the
+member.
+
+Message, severity and source are unchanged, and so is A5's anchor for a
+reference the stored document holds.
+
+### K3. The third arm stays shut
+
+No `:graph` finding is anchored on an expanded block. The member's id is
+kept, at the engineer's altitude, as `expanded_from`, as E3 keeps the
+provenance map's member spans: the author's surface says which block they
+placed, and the reference still says which member carries the `<invoke>`.
+
+### What this Amendment does not decide
+
+- How the editor renders a `:graph` finding: A5 left that undecided, and
+  this section adds no rendering.
+- Anything about the provenance map, the SCXML or chart identity:
+  `interface` is not emitted (H1), and K1 rewrites none of them.
+- Whether a composite's param map should one day name a param for a
+  `:graph` rule; K2 records why it does not now.
+
+### Consequences
+
+- A host that changes nothing sees one changed answer: for a
+  `core.subchart` or `core.map` a composite's expansion placed, the
+  recorded reference's `block_id` is the outermost composite's and it
+  carries `expanded_from`, and a `:graph` finding about it is anchored
+  `{:block, composite_id}`. Every other reference and finding is unchanged.
+- The tests under "a reference a composite's expansion placed" in
+  `test/statifier_blocks/graph_test.exs` pin K1 to K3: the recorded
+  reference, the forward, unresolvable and reverse findings, the climb to
+  the outermost composite, and a pass-through child keeping its own anchor.
+- `ADR-0008`'s "Not decided by the Amendment" bullet on a reference inside
+  a composite's expansion is answered here; that record is not edited.
+
+Filed with `sb-ti1o`.

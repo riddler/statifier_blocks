@@ -59,7 +59,9 @@ defmodule StatifierBlocks.Compiled do
   amendment of 2026-09-22, A1's parent side).
 
     * `block_id` - the referencing block, which a finding about this
-      reference is anchored on.
+      reference is anchored on. For a block a composite's expansion placed,
+      the outermost composite block the stored document holds (ADR-0004's
+      Amendment of 2026-10-19).
     * `document_id` - the document the block names in its `chart` field.
     * `routes_on` - the child outcomes the block routes on: a
       `core.subchart`'s `outcomes` as
@@ -76,13 +78,19 @@ defmodule StatifierBlocks.Compiled do
       is `[]`. `nil` for the inline arm, an absent or blank `collect_type`, a
       name read against a supplied `:datamodel` and every `core.subchart`
       (ADR-0008's second amendment of 2026-09-22, U2).
+    * `expanded_from` - present only on a reference a composite's expansion
+      placed: the expanded member's block id, the one the compile emitted
+      the `<invoke>` for, which the stored document does not hold. A finding
+      about such a reference is anchored on the composite block's chrome
+      rather than on a field.
   """
   @type child_reference :: %{
-          block_id: Block.id(),
-          document_id: String.t(),
-          routes_on: [String.t()],
-          reads: [String.t()],
-          unresolved: String.t() | nil
+          required(:block_id) => Block.id(),
+          required(:document_id) => String.t(),
+          required(:routes_on) => [String.t()],
+          required(:reads) => [String.t()],
+          required(:unresolved) => String.t() | nil,
+          optional(:expanded_from) => Block.id()
         }
 
   @typedoc """
