@@ -54,6 +54,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       |> Enum.map(&List.last/1)
     end
 
+    # Every palette row's markup, keyed by its type or recipe name.
+    defp row_chunks(html) do
+      ~r{<li\b([^>]*data-(?:type|recipe)="[^"]+"[^>]*)>(.*?)</li>}s
+      |> Regex.scan(html)
+      |> Enum.map(fn [_whole, attrs, inner] ->
+        [_, key] = Regex.run(~r/data-(?:type|recipe)="([^"]+)"/, attrs)
+        {key, inner}
+      end)
+    end
+
+    defp with_mark(html) do
+      for {key, inner} <- row_chunks(html), inner =~ ~s(data-bare-host-icon="), do: key
+    end
+
     defp types_in(document, block_id, slot) do
       document
       |> Document.blocks()
@@ -155,6 +169,67 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert %Document{} = changed = latest_document()
         assert types_in(changed, "blk_group", "body") == ["core.send"]
         assert types_in(changed, "blk_group", "interrupts") == ["core.on_event"]
+      end
+    end
+
+    describe "a host icon component at an armed gap (sb-7ix5)" do
+      # The report was a palette whose rows went blank once a "+" armed it.
+      # The shipped set and the first host component never reproduced it, so
+      # this drives a second, differently shaped host component (a bare svg:
+      # no wrapper, no use of the tile class) at every armed gap the probe
+      # document offers, and holds that no row the slot still offers loses the
+      # mark it had in the unarmed palette.
+      #
+      # Sabotage: the palette row passing `nil` as the icon name whenever the
+      # palette is armed (`@allowed` set) - every armed row loses its mark and
+      # the per-gap assertion goes red.
+      test "every row an armed slot accepts keeps its icon", %{conn: conn} do
+        {:ok, view, html} =
+          mount_editor(conn,
+            document: InsertProbeFixtures.document(),
+            palette: InsertProbeFixtures.palette(),
+            datamodel: InsertProbeFixtures.datamodel(),
+            icon: :bare
+          )
+
+        marked = with_mark(html)
+        assert length(marked) > 10, "the scan saw the unarmed palette's icons"
+
+        gaps = [
+          {"blk_GRP", "body", 0},
+          {"blk_GRP", "interrupts", 0},
+          {"blk_ROOT", "body", 0},
+          {"blk_ROOT", "body", 1},
+          {"blk_ROOT", "body", 2}
+        ]
+
+        for {parent, slot, index} <- gaps do
+          armed = arm(view, parent, slot, index)
+          where = "#{parent}/#{slot}/#{index}"
+          offered = Enum.map(row_chunks(armed), &elem(&1, 0))
+
+          assert Enum.any?(offered, &(&1 in marked)), "#{where} offers rows with icons"
+
+          for key <- offered, key in marked do
+            assert key in with_mark(armed), "#{where}: #{key} lost the host's mark"
+          end
+
+          for {key, inner} <- row_chunks(armed) do
+            assert inner =~ ~s(class="sb-palette__icon"), "#{where}: #{key} lost its tile"
+          end
+        end
+      end
+
+      # Sabotage: the same armed-only `nil` icon name - the recipe row loses its
+      # mark as well.
+      test "a recipe row at an armed gap keeps its icon too", %{conn: conn} do
+        {:ok, view, _html} =
+          mount_editor(conn, document: recipe_document(), palette: Palette.core(), icon: :bare)
+
+        armed = arm(view, "blk_group", "body", 0)
+
+        assert armed =~ ~s(data-recipe="deadline")
+        assert "deadline" in with_mark(armed), "the recipe row keeps the host's mark"
       end
     end
   end

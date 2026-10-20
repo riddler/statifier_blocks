@@ -64,7 +64,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          header: session["header"],
          host_tabs: session["host_tabs"] || [],
          feed: session["feed"] || [],
-         icon: session["icon"] && (&host_icon/1),
+         icon: icon_component(session["icon"]),
          on_select?: session["on_select"] != false,
          on_collapse?: session["on_collapse"] != false,
          profile: session["profile"],
@@ -204,6 +204,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </span>
       """
     end
+
+    # A second host icon component, deliberately unlike `host_icon/1`: no
+    # wrapper span and no use of the `class` the tile hands it, just a bare
+    # svg that carries its name in a data attribute. `icon: :bare` mounts it.
+    defp bare_icon(assigns) do
+      ~H"""
+      <svg data-bare-host-icon={@name} viewBox="0 0 16 16"><path d="M2 8h12" /></svg>
+      """
+    end
+
+    defp icon_component(nil), do: nil
+    defp icon_component(:bare), do: &bare_icon/1
+    defp icon_component(_other), do: &host_icon/1
 
     defp notifier(nil), do: nil
     defp notifier(pid), do: fn document -> send(pid, {:document, document}) end
