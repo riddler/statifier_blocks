@@ -23,10 +23,10 @@ learned rides into the module as data (below, `@dropped` is exactly that).
 
 ## The rule
 
-Take a card-processing document. Your datamodel document redefined the `card`
-record and dropped `risk_band` from it, so every config value in every open
-draft that still reads that member now reads a path the datamodel no longer
-covers. The compiler will not say so - the member's absence is a fact about
+Take a patron registration document. Your datamodel document redefined the
+`patron` record and dropped `age_band` from it, so every config value in every
+open draft that still reads that member now reads a path the datamodel no
+longer covers. The compiler will not say so - the member's absence is a fact about
 your datamodel, not about this document - but an author looking at the branch
 should see it.
 
@@ -36,16 +36,16 @@ exists. The rule is the half that finds them in the document:
 ```elixir
 defmodule MyApp.Rules.RecordCoverage do
   @moduledoc """
-  Warns where a config value still reads a member the `card` record lost.
+  Warns where a config value still reads a member the `patron` record lost.
   """
 
   @behaviour StatifierBlocks.DocumentValidator
 
   alias StatifierBlocks.Document
 
-  # What redefining `card` dropped. Derived from your own datamodel diff and
+  # What redefining `patron` dropped. Derived from your own datamodel diff and
   # baked in here as data, because the callback itself is pure.
-  @dropped ~w(risk_band)
+  @dropped ~w(age_band)
 
   @impl true
   def validate_document(%Document{} = document) do
@@ -55,7 +55,7 @@ defmodule MyApp.Rules.RecordCoverage do
   defp block_findings(block) do
     for {key, value} <- block.config, member <- @dropped, reads?(value, member) do
       {{:config, block.id, key},
-       "`card.#{member}` is no longer a member of the `card` record, so this " <>
+       "`patron.#{member}` is no longer a member of the `patron` record, so this " <>
          "reads a path the datamodel no longer covers", severity: :warning}
     end
   end
@@ -164,10 +164,11 @@ value, delete a step, and your warning is still on the block it was on -
 recomputed each time from the document as it now reads, which also means it
 goes away by itself the moment the author fixes what it objected to.
 
-`StatifierBlocks.Editor.HostValidatorRefreshTest` is that claim as a test: the
-rule above, a mounted editor over the card-processing document, a config edit
-on an unrelated block, the same row still in the drawer afterwards, and then
-the row gone once the block it objected to is deleted.
+`StatifierBlocks.Editor.HostValidatorRefreshTest` pins that claim as a test.
+It drives a rule of the same shape as the one above over a fixture document
+from another domain, not over a patron registration document: a mounted
+editor, a config edit on an unrelated block, the same row still in the drawer
+afterwards, and then the row gone once the block it objected to is deleted.
 
 ## What this channel will not do
 
