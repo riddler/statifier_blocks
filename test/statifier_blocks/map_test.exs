@@ -52,7 +52,7 @@ defmodule StatifierBlocks.MapTest do
     # Sabotage: made @body_lead 47; this went red. Reverted from a copy.
     test "each teaching document's graph equals its checked-in regenerated fixture" do
       for key <- MapFixtures.keys() do
-        assert graph(key) == MapFixtures.host_graph!(key), key
+        assert graph(key) == MapFixtures.fixture_graph!(key), key
       end
     end
   end
