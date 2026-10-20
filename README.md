@@ -27,8 +27,9 @@ non-engineer will author by hand. This package is the authoring layer:
   shape rather than free-form XML. The document, not the chart, is the source
   of truth that gets edited and stored, one revision per saved edit. The
   four nouns this README uses - document, revision, chart, execution - have
-  one job each; [Document, revision, chart and
-  execution](#document-revision-chart-and-execution) says which.
+  one job each; [Documents, revisions, charts and
+  executions](docs/explanation/documents-revisions-charts-and-executions.md)
+  says which.
 
 - **A one-way SCXML compiler.** The compiler turns a block document into an
   SCXML chart that Statifier can run, and carries a provenance map so a
@@ -91,55 +92,11 @@ with a step that must finish within a bound or the flow continues - are in
   - [Config fields and the handlers this package ships](docs/reference/config-fields-and-handlers.md) -
     where a config field's value is stored, and the invoke handler the package
     ships for `core.subchart`
+- Understand
+  - [Documents, revisions, charts and executions, and why blocks compile to a chart](docs/explanation/documents-revisions-charts-and-executions.md) -
+    what a document, a revision, a chart and an execution each are, how a
+    compile joins a revision to its chart, and why the compile runs one way
 
-## Document, revision, chart and execution
-
-This README uses four nouns, each with one job, the same four the engine's
-[persistence guide](https://github.com/riddler/statifier-ex/blob/main/docs/persistence.md#the-four-nouns)
-uses:
-
-| Noun | What it is here | Identity | Owner | Changes when |
-|---|---|---|---|---|
-| **Document** | The block tree an author edits, under one stable id | The `id` of a `%StatifierBlocks.Document{}` | The host's authoring store | Never |
-| **Revision** | One saved edit of a document | The document id plus the ordinal in the document's `revision` field | The host's revision store; this package stores nothing | Every saved edit |
-| **Chart** | The SCXML `StatifierBlocks.Compiler.compile/3` emits for a revision | `chart_identity`: the SHA-256 hash of the SCXML bytes, plus the document id as `:chart_name` and a `nil` `:chart_version` (`Statifier.Machine.Identity`, the engine's ADR-0052) | The engine | A byte of the SCXML changes |
-| **Execution** | One instance of a chart a host starts | A minted id, pinned to one chart identity | The persistence package or the host | Re-pinned only by an explicit migration |
-
-`StatifierBlocks.CompilationRecord` is the bridge between a revision and a
-chart. Every successful compile returns one as `compiled.record`: the
-revision's side (`document_id`, `revision`, and `document_hash`, the
-SHA-256 of the revision's canonical bytes), the compile inputs (`palette_hash`,
-`compiler_version`) and the chart's side (`chart_identity`). Neither hash
-is derived from the other - two revisions that differ only in `metadata`
-compile to one chart - so the compile emits the join as a fact. An
-execution names its chart identity; looking the record up by
-`chart_identity` gives back the document, and the revision or revisions
-that compiled to that chart.
-
-Three more parts of the compiled artifact, in the same nouns:
-
-- **`accepts`** is a document field, so each revision carries its own
-  list: the names of the external events it declares its chart accepts.
-  The compile passes it through onto `compiled.accepts` and
-  `compiled.record.accepts` without judging it. It never reaches the
-  SCXML, so a revision that edits only `accepts` compiles to the same
-  chart. Whether the chart can take each name is a publish-time question
-  (step 4 below).
-- **`interface`** on `%StatifierBlocks.Compiled{}` is what the chart offers
-  a parent that invokes it - the outcomes and done-data keys its root
-  declares - and what it relies on from each document it names. A child is
-  named by document id, never by chart: which revision, and so which
-  chart, an id resolves to is the host's resolver's answer. `interface`
-  adds nothing to the SCXML and is not on the record.
-- **`StatifierBlocks.Publish.findings/3`** judges one revision - the
-  document the host is about to publish - and emits no SCXML, so it runs before
-  any chart for that revision exists. The host refuses to publish the
-  revision on an `:error`.
-
-Publishing makes a chart and its record, and touches no execution. An
-execution already running stays pinned to the chart it started on; moving
-it to another chart is an explicit migration a host performs, never a side
-effect of a publish, and nothing in this package migrates one.
 
 ## At publish
 

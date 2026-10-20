@@ -75,6 +75,7 @@ defmodule StatifierBlocks.MixProject do
         "docs/theming.md",
         "docs/typing-a-palette.md",
         "docs/reference/config-fields-and-handlers.md",
+        "docs/explanation/documents-revisions-charts-and-executions.md",
         "docs/block-level-flow-graph.md",
         "docs/upgrading.md",
         "CHANGELOG.md"
@@ -97,7 +98,10 @@ defmodule StatifierBlocks.MixProject do
           "docs/typing-a-palette.md"
         ],
         Reference: ["docs/reference/config-fields-and-handlers.md"],
-        Explanation: ["docs/block-level-flow-graph.md"],
+        Explanation: [
+          "docs/explanation/documents-revisions-charts-and-executions.md",
+          "docs/block-level-flow-graph.md"
+        ],
         Upgrading: ["docs/upgrading.md"]
       ],
       # Without this the first hexdocs is one flat list of ~50 modules, which
@@ -163,7 +167,7 @@ defmodule StatifierBlocks.MixProject do
       # file a host validates against, and it is named narrowly rather than as
       # `priv` so a later addition under priv/ has to say that it ships.
       files:
-        ~w(lib/statifier_blocks lib/statifier_blocks.ex priv/schemas assets mix.exs README.md LICENSE CHANGELOG.md docs/describing-a-document.md docs/upgrading.md docs/guides/build-and-compile.md docs/guides/register-block-types.md docs/guides/flow-patterns.md docs/guides/migrating-documents-0.27-to-0.34.md docs/host-validators.md docs/profiles.md docs/theming.md docs/typing-a-palette.md docs/reference/config-fields-and-handlers.md docs/block-level-flow-graph.md),
+        ~w(lib/statifier_blocks lib/statifier_blocks.ex priv/schemas assets mix.exs README.md LICENSE CHANGELOG.md docs/describing-a-document.md docs/upgrading.md docs/guides/build-and-compile.md docs/guides/register-block-types.md docs/guides/flow-patterns.md docs/guides/migrating-documents-0.27-to-0.34.md docs/host-validators.md docs/profiles.md docs/theming.md docs/typing-a-palette.md docs/reference/config-fields-and-handlers.md docs/explanation/documents-revisions-charts-and-executions.md docs/block-level-flow-graph.md),
       links: %{
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
