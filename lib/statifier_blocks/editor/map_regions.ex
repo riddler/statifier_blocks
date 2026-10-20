@@ -49,6 +49,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     id is not stamped. The drawing goes into a child marked
     `data-map-canvas`, which LiveView leaves alone (`phx-update="ignore"`).
 
+    A document with drafts (steps not wired into the flow) gets them in a
+    drawer under the drawing, laid out apart from the path. If that layout
+    alone fails, the hook leaves the drawer out and draws the path; only a
+    path that cannot be laid out draws the error pane. A read-only page draws
+    the drawer closed, and the hook keeps no state of its own (ADR-0005
+    decision 7f), so an opened drawer closes again whenever the graph
+    changes and the drawing is replaced; the list still holds every draft.
+
     ## The description region
 
     `description_region/1` renders the region with `aria-live="polite"`, so

@@ -1,12 +1,14 @@
 // Test driver for assets/js/statifier_blocks_map.js, run by
 // StatifierBlocks.MapLayoutTest through Node.
 //
-//   node statifier_blocks_map_layout.mjs <graph.json> [editable] [reject-second]
+//   node statifier_blocks_map_layout.mjs <graph.json> [editable] [reject-second] [reject-shelf]
 //
 // `reject-second` makes elkjs reject the second layout it is asked for,
 // as a layout that fails would. `first` in what it prints is every box of
 // the first layout elkjs answered, in absolute coordinates, so a test can
-// tell which layout was drawn.
+// tell which layout was drawn. `reject-shelf` makes elkjs reject the layout
+// of the drafts shelf alone (the graph whose id ends in "/drafts"), as a
+// shelf that fails to lay out would.
 //
 // Lays the graph out through the real elkjs and draws it with the hook's
 // own drawMap/3, then prints one JSON object: what was drawn ("map" or
@@ -46,12 +48,16 @@ const events = {select: "select-row", insert: "insert-open"}
 const flags = process.argv.slice(3)
 const editable = flags.includes("editable")
 const rejectSecond = flags.includes("reject-second")
+const rejectShelf = flags.includes("reject-shelf")
 
 let layouts = 0
 const first = {}
 const realLayout = ELK.prototype.layout
 ELK.prototype.layout = async function (...args) {
   layouts += 1
+  if (rejectShelf && String(args[0] && args[0].id).endsWith("/drafts")) {
+    throw new Error("the shelf layout was refused")
+  }
   if (rejectSecond && layouts === 2) throw new Error("the second layout was refused")
   const laid = await realLayout.apply(this, args)
   if (layouts === 1) {
