@@ -972,6 +972,53 @@ defmodule StatifierBlocks.GraphTest do
     end
   end
 
+  describe "the unconditioned arm a dead route leaves (ADR-0008's Note of 2026-10-19)" do
+    # The next child revision renames `verified` to `confirmed`. The
+    # parent still lists `verified` first, with a hold in that outcome's
+    # slot, and `check/2` refuses the route. Compiled all the same, the
+    # parent's last `done.invoke` arm is unconditioned and targets the
+    # `verified` slot's child, so the child's `confirmed` answer, which no
+    # conditioned arm names, runs the `verified` path.
+    #
+    # sabotage: made `Subchart`'s private `default_target/1` answer the
+    # last routed outcome's target - the arm targets the `expired` final
+    # and this goes red (verified); dropped the unconditioned arm from
+    # `done_transitions/2` - the last arm is `expired`'s conditioned one
+    # and this goes red (verified)
+    test "an answer no listed outcome names takes the first listed outcome's path" do
+      parent = compile!(held_registration())
+      resolver = resolver(%{published() | "email_verification" => stored_child(@child_next)})
+
+      assert [
+               %Finding{
+                 anchor: {:config, "blk_VERIFY", "outcomes"},
+                 source: :graph,
+                 severity: :error,
+                 message: message
+               }
+             ] = Graph.check(parent, resolver)
+
+      assert message =~ ~s("verified")
+
+      arms = Regex.scan(~r/<transition[^>]*event="done\.invoke"[^>]*>/, parent.scxml)
+
+      assert List.last(arms) == [~s(<transition event="done.invoke" target="s_blk_HOLD"/>)]
+      refute parent.scxml =~ "'confirmed'"
+
+      {:ok, machine} = Statifier.compile(parent.scxml)
+      {machine_state, _effects} = Statifier.initialize(machine)
+
+      event =
+        Statifier.Event.external("done.invoke.blk_VERIFY",
+          data: %{"outcome" => "confirmed"},
+          invokeid: "blk_VERIFY"
+        )
+
+      assert {:ok, machine_state, _effects} = Statifier.send_event(machine_state, event)
+      assert Statifier.active_leaf_states(machine_state) == MapSet.new(["s_blk_HOLD__waiting"])
+    end
+  end
+
   # -- documents ---------------------------------------------------------
 
   defp published do
@@ -1031,6 +1078,23 @@ defmodule StatifierBlocks.GraphTest do
 
     Document.new(Block.new("core.sequence", id: "blk_SEQ", slots: %{"body" => body}),
       id: Keyword.get(opts, :id, "patron_registration")
+    )
+  end
+
+  # A registration that verifies the patron's email address and, on
+  # `verified`, holds for 48 hours before going on.
+  defp held_registration do
+    hold = Block.new("core.wait", id: "blk_HOLD", config: %{"duration" => "48h"})
+
+    verify =
+      Block.new("core.subchart",
+        id: "blk_VERIFY",
+        config: %{"chart" => "email_verification", "outcomes" => "verified\nexpired"},
+        slots: %{"on_verified" => [hold]}
+      )
+
+    Document.new(Block.new("core.sequence", id: "blk_SEQ", slots: %{"body" => [verify]}),
+      id: "patron_registration"
     )
   end
 

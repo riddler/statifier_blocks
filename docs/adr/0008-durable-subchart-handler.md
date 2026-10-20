@@ -1219,3 +1219,82 @@ the answers are U2's and U3's, word for word, with `unresolved_reason`
 - `changelog.d/sb-z0j3.md`, under "Changed", records the change for a host.
 
 Filed with `sb-z0j3`.
+
+## Note (2026-10-19): where a `core.subchart`'s unconditioned `done.invoke` arm leads, and what a run that reaches it past a dead route means
+
+A dated Note, not an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. It gathers into one place three facts the
+Amendment of 2026-09-22 above and the code already hold, for the case
+where a parent still routes on an outcome its child no longer declares.
+Nothing the compiler emits changes with it. Every code cite below is by
+anchor, read at `ff533a9`; re-locate by anchor, not by number.
+
+### Where the arm leads
+
+`StatifierBlocks.Core.Subchart`'s private `done_transitions/2`
+(`lib/statifier_blocks/core/subchart.ex`) emits one conditioned
+`done.invoke` arm per outcome the author listed in `outcomes`, as
+`child_outcomes/1` reads the field (`done` when the author listed none),
+in the order listed, and then one unconditioned arm, last. Its private
+`default_target/1` gives that last arm the target of the **first outcome
+the author listed**: the state of the first block in that outcome's
+`on_<outcome>` slot when the slot holds one, and that outcome's `<final>`
+when it does not. So an answer that no listed outcome names runs the first
+listed outcome's path, the steps in its slot included, and the
+`assign_to` write rides on that arm as on every other `done.invoke` arm.
+`emit/2`'s `@doc` says the same ("it lands on the **first declared
+outcome**"), and so does the Context of the Amendment of 2026-09-22 above,
+which reads `default_target/1` at an earlier SHA.
+
+### What publish refuses
+
+`StatifierBlocks.Graph.check/2` (`lib/statifier_blocks/graph.ex`), through
+its private `pair/3`, answers one `:error` finding, source `:graph`,
+anchored `{:config, block_id, "outcomes"}`, for every outcome a parent's
+`core.subchart` routes on that the child it names does not declare,
+`error` exempt. `Graph.consumers_broken/2` answers the same finding,
+paired with the parent's document id, when the child is republished. A
+host publish step that refuses on `:error` findings therefore refuses a
+route on an outcome the child does not declare in both directions (A2,
+A3).
+
+### What a run that reaches the arm past a dead route means
+
+The arm is taken only by an answer no conditioned arm names: the child
+finished with a name the parent does not list. A route on an outcome the
+child does not declare does not by itself lead there; it leaves that
+route's own arm dead. The two meet when a child outcome is renamed or
+dropped and the parent still lists the old name: the child's new answer
+finds no conditioned arm and takes the unconditioned one, into the old
+first-listed path, while the old name is exactly the route `check/2` and
+`consumers_broken/2` refuse. A run that reaches the arm while its parent
+still routes on an outcome the child does not declare therefore means a
+document published without that check: the parent published without
+`check/2` against that child, or the child republished without
+`consumers_broken/2` against that parent.
+
+That is not every way to reach the arm. A child that adds an outcome its
+parent has no arm for passes both checks, as the Amendment of 2026-09-22
+decides under "How it stands beside the two existing checks", and reaches
+the same arm with every check run; its signal is
+`StatifierBlocks.ViewModel.outcome_findings/3`'s `:warning`
+(`lib/statifier_blocks/view_model.ex`), which answers only when the host
+supplies `chart_outcomes` naming that child, and this Note changes nothing
+about it.
+
+### Worked example: patron registration
+
+The parent `patron_registration` has the `core.subchart` block
+`blk_VERIFY`, whose `chart` is `email_verification` and whose `outcomes`
+lists `verified` and then `expired`; its `on_verified` slot holds a
+48-hour `core.wait`, `blk_HOLD`. The next `email_verification` revision
+renames `verified` to `confirmed`. `check/2` against that revision returns
+one `:error` anchored `{:config, "blk_VERIFY", "outcomes"}` naming
+`verified`. Compiled all the same, the parent's last `done.invoke` arm is
+unconditioned and targets `s_blk_HOLD`, no conditioned arm names
+`confirmed`, and a `done.invoke` carrying the outcome `confirmed` enters
+the hold on the `verified` path. The test "an answer no listed outcome
+names takes the first listed outcome's path" in
+`test/statifier_blocks/graph_test.exs` pins each of those steps.
+
+Filed with `sb-ckm8`.
