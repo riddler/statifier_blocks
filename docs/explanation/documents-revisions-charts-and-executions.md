@@ -80,8 +80,8 @@ Three more parts of what a compile returns belong to the same nouns:
   `compiled.record.accepts` without judging it. It never reaches the
   SCXML, so a revision that edits only `accepts` compiles to the same
   chart. Whether the chart can take each name is a publish-time question,
-  answered by the fourth check in the README's
-  [At publish](../../README.md#at-publish) section.
+  answered by the fourth check in
+  [How to publish a document](../guides/publish-a-document.md).
 - **`interface`** on `%StatifierBlocks.Compiled{}` is what the chart offers
   a parent that invokes it - the outcomes and done-data keys its root
   declares - and what it relies on from each document it names. A child is
@@ -109,5 +109,5 @@ the visitor's execution is not moved to it.
 
 - [How to build a block document and compile it to a chart](../guides/build-and-compile.md)
   shows the compile and its record in running code.
-- [At publish](../../README.md#at-publish) lists the checks a host's publish
-  step makes before it keeps a revision.
+- [How to publish a document](../guides/publish-a-document.md) lists the
+  checks a host's publish step makes before it keeps a revision.

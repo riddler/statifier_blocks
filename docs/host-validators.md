@@ -135,8 +135,9 @@ severity you gave it. An `:error` from either call refuses the publish; a
 over one and shows it rather than dropping it; an `:info` never refuses. In a
 patron registration document, a rule that flags a `core.assign` writing
 `patron.card_number` as `:warning` leaves the publish to you, the same rule
-returning `:error` refuses it, and the undeclared-path advisory this package
-raises on the same field stays `:info` whatever your rule says.
+returning `:error` refuses it, and in a document that declares no datamodel
+roots of its own the undeclared-path advisory this package raises on the
+same field stays `:info` whatever your rule says.
 
 A validator finding is about that revision, never about a chart. The chart
 is what `compile/3` emits once nothing refuses, identified by its
@@ -146,9 +147,8 @@ document id, `revision` and `document_hash` to the chart it compiled to.
 Publishing the revision makes that chart; it touches no execution, and an
 execution already running stays on the chart it started on. The publish
 step, its registries and its revision store are yours; this package ships
-the functions. The README's
-[At publish](https://github.com/riddler/statifier_blocks/blob/main/README.md#at-publish)
-section is the whole check.
+the functions. [How to publish a document](guides/publish-a-document.md)
+is the whole check.
 
 ## It survives the author's next edit
 
@@ -176,9 +176,9 @@ afterwards, and then the row gone once the block it objected to is deleted.
   the package defaults to is `:warning` for that reason, and even `:error`
   from a host rule is a rendering, not a refusal, to the compile. (At
   publish the severity is read: see [Where the finding shows](#where-the-finding-shows).)
-  If your rule is really about
-  whether one block's config is well-formed, it belongs in that block type's
-  `validate_config/1`, where a refusal is available.
+  If your rule is really about whether one block's config is well-formed,
+  it belongs in that block type's `validate_config/1`, where a refusal is
+  available.
 - **It is not validated back at you.** A return that is not a list, and a
   member that is neither `{anchor, message}` nor `{anchor, message, opts}`, is
   read as no finding rather than raised at. A `:severity` outside the enum
