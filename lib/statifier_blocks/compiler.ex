@@ -3261,7 +3261,8 @@ defmodule StatifierBlocks.Compiler do
   # With no `:datamodel` there are no declarations to resolve a type name
   # against, and that is told apart from a datamodel that declares nothing:
   # ADR-0008's second amendment of 2026-09-22 (U2) marks a name left
-  # unresolved for that reason alone.
+  # unresolved for that reason, and its Amendment of 2026-10-19 (V1) marks
+  # a name a supplied datamodel does not declare too, saying which reason.
   @typep declarations :: StatifierDatamodel.Declarations.t() | :no_datamodel
 
   @spec interface(Resolved.t(), keyword()) :: Compiled.interface()
@@ -3314,15 +3315,18 @@ defmodule StatifierBlocks.Compiler do
        when is_binary(chart) do
     collect_type = Map.get(config, "collect_type")
 
-    [
-      %{
-        block_id: id,
-        document_id: chart,
-        routes_on: [],
-        reads: required_members(collect_type, declarations),
-        unresolved: unresolved(collect_type, declarations)
-      }
-    ]
+    reference = %{
+      block_id: id,
+      document_id: chart,
+      routes_on: [],
+      reads: required_members(collect_type, declarations),
+      unresolved: nil
+    }
+
+    case unresolved(collect_type, declarations) do
+      nil -> [reference]
+      {name, reason} -> [Map.merge(reference, %{unresolved: name, unresolved_reason: reason})]
+    end
   end
 
   defp reference(_module, _block, _declarations), do: []
@@ -3348,20 +3352,34 @@ defmodule StatifierBlocks.Compiler do
 
   defp required_members(_absent, _declarations), do: []
 
-  # ADR-0008's second amendment of 2026-09-22, U2: the name a
-  # `collect_type` gives when the compile had no `:datamodel` to resolve it
-  # against, so the keys it would read are unchecked rather than absent. A
-  # blank name is an absent `collect_type`, and a name read against a
-  # supplied datamodel is not marked, whatever the lookup found.
-  @spec unresolved(term(), declarations()) :: String.t() | nil
-  defp unresolved(name, :no_datamodel) when is_binary(name) do
+  # ADR-0008's second amendment of 2026-09-22, U2, and its Amendment of
+  # 2026-10-19, V1: the name a `collect_type` gives when it resolves to no
+  # members, so the keys it would read are unchecked rather than absent,
+  # with the reason - the compile had no `:datamodel` to resolve it against,
+  # or the supplied one does not declare it. A blank name is an absent
+  # `collect_type`, and a name the supplied datamodel declares is not
+  # marked.
+  @spec unresolved(term(), declarations()) ::
+          {String.t(), Compiled.unresolved_reason()} | nil
+  defp unresolved(name, declarations) when is_binary(name) do
     case String.trim(name) do
       "" -> nil
-      trimmed -> trimmed
+      trimmed -> unresolved_reason(trimmed, declarations)
     end
   end
 
   defp unresolved(_collect_type, _declarations), do: nil
+
+  @spec unresolved_reason(String.t(), declarations()) ::
+          {String.t(), Compiled.unresolved_reason()} | nil
+  defp unresolved_reason(name, :no_datamodel), do: {name, :no_datamodel}
+
+  defp unresolved_reason(name, declarations) do
+    case StatifierDatamodel.Declarations.fetch(declarations, name) do
+      {:ok, _declaration} -> nil
+      :error -> {name, :not_declared}
+    end
+  end
 
   @spec lint([InvokeTypes.emitted()], keyword()) :: [Finding.t()]
   defp lint(emitted, opts) do

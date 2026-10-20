@@ -1066,3 +1066,156 @@ None reverses what the Amendment decides.
   (`:687-697`).
 
 Filed with `sb-qiox`.
+
+## Amendment (2026-10-19): a `core.map` `collect_type` name that a supplied `:datamodel` does not declare is reported unchecked too
+
+**Status: proposed (2026-10-19, bead `sb-z0j3`, which also carries the
+implementation).** A decision record merges at proposed and is flipped to
+accepted by a separate request through the same `docs/adr/` gate once the
+code that implements it has shipped in a published version. Additive: no
+text above this line is edited, no line above it is removed, and the head
+`Status:` line at `:3` is not extended. Every decision above stands as
+printed except where the section "What this changes above" below says how
+U2 and U3 read now. It adds clauses `V1` to `V3`.
+
+**Why this is an Amendment and not a Note.** The Amendment on an
+unresolvable `collect_type` name lists this case first under "What this
+does not decide" (`:964-966`): for a name a supplied `:datamodel` does not
+declare, "`unresolved` stays `nil` for it, `reads` is `[]`, and the key
+check passes it without a finding, as before". Saying what is reported for
+it decides what that list left open, and it changes what `interface`
+records and what `StatifierBlocks.Graph` answers, so by this directory's
+README it is an Amendment. That the answer is the same `:graph` `:warning`,
+never an `:error` and never a refusal, was ruled by the operator,
+2026-09-22.
+
+Code cites below that name code already on `main` were read at `453cad5`
+and carry their anchors; the code this Amendment adds is cited by anchor
+alone. Re-locate by anchor, not by number.
+
+### Context
+
+At `453cad5` the compile reads a supplied `:datamodel` into declarations in
+the private `interface/2` (`lib/statifier_blocks/compiler.ex:3307`). For a
+`core.map` reference the private `reference/3`'s `FanOut` clause
+(`compiler.ex:3352`) takes `reads` from the private `required_members/2`,
+whose name clause asks `StatifierDatamodel.Declarations.fetch/2` and
+answers `[]` when the lookup fails (`compiler.ex:3381`), and takes
+`unresolved` from the private `unresolved/2`, which marks a name only under
+`:no_datamodel` (`compiler.ex:3396`). So a name the supplied datamodel does
+not declare records `reads: []` and `unresolved: nil`, and the private
+`pair/3` in `lib/statifier_blocks/graph.ex` (`graph.ex:186`) judges that
+empty `reads` and finds nothing: both `check/2` (`graph.ex:122`) and
+`consumers_broken/2` (`graph.ex:160`) pass the read as if it had been
+checked. That is the key check that "looks complete and is not" which the
+earlier Amendment's Context names for a compile without `:datamodel`
+(`:890-891`), reached the other way.
+
+### V1. `interface` marks a name a supplied `:datamodel` does not declare, and says why a name is marked
+
+For a `core.map` reference whose `collect_type` is a name that is not blank,
+`unresolved` is the trimmed name in two cases: the compile was given no
+`:datamodel` (U2's case, the option absent or `nil`), or it was given one
+and that datamodel's declarations do not hold the name. It is `nil` when the
+supplied datamodel declares the name, and in U2's other cases as U2 lists
+them. When `unresolved` is set, `reads` is `[]`, as A1 and U2 already have
+it.
+
+Every reference whose `unresolved` is set gains one key,
+`unresolved_reason`: `:no_datamodel` for U2's case and `:not_declared` for
+a name the supplied datamodel does not declare. A reference whose
+`unresolved` is `nil` does not carry it. The key is declared optional on
+`StatifierBlocks.Compiled`'s `t:child_reference/0`, and its values are the
+type `t:unresolved_reason/0` beside it. The private `unresolved/2` in
+`lib/statifier_blocks/compiler.ex` decides both fields. Like the rest of
+`interface`, they are a function of the compile's inputs, the `:datamodel`
+option included, and add nothing to the SCXML.
+
+### V2. Both directions report it with U3's `:warning`, and its message tells the two reasons apart
+
+Where U3 judges a reference whose `unresolved` is set, it now does so for
+both reasons: forward in `check/2`, reverse in `consumers_broken/2`, one
+`StatifierBlocks.Finding` with source `:graph` and severity `:warning`, on
+U3's anchor (or, for a reference a composite's expansion placed, on the one
+`ADR-0004`'s Amendment of 2026-10-19 gives it), in place of the key rule.
+It is never an `:error`, so a host that refuses on `:error` findings does
+not refuse on it, and neither direction refuses a parent or a child because
+of it.
+
+The message names the type name and says the done-data keys read there are
+unchecked, as U3's does, and then gives the reason: for `:no_datamodel`,
+the wording U3 describes, that the name "names a type that is not
+resolvable without :datamodel"; for `:not_declared`, that it "names a type
+the supplied :datamodel does not declare". In the reverse direction it
+names the parent, as A5 and U3 have it. The reason is read in `Graph`'s
+private `unchecked/1` (`lib/statifier_blocks/graph.ex`).
+
+### V3. A reference recorded without the reason reads as U2's
+
+A host may store `%Compiled{}` beside the document (`ADR-0004` decision 1),
+so an artifact compiled before V1 carries `unresolved` with no
+`unresolved_reason`. Before V1 `unresolved` was set for one reason only, so
+`Graph` reads such a reference as `:no_datamodel` and answers it exactly as
+it answered before: the same `:warning` and the same message.
+
+### What this changes above
+
+- U2's "It is `nil` in every other case: ... a name read against a supplied
+  `:datamodel`" (`:902-905`) now reads "a name the supplied `:datamodel`
+  declares": V1 marks the undeclared one. U2's other cases stand.
+- U3's message sentence (`:914-916`) holds for `:no_datamodel`; V2 gives
+  `:not_declared` the second wording. Its severity, anchor, pairing and the
+  rest of its paragraph stand, and so does "With `:datamodel` supplied
+  nothing changes" (`:924-926`) for a name the datamodel declares.
+- The earlier Amendment's first "What this does not decide" bullet
+  (`:964-966`) is decided here. That Amendment is not edited.
+- A1's "unknown is not disagreement" (`:580`) stands: an undeclared name
+  contributes no keys and no `:error`, as U2's unresolved name does.
+
+### Worked example: patron registration
+
+The parent `patron_registration` has the `core.map` block `blk_CARDS` that
+runs the child `library_card_issue` once per household member, with
+`collect_type` the name `library.card_receipt`, as in the earlier
+Amendment's example. The host's datamodel declares the type
+`library.loan_receipt` and not `library.card_receipt`. Compiled with that
+datamodel, the reference reads nothing, `unresolved` is
+`"library.card_receipt"` and `unresolved_reason` is `:not_declared`.
+`check/2` against the published child returns one `:warning` anchored
+`{:config, "blk_CARDS", "collect_type"}` whose message says
+`"library.card_receipt"` names a type the supplied `:datamodel` does not
+declare, and `consumers_broken/2` returns it paired with
+`"patron_registration"`, naming that parent. Compiled without `:datamodel`,
+the answers are U2's and U3's, word for word, with `unresolved_reason`
+`:no_datamodel`. Compiled with a datamodel that declares
+`library.card_receipt`, the keys are checked as A1 and A2 say and no
+`:warning` is produced.
+
+### What this does not decide
+
+- How the editor renders a `:graph` `:warning`, which the first
+  Amendment's "What this does not decide" leaves undecided (`:687-697`).
+- Whether a type name that a supplied datamodel does not declare should
+  refuse anywhere: it is a `:warning` here and nothing else changes.
+- Anything about done-data types, which stay `ADR-0013` decision 4's
+  dormant advisory.
+
+### Consequences
+
+- A host that passes a `:datamodel` declaring every `collect_type` name its
+  documents use, or that passes none, sees no changed answer, except the
+  new `unresolved_reason` key beside an `unresolved` U2 already set. A host
+  whose `:datamodel` does not declare such a name now sees, per judged
+  pair, one `:warning` where it saw nothing, and clears it by declaring the
+  name or by writing the `collect_type` inline.
+- The tests in `test/statifier_blocks/graph_test.exs` pin V1 to V3: "a
+  collect_type name a supplied :datamodel does not declare is marked
+  unresolved, with its reason", "a read the supplied :datamodel does not
+  declare is a warning that says so", "a read the supplied :datamodel does
+  not declare is a warning paired with the parent", "a read left unchecked
+  without :datamodel keeps its message in both directions" and "a
+  reference stored without unresolved_reason reads as having had no
+  :datamodel".
+- `changelog.d/sb-z0j3.md`, under "Changed", records the change for a host.
+
+Filed with `sb-z0j3`.

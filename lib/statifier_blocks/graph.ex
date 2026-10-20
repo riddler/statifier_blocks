@@ -40,10 +40,13 @@ defmodule StatifierBlocks.Graph do
        `collect_type` field. Only presence is checked: whether a declared
        key has the type the parent expects stays
        `StatifierBlocks.BlockType.agrees?/3`'s dormant advisory. A
-       `collect_type` that is a type name the parent was compiled with no
-       `:datamodel` to resolve has no keys to check: the reference records
-       the name as `unresolved`, and the pair reports the read as unchecked
-       rather than passing it (ADR-0008's second amendment of 2026-09-22).
+       `collect_type` that is a type name the parent could not resolve has
+       no keys to check: the reference records the name as `unresolved`,
+       and the pair reports the read as unchecked rather than passing it.
+       That is a name the parent was compiled with no `:datamodel` to
+       resolve (ADR-0008's second amendment of 2026-09-22), or one the
+       `:datamodel` it was compiled with does not declare (ADR-0008's
+       Amendment of 2026-10-19).
 
   The other direction of the outcome rule - a child outcome the parent has
   **no** arm for, such as one a child revision adds - is not refused here.
@@ -67,12 +70,14 @@ defmodule StatifierBlocks.Graph do
   document id, and its message names that document.
 
   Every finding is severity `:error` but one: a done-data read left
-  unchecked because the parent's `collect_type` names a type and the parent
-  was compiled without `:datamodel` is a `:warning` on the block's
-  `collect_type` field. The host chose not to pass that option, which is
-  not the author's error, so a publish step refusing on `:error` findings
-  does not refuse on it; passing `:datamodel`, or writing the
-  `collect_type` inline, lets the keys be checked.
+  unchecked because the parent's `collect_type` names a type the parent's
+  compile could not resolve is a `:warning` on the block's `collect_type`
+  field, and its message says which of the two reasons it was: the parent
+  was compiled without `:datamodel`, or with one that does not declare the
+  name. Either way the keys are unknown rather than in disagreement, so a
+  publish step refusing on `:error` findings does not refuse on it; passing
+  a `:datamodel` that declares the name, or writing the `collect_type`
+  inline, lets the keys be checked.
   """
 
   alias StatifierBlocks.{Compiled, Finding}
@@ -108,8 +113,9 @@ defmodule StatifierBlocks.Graph do
       anchored `{:config, block_id, "collect_type"}`;
     * a `:warning`, when the child resolves and the reference's
       `collect_type` names a type the parent was compiled with no
-      `:datamodel` to resolve, so its keys are unchecked - anchored
-      `{:config, block_id, "collect_type"}`.
+      `:datamodel` to resolve, or one the `:datamodel` it was compiled with
+      does not declare, so its keys are unchecked - anchored
+      `{:config, block_id, "collect_type"}`, its message naming which.
 
   `block_id` is always the parent's referencing block. A reference a
   composite's expansion placed is recorded under the composite block and
@@ -153,7 +159,8 @@ defmodule StatifierBlocks.Graph do
   reference a composite's expansion placed - and its message names the
   parent document. Each is severity `:error`, except a `:warning` on
   `"collect_type"` for a reference whose `collect_type` names a type the
-  parent was compiled with no `:datamodel` to resolve, so its keys are
+  parent was compiled with no `:datamodel` to resolve, or one the
+  `:datamodel` it was compiled with does not declare, so its keys are
   unchecked. The resolver plays no part: both sides are in hand.
   """
   @spec consumers_broken(Compiled.t(), [Compiled.t()]) :: [{String.t(), Finding.t()}]
@@ -181,7 +188,9 @@ defmodule StatifierBlocks.Graph do
   # The two rules A1 names, over one reference and the child's interface,
   # and U3 of ADR-0008's second amendment of 2026-09-22: a read whose keys
   # could not be resolved is reported as unchecked, at `:warning`, in place
-  # of the key rule.
+  # of the key rule. V2 of its Amendment of 2026-10-19 gives the same
+  # finding a message of its own when the reason is a name the supplied
+  # datamodel does not declare.
   @spec pair(Compiled.child_reference(), Compiled.interface(), message()) :: [Finding.t()]
   defp pair(reference, child, message) do
     outcomes =
@@ -195,7 +204,7 @@ defmodule StatifierBlocks.Graph do
       case reference do
         %{unresolved: name} when is_binary(name) ->
           [
-            finding(reference, "collect_type", message.(reference, :unchecked, name),
+            finding(reference, "collect_type", message.(reference, unchecked(reference), name),
               severity: :warning
             )
           ]
@@ -208,6 +217,12 @@ defmodule StatifierBlocks.Graph do
 
     outcomes ++ keys
   end
+
+  # V1 of ADR-0008's Amendment of 2026-10-19: a reference recorded before
+  # `unresolved_reason` existed was marked for the one reason there was.
+  @spec unchecked(Compiled.child_reference()) :: :unchecked | :undeclared
+  defp unchecked(%{unresolved_reason: :not_declared}), do: :undeclared
+  defp unchecked(_no_datamodel), do: :unchecked
 
   @spec unpublished(Compiled.child_reference()) :: Finding.t()
   defp unpublished(reference) do
@@ -234,11 +249,11 @@ defmodule StatifierBlocks.Graph do
 
   defp anchor(%{block_id: block_id}, key), do: {:config, block_id, key}
 
-  @typep message ::
-           (Compiled.child_reference(), :outcome | :key | :unchecked, String.t() -> String.t())
+  @typep kind :: :outcome | :key | :unchecked | :undeclared
 
-  @spec forward_message(Compiled.child_reference(), :outcome | :key | :unchecked, String.t()) ::
-          String.t()
+  @typep message :: (Compiled.child_reference(), kind(), String.t() -> String.t())
+
+  @spec forward_message(Compiled.child_reference(), kind(), String.t()) :: String.t()
   defp forward_message(reference, :outcome, outcome),
     do: ~s("#{reference.document_id}" does not declare the outcome "#{outcome}" routed on here)
 
@@ -249,6 +264,11 @@ defmodule StatifierBlocks.Graph do
     do:
       ~s(the done-data keys read here from "#{reference.document_id}" are unchecked: ) <>
         ~s("#{name}" names a type that is not resolvable without :datamodel)
+
+  defp forward_message(reference, :undeclared, name),
+    do:
+      ~s(the done-data keys read here from "#{reference.document_id}" are unchecked: ) <>
+        ~s("#{name}" names a type the supplied :datamodel does not declare)
 
   @spec reverse_message(String.t()) :: message()
   defp reverse_message(parent_id) do
@@ -264,6 +284,10 @@ defmodule StatifierBlocks.Graph do
       reference, :unchecked, name ->
         ~s(the done-data keys "#{parent_id}" reads from "#{reference.document_id}" are ) <>
           ~s(unchecked: "#{name}" names a type that is not resolvable without :datamodel)
+
+      reference, :undeclared, name ->
+        ~s(the done-data keys "#{parent_id}" reads from "#{reference.document_id}" are ) <>
+          ~s(unchecked: "#{name}" names a type the supplied :datamodel does not declare)
     end
   end
 end

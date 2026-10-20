@@ -219,6 +219,18 @@ defmodule StatifierBlocks.GraphTest do
     ]
   }
 
+  # A host datamodel that declares a loan receipt and not the card receipt
+  # the registration's `core.map` names.
+  @loan_receipt_datamodel %{
+    "types" => [
+      %{
+        "name" => "library.loan_receipt",
+        "kind" => "shape",
+        "fields" => [%{"name" => "due_on", "type" => "string", "required?" => true}]
+      }
+    ]
+  }
+
   @card_members [
     %{"name" => "card_number", "type" => "string", "required?" => true},
     %{"name" => "branch", "type" => "string"}
@@ -368,6 +380,40 @@ defmodule StatifierBlocks.GraphTest do
 
       assert %{references: [_verify, %{unresolved: nil}]} =
                compile!(registration(cards: "  ")).interface
+    end
+
+    # ADR-0008's Amendment of 2026-10-19, V1: a name the supplied datamodel
+    # does not declare is marked as one with no datamodel is, and each mark
+    # says which reason it is; a name the datamodel declares is not marked.
+    #
+    # sabotage: made `unresolved_reason/2` answer `nil` when the lookup
+    # fails - the undeclared name is not marked and this goes red (verified)
+    test "a collect_type name a supplied :datamodel does not declare is marked unresolved, with its reason" do
+      named = registration(cards: " library.card_receipt ")
+
+      assert %{
+               references: [
+                 _verify,
+                 %{
+                   reads: [],
+                   unresolved: "library.card_receipt",
+                   unresolved_reason: :not_declared
+                 }
+               ]
+             } = compile!(named, datamodel: @loan_receipt_datamodel).interface
+
+      assert %{references: [_verify, %{unresolved: "library.card_receipt"} = empty]} =
+               compile!(named, datamodel: %{"types" => []}).interface
+
+      assert empty.unresolved_reason == :not_declared
+
+      assert %{references: [_verify, %{unresolved_reason: :no_datamodel}]} =
+               compile!(named).interface
+
+      assert %{references: [_verify, %{unresolved: nil} = declared]} =
+               compile!(named, datamodel: @card_receipt_datamodel).interface
+
+      refute Map.has_key?(declared, :unresolved_reason)
     end
 
     # sabotage: read the child side from `donedata_type/1` only under
@@ -564,6 +610,80 @@ defmodule StatifierBlocks.GraphTest do
     # sabotage: judged a reference whose child is unpublished against an
     # empty interface too, in `check/2` - a `:warning` joins the `:error`
     # and this goes red (verified)
+    # ADR-0008's Amendment of 2026-10-19, V2: a name the supplied datamodel
+    # does not declare is the same `:warning` on the same field, never an
+    # `:error`, and its message says the datamodel does not declare it
+    # rather than that there was none.
+    #
+    # sabotage: made `defp unchecked/1` answer `:unchecked` for every
+    # reference - the message says there was no `:datamodel` and this goes
+    # red (verified)
+    test "a read the supplied :datamodel does not declare is a warning that says so" do
+      parent =
+        compile!(registration(cards: "library.card_receipt"), datamodel: @loan_receipt_datamodel)
+
+      assert [
+               %Finding{
+                 anchor: {:config, "blk_CARDS", "collect_type"},
+                 source: :graph,
+                 severity: :warning,
+                 message: message
+               }
+             ] = Graph.check(parent, resolver(published()))
+
+      assert message ==
+               ~s(the done-data keys read here from "library_card_issue" are unchecked: ) <>
+                 ~s("library.card_receipt" names a type the supplied :datamodel does not declare)
+    end
+
+    # A compile without `:datamodel` answers exactly as it did before the
+    # Amendment of 2026-10-19, in both directions.
+    #
+    # sabotage: made the forward `:unchecked` message read as the
+    # `:undeclared` one - the no-datamodel message changes and this goes
+    # red (verified)
+    test "a read left unchecked without :datamodel keeps its message in both directions" do
+      parent = compile!(registration(cards: "library.card_receipt"), id: "patron_registration")
+
+      assert [%Finding{severity: :warning, message: forward}] =
+               Graph.check(parent, resolver(published()))
+
+      assert forward ==
+               ~s(the done-data keys read here from "library_card_issue" are unchecked: ) <>
+                 ~s("library.card_receipt" names a type that is not resolvable without :datamodel)
+
+      assert [{"patron_registration", %Finding{severity: :warning, message: reverse}}] =
+               Graph.consumers_broken(issue_card(), [parent])
+
+      assert reverse ==
+               ~s(the done-data keys "patron_registration" reads from "library_card_issue" ) <>
+                 ~s(are unchecked: "library.card_receipt" names a type that is not resolvable ) <>
+                 ~s(without :datamodel)
+    end
+
+    # An artifact a host stored before `unresolved_reason` existed carries
+    # `unresolved` alone, and it was set for the one reason there was then.
+    #
+    # sabotage: made `defp unchecked/1`'s fallback answer `:undeclared` -
+    # the stored reference reads as undeclared and this goes red (verified)
+    test "a reference stored without unresolved_reason reads as having had no :datamodel" do
+      parent = compile!(registration(cards: "library.card_receipt"))
+
+      stored =
+        update_in(parent.interface.references, fn references ->
+          Enum.map(references, &Map.delete(&1, :unresolved_reason))
+        end)
+
+      assert [_card] = stored.interface.references |> Enum.filter(& &1.unresolved)
+
+      assert [%Finding{severity: :warning, message: message}] =
+               Graph.check(stored, resolver(published()))
+
+      assert message ==
+               ~s(the done-data keys read here from "library_card_issue" are unchecked: ) <>
+                 ~s("library.card_receipt" names a type that is not resolvable without :datamodel)
+    end
+
     test "an unpublished child of an unresolved reference is the chart error alone" do
       parent = compile!(registration(cards: "library.card_receipt"))
       resolver = resolver(Map.delete(published(), "library_card_issue"))
@@ -696,6 +816,36 @@ defmodule StatifierBlocks.GraphTest do
 
       checked = compile!(named, id: "patron_registration", datamodel: @card_receipt_datamodel)
       assert Graph.consumers_broken(issue_card(), [checked]) == []
+    end
+
+    # ADR-0008's Amendment of 2026-10-19, V2, reverse: the undeclared name's
+    # `:warning` is paired with the parent, names it, and says the supplied
+    # datamodel does not declare the name.
+    #
+    # sabotage: made the reverse `:undeclared` message read as the
+    # `:unchecked` one - the message says there was no `:datamodel` and this
+    # goes red (verified)
+    test "a read the supplied :datamodel does not declare is a warning paired with the parent" do
+      parent =
+        compile!(registration(cards: "library.card_receipt"),
+          id: "patron_registration",
+          datamodel: @loan_receipt_datamodel
+        )
+
+      assert [
+               {"patron_registration",
+                %Finding{
+                  anchor: {:config, "blk_CARDS", "collect_type"},
+                  source: :graph,
+                  severity: :warning,
+                  message: message
+                }}
+             ] = Graph.consumers_broken(issue_card(), [parent])
+
+      assert message ==
+               ~s(the done-data keys "patron_registration" reads from "library_card_issue" ) <>
+                 ~s(are unchecked: "library.card_receipt" names a type the supplied :datamodel ) <>
+                 ~s(does not declare)
     end
   end
 

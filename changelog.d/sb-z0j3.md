@@ -1,0 +1,3 @@
+### Changed
+
+- A `core.map` whose `collect_type` names a type the compile's `:datamodel` does not declare is now marked `unresolved` in the compiled `interface`, with a new `unresolved_reason` (`:not_declared`, or `:no_datamodel` for a compile without `:datamodel`), and `StatifierBlocks.Graph.check/2` and `consumers_broken/2` report its done-data read as unchecked with the same `:graph` `:warning` a compile without `:datamodel` gets, its message saying the supplied datamodel does not declare the name; before, the read passed without a finding. It is never an `:error`, so a publish step refusing on errors does not refuse on it.

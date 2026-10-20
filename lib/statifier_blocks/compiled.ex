@@ -73,11 +73,17 @@ defmodule StatifierBlocks.Compiled do
       members - its inline arm, or a name the compile's `:datamodel`
       declares. A `core.subchart` reads none, so `[]`.
     * `unresolved` - the `collect_type` name, trimmed, of a `core.map` whose
-      `collect_type` is a name the compile was given no `:datamodel` to
-      resolve: the keys it reads are then unchecked, not absent, and `reads`
-      is `[]`. `nil` for the inline arm, an absent or blank `collect_type`, a
-      name read against a supplied `:datamodel` and every `core.subchart`
-      (ADR-0008's second amendment of 2026-09-22, U2).
+      `collect_type` is a name the compile could not resolve: it was given
+      no `:datamodel` (ADR-0008's second amendment of 2026-09-22, U2), or
+      the `:datamodel` it was given does not declare the name (ADR-0008's
+      Amendment of 2026-10-19, V1). The keys it reads are then unchecked,
+      not absent, and `reads` is `[]`. `nil` for the inline arm, an absent
+      or blank `collect_type`, a name the supplied `:datamodel` declares and
+      every `core.subchart`.
+    * `unresolved_reason` - present exactly when `unresolved` is set: which
+      of the two it was, `t:unresolved_reason/0`. A reference recorded
+      before this key existed and carrying `unresolved` reads as
+      `:no_datamodel`, the only case that set `unresolved` then.
     * `expanded_from` - present only on a reference a composite's expansion
       placed: the expanded member's block id, the one the compile emitted
       the `<invoke>` for, which the stored document does not hold. A finding
@@ -90,8 +96,17 @@ defmodule StatifierBlocks.Compiled do
           required(:routes_on) => [String.t()],
           required(:reads) => [String.t()],
           required(:unresolved) => String.t() | nil,
+          optional(:unresolved_reason) => unresolved_reason(),
           optional(:expanded_from) => Block.id()
         }
+
+  @typedoc """
+  Why a reference's `collect_type` name is `unresolved` (ADR-0008's
+  Amendment of 2026-10-19, V1): `:no_datamodel` when the compile was given
+  no `:datamodel`, `:not_declared` when the one it was given does not
+  declare the name.
+  """
+  @type unresolved_reason :: :no_datamodel | :not_declared
 
   @typedoc """
   The document's side of the parent/child interface (A1, A5).
