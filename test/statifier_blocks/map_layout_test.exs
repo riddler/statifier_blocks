@@ -1387,6 +1387,28 @@ defmodule StatifierBlocks.MapLayoutTest do
       end
     end
 
+    # The shelf is laid out apart from the path, so a shelf that fails to
+    # lay out does not take the path's drawing with it: the path is drawn,
+    # the drawer is left out, and no error pane stands over a map that laid
+    # out. The path alone failing still draws the error pane (the
+    # error-pane tests below).
+    #
+    # Sabotage: put the shelf's layout back in the same try as the path's;
+    # the error pane was drawn and this went red. Reverted from a copy.
+    test "a shelf that fails to lay out leaves the drawer out and draws the path",
+         %{tmp_dir: dir} do
+      graph = BlockMap.graph(shelf_view_model())
+      %{"drawn" => "map", "boxes" => plain} = run(dir, "shelf-ok", graph)
+
+      assert %{"drawn" => "map", "boxes" => boxes, "drafts" => nil, "html" => html} =
+               run(dir, "shelf-refused", graph, "reject-shelf")
+
+      assert boxes == plain
+      assert html =~ "<svg"
+      refute html =~ ~s(data-map-error="true")
+      refute html =~ "data-map-drafts"
+    end
+
     # On a page that can edit, the drawer is drawn open, in the same place,
     # and the shelf's steps are reached as the drawing's are: a click on a
     # box selects it, a "+" arms the insert after it, both under the list's

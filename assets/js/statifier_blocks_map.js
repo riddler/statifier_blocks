@@ -818,9 +818,22 @@ export function renderError(reason) {
     `</div>`
 }
 
+// The shelf laid out on its own, or null when it cannot be. The shelf is a
+// drawer under the path, not part of it, so a shelf that fails to lay out
+// leaves the drawer out and the path drawn; only the path failing draws the
+// error pane.
+async function layoutShelf(graph, drafts, elk) {
+  try {
+    return await layout(draftsGraph(graph, drafts), elk)
+  } catch (_reason) {
+    return null
+  }
+}
+
 // Lays `graph` out and draws the result, or the error pane, into `target`.
 // Resolves to `{drawn: "map", laid, drafts}` with the laid-out graph it
-// drew and the drafts shelf laid out on its own (null without one), or
+// drew and the drafts shelf laid out on its own (null without one, or when
+// the shelf alone failed to lay out), or
 // `{drawn: "error", laid: null, drafts: null}`, so a caller can tell which
 // it drew and read the very positions it drew from. The shelf is laid out
 // apart from the path and drawn in its drawer under it (see "drafts"
@@ -830,7 +843,7 @@ export async function drawMap(target, graph, {elk = elkInstance(), editable = fa
   try {
     const {graph: path, drafts} = withoutDrafts(graph)
     const laid = await layout(path, elk)
-    const shelf = drafts === null ? null : await layout(draftsGraph(graph, drafts), elk)
+    const shelf = drafts === null ? null : await layoutShelf(graph, drafts, elk)
     target.innerHTML = renderSvg(laid, {editable}) + renderDrafts(drafts, shelf, {editable})
     return {drawn: "map", laid, drafts: shelf}
   } catch (reason) {
