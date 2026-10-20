@@ -75,8 +75,9 @@ defmodule StatifierBlocks.Finding do
       `StatifierBlocks.Graph` is its only producer, at `:error` but for
       one `:warning` - a done-data read left unchecked because a type name
       had no `:datamodel` to resolve against (ADR-0008's second amendment
-      of 2026-09-22, U3) - and `from_compiler/2` never produces it: no
-      compile sees a child.
+      of 2026-09-22, U3), or a supplied `:datamodel` does not declare it
+      (ADR-0008's Amendment of 2026-10-19) - and `from_compiler/2` never
+      produces it: no compile sees a child.
   """
   @type source :: :config | :assignability | :resolution | :lint | :compile | :graph
 

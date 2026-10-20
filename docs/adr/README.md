@@ -18,6 +18,7 @@
 | [0006](0006-datamodel-document.md) | The datamodel document is a typed, three-scope declaration, and the declared-path set is its projection | accepted |
 | [0007](0007-block-type-defaults.md) | A block type declares its defaults with `use`, and the leaf invoke step is one declaration | accepted |
 | [0008](0008-durable-subchart-handler.md) | The durable subchart handler answers at dispatch time, not from a pure `start/2`, and its refusal set gains exactly one reason | accepted |
+| [0008 Amendment 2026-10-19](0008-durable-subchart-handler.md#amendment-2026-10-19-a-coremap-collect_type-name-that-a-supplied-datamodel-does-not-declare-is-reported-unchecked-too) | A `core.map` `collect_type` name a supplied `:datamodel` does not declare is marked `unresolved` with an `unresolved_reason`, and both directions of the graph check report it with the same `:warning`, its message telling the two reasons apart | proposed |
 | [0009](0009-fan-out-block-type.md) | Durable fan-out is a new block type, `core.map`, compiling to one invocation whose handler starts N children | accepted |
 | [0010](0010-clock-interrupt-spelling.md) | A clock interrupt is a delayed `core.send` at the head of a group's body caught by a `core.on_event` on its rail, and there is no `core.timeout` | accepted |
 | [0011](0011-typed-environment.md) | Nothing flows between adjacent blocks - a pre-order walk carries an environment from datamodel path to type, and a block declares what it reads and writes there | accepted |
