@@ -7,7 +7,7 @@ stopping the document from compiling.
 The channel is `StatifierBlocks.DocumentValidator`: a module of yours, listed
 on the palette under `:validators`, handed the whole document as authored and
 answering with whatever it objects to.
-[`docs/adr/0005-liveview-editor.md`](adr/0005-liveview-editor.md) clauses `11p`
+[`docs/adr/0005-liveview-editor.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0005-liveview-editor.md) clauses `11p`
 to `11t` are the record; everything below is the moves.
 
 ## Before you start

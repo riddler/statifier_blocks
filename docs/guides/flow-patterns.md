@@ -6,9 +6,9 @@ document you can copy, what Describe and the Map show for it, what a host sees
 when it runs, and where a simpler block does the same job.
 
 Every document on this page is a fixture under
-[`test/fixtures/documents/flow_patterns/`](../../test/fixtures/documents/flow_patterns/),
+[`test/fixtures/documents/flow_patterns/`](https://github.com/riddler/statifier_blocks/blob/main/test/fixtures/documents/flow_patterns/),
 quoted here byte for byte, and
-[`test/statifier_blocks/flow_patterns_guide_test.exs`](../../test/statifier_blocks/flow_patterns_guide_test.exs)
+[`test/statifier_blocks/flow_patterns_guide_test.exs`](https://github.com/riddler/statifier_blocks/blob/main/test/statifier_blocks/flow_patterns_guide_test.exs)
 compiles and runs each one on the current release under the core palette
 (`StatifierBlocks.Palette.core/0`).
 

@@ -4,9 +4,9 @@ How to make `StatifierBlocks.Editor` look like your product without forking it.
 
 The contract is ADR-0005 decision 14 and its 2026-08-28 amendment. This page
 is the how-to; the record is in
-[`docs/adr/0005-liveview-editor.md`](adr/0005-liveview-editor.md), and the
+[`docs/adr/0005-liveview-editor.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0005-liveview-editor.md), and the
 shipped surface is
-[`assets/css/statifier_blocks.css`](../assets/css/statifier_blocks.css), whose
+[`assets/css/statifier_blocks.css`](https://github.com/riddler/statifier_blocks/blob/main/assets/css/statifier_blocks.css), whose
 header comment carries the tier of every token.
 
 ## The rule
