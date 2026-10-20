@@ -59,12 +59,15 @@ defmodule StatifierBlocks.Schema do
   generic block shape. A `core.*` entry takes its definition from
   `definitions/core`, verbatim. Any other entry - a host type, or a host
   module mounted under a `core.` name - takes one generated from its
-  `config_schema/1` and `slots/1` as declared for the config
-  `StatifierBlocks.Palette.new_block/2` builds: each declared field named with
-  its label as `title` and its default as `default`, and typed from its
-  declared field type, with `null` admitted beside it; each declared slot
-  named as a list of blocks. A name the palette does not carry takes the
-  generic block shape alone, as it decodes.
+  `config_schema/1` and `slots/1`: `config_schema(%{})`, as
+  `StatifierBlocks.Palette.new_block/2` asks it, then `slots/1` of the config
+  built from those defaults. Each declared field is
+  named with its label as `title` and its default as `default`, and typed
+  from its declared field type, with `null` admitted beside it; each
+  declared slot named as a list of blocks. A type whose declared field types
+  vary with its config is typed from the `config_schema(%{})` answer alone.
+  A name the palette does not carry takes the generic block shape alone, as
+  it decodes.
 
   A generated definition never carries `required?` into `required`, never
   closes `config` or `slots` to keys it does not name, and never names a
@@ -120,8 +123,8 @@ defmodule StatifierBlocks.Schema do
   palettes answer equal maps. Every document the package admits validates
   against it when every block whose type the palette carries answers `:ok`
   from its `validate_config/1` and holds, in each field its
-  `config_schema/1` declares for the config `Palette.new_block/2` builds, a
-  value the field's type admits.
+  `config_schema/1` declares for `config_schema(%{})`, as
+  `Palette.new_block/2` asks it, a value the field's type admits.
 
       iex> schema = StatifierBlocks.Schema.for_palette(StatifierBlocks.Palette.new())
       iex> {schema["$schema"], Map.has_key?(schema, "$id")}

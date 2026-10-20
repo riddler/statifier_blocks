@@ -121,6 +121,41 @@ defmodule StatifierBlocks.SchemaForPaletteTest do
     def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
   end
 
+  defmodule LoanDesk do
+    @moduledoc false
+    # A library-loan host type whose declared field types depend on its
+    # config: the loan periods a desk offers follow the kind of item, the
+    # "a select's choices can depend on an earlier field's value" case.
+    # config_schema(%{}) declares the book periods.
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def config_schema(config) do
+      [
+        %{
+          key: "item_kind",
+          type: {:select, [{"book", "Book"}, {"media", "Media"}]},
+          label: "Item kind",
+          required?: false,
+          default: "book"
+        },
+        %{
+          key: "loan_period",
+          type: {:select, periods(Map.get(config, "item_kind"))},
+          label: "Loan period",
+          required?: false,
+          default: "21d"
+        }
+      ]
+    end
+
+    defp periods("media"), do: [{"3d", "Three days"}, {"7d", "One week"}]
+    defp periods(_book), do: [{"21d", "Three weeks"}, {"42d", "Six weeks"}]
+
+    @impl true
+    def emit(%Block{id: id}, _context), do: {:ok, {:emitted, id}}
+  end
+
   defmodule StatefulDesk do
     @moduledoc false
     # A `{module, state}` entry: the state names the one field it declares.
@@ -193,6 +228,18 @@ defmodule StatifierBlocks.SchemaForPaletteTest do
     |> Enum.find_value(fn %{"if" => condition, "then" => definition} ->
       if get_in(condition, ["properties", "type", "const"]) == type, do: definition
     end)
+  end
+
+  defp select_choices(declarations, key) do
+    %{type: {:select, choices}} = Enum.find(declarations, &(&1.key == key))
+    choices
+  end
+
+  defp schema_definition_property(palette, type, key) do
+    palette
+    |> Schema.for_palette()
+    |> definition(type)
+    |> get_in(["properties", "config", "properties", key])
   end
 
   defp block_documents do
@@ -609,6 +656,51 @@ defmodule StatifierBlocks.SchemaForPaletteTest do
 
     assert config["manifest"]["anyOf"] == [%{"type" => "null"}, %{"type" => ["string", "array"]}]
     assert config["speed"] == %{"title" => "Speed", "default" => "slow"}
+  end
+
+  # --- a host type whose declarations depend on its config ----------------------
+
+  # Sabotage: HostDefinition's read_fields/1 asking config_schema/1 about
+  # %{"item_kind" => "media"} rather than %{} -> the generated enum holds the
+  # media periods and the book config goes red. Sabotage: FieldType's select
+  # clause answering %{} rather than the enum -> the media config the schema
+  # must refuse is admitted and the refusal goes red.
+  test "the generated definition is read from config_schema(%{}): a config-dependent select is outside the guarantee" do
+    palette = Palette.new(%{"library.loan_desk" => LoanDesk})
+    schema = palette |> Schema.for_palette() |> resolve()
+
+    desk = fn config ->
+      document(%{
+        "id" => "desk",
+        "type" => "library.loan_desk",
+        "type_version" => 1,
+        "config" => config
+      })
+    end
+
+    book = %{"item_kind" => "book", "loan_period" => "21d"}
+    media = %{"item_kind" => "media", "loan_period" => "3d"}
+
+    # Fixture guards: the declared choices follow the config.
+    assert [{"3d", _}, {"7d", _}] = LoanDesk.config_schema(media) |> select_choices("loan_period")
+    assert [{"21d", _}, {"42d", _}] = LoanDesk.config_schema(%{}) |> select_choices("loan_period")
+
+    # A config whose declared choices are the default config's validates.
+    assert package_accepts?(LoanDesk, book)
+    assert validate(schema, desk.(book)) == :ok
+
+    # A media config: the binding check and validate_config/1 accept it, and
+    # the schema, generated from config_schema(%{}), refuses it.
+    assert BlockType.field_type_findings(LoanDesk, media) == []
+    assert package_accepts?(LoanDesk, media)
+    assert {:ok, _document} = Document.from_json(JSON.encode!(desk.(media)))
+    assert {:error, [_ | _]} = validate(schema, desk.(media))
+
+    # The generated enum is the default config's.
+    loan_period =
+      schema_definition_property(palette, "library.loan_desk", "loan_period")
+
+    assert loan_period["anyOf"] == [%{"type" => "null"}, %{"enum" => ["21d", "42d"]}]
   end
 
   # --- degradation --------------------------------------------------------------

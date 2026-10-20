@@ -6,9 +6,10 @@ defmodule StatifierBlocks.Schema.HostDefinition do
   # mounted under a `core.` name.
   #
   # It is read from the entry's declared `config_schema/1` and `slots/1`,
-  # each asked about the config `Palette.new_block/2` builds (the
-  # `config_schema(%{})` defaults) and reached through `Palette.call/4`, so
-  # a `{module, state}` entry is read the way every other caller reads it.
+  # `config_schema(%{})`, as `Palette.new_block/2` asks it, then `slots/1` of
+  # the config built from those defaults. Both are reached through
+  # `Palette.call/4`, so a `{module, state}` entry is read the way every
+  # other caller reads it.
   #
   # Each declared field is typed through `StatifierBlocks.Schema.FieldType`,
   # the one field-type mapping, with `null` admitted beside the fragment,
