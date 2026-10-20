@@ -81,49 +81,10 @@ with a step that must finish within a bound or the flow continues - are in
   - [How to build a block document and compile it to a chart](docs/guides/build-and-compile.md) -
     write two block types, compose a document, compile it and point a running
     position back at its blocks
-
-## Config fields and where their values live
-
-A block type's `config_schema/1` declares the fields the editor renders for
-it. A field's `key` is its **identity**: the DOM id, the form param name, and
-what a `{:config, block_id, key}` finding anchors to. Where the value is
-*stored* is a second, separate question, and a field answers it with an
-optional `value_path` - a list of keys and list indexes from the config root
-down to the value it edits.
-
-Most fields need no path: `key` alone addresses `config[key]`. Some cannot use
-one. `core.branch` keys a condition field by the arm's slot name, because that
-is what a finding has to name, while the condition itself is stored inside the
-ordered `"arms"` list:
-
-```elixir
-alias StatifierBlocks.{BlockType, Core}
-
-config = %{"arms" => [%{"slot" => "arm_approved", "cond" => "budget_remaining > amount"}]}
-
-[field] = Core.Branch.config_schema(config)
-
-field.key
-#=> "arm_approved"
-
-BlockType.value_path(field)
-#=> ["arms", 0, "cond"]
-
-BlockType.fetch_value(config, BlockType.value_path(field))
-#=> {:ok, "budget_remaining > amount"}
-
-BlockType.put_value(config, BlockType.value_path(field), "amount <= 5000")
-#=> %{"arms" => [%{"cond" => "amount <= 5000", "slot" => "arm_approved"}]}
-```
-
-`value_path/1` answers `[key]` for a declaration that declares no path, so a
-caller never branches on which case it has. `fetch_value/2` is total and
-answers `:error` for a path that does not resolve; `put_value/3` writes the
-last segment whether or not a value was already there - an arm with no
-condition yet is exactly the one an author is about to type into - but never
-invents an intermediate map or list a block type did not write. A host block
-type that stores a value somewhere other than a top-level key declares the
-path the same way.
+- Look up
+  - [Config fields and the handlers this package ships](docs/reference/config-fields-and-handlers.md) -
+    where a config field's value is stored, and the invoke handler the package
+    ships for `core.subchart`
 
 ## Registering your own block types
 
@@ -282,7 +243,7 @@ composes its own `validate_config/1` out of the checks the module exports.
 It still only **names** an invoke type. What runs one is a handler the host
 registers separately, per session - the two-registry seam this package
 draws, which `use` does not cross. One type is the exception: see
-"The one handler this package does ship" below.
+[The handlers this package does ship](docs/reference/config-fields-and-handlers.md#the-handlers-this-package-does-ship).
 
 ### A type that stands for a subtree
 
@@ -498,101 +459,6 @@ shape's required fields. This package defines no second read check.
 is the how-to: declaring records and shapes, naming the subject, projecting a
 host schema into the document with the scalar mapping table, and what a host
 re-resolves at publish.
-
-## The handlers this package does ship
-
-The seam above is unchanged: a block type still only **names** an invoke
-type, and the host still registers the handler that runs it, per session.
-`core.subchart` is the one type where that handler is generic enough to
-write once and ship: "start the child chart this block names by document
-id" is the same code in every host, because a subchart's contract
-already fixes both ends of it (`StatifierBlocks.Core.Subchart`'s moduledoc) - a child compiled
-with `child_use: true`, its outcome carried on `<donedata>`, one final per
-outcome. Nothing host-specific is left for a handler to decide except
-*which* chart a document id names - which of the document's revisions the
-child is compiled from - so that is the one thing this handler asks the
-host for.
-
-`use StatifierBlocks.Runtime.Subchart` builds that handler from two
-callbacks a host supplies: `resolve_chart/2`, which turns a document id
-into the revision to start (a `%StatifierBlocks.Document{}`, or a
-refusal), and `palette/0`, the palette the child compiles that revision
-against into the child chart. `handlers/1` turns the resulting module
-into the map `Statifier.Session.start_link/2` expects for `:invoke_handlers`:
-
-```elixir
-defmodule MyApp.Charts do
-  @moduledoc "Resolves a document id to the chart it names."
-
-  use StatifierBlocks.Runtime.Subchart
-
-  alias StatifierBlocks.{Document, Palette}
-
-  @impl true
-  def resolve_chart(document_id, _ctx) do
-    case Map.fetch(document_store(), document_id) do
-      {:ok, %Document{} = document} -> {:ok, document}
-      :error -> :error
-    end
-  end
-
-  @impl true
-  def palette, do: Palette.core()
-
-  defp document_store, do: Application.get_env(:my_app, :charts, %{})
-end
-
-StatifierBlocks.Runtime.Subchart.handlers(MyApp.Charts)
-#=> %{"statifier_blocks:subchart" => MyApp.Charts}
-```
-
-A refusal to run the child surfaces on `error.communication.invoke` with
-one of exactly three reasons: `unknown_document` (the resolver could not
-place the id), `child_compile_findings` (the resolved document failed to
-compile as a child), or `cycle_refused` (the resolver detected a
-cross-document cycle a single-document compile cannot see for itself).
-
-Placing the runtime is the host's job, not this package's: statifier ships
-no `mod:` application callback, so a host that wants `Statifier.Session`
-to run at all - subcharts or not - adds `Statifier.Supervisor` to its own
-supervision tree, then passes `handlers/1`'s map as the `:invoke_handlers`
-option on every `Statifier.Session.start_link/2` call that should run
-subcharts.
-
-### The durable variant
-
-`start/2` staying a pure planning callback is what scopes the handler
-above to the in-memory `Statifier.Session` case: a child that is its own
-durably persisted execution has to record its parent linkage as part of
-starting, and a planning callback performs nothing.
-
-So the durable variant is a **second module**,
-`StatifierBlocks.Runtime.DurableSubchart` (ADR-0008). It takes the same
-two callbacks, refuses for the same reasons, and answers at dispatch time
-instead - `dispatch_fun/1` builds the fun
-`StatifierPersistence.Driver`'s `:dispatch` option takes:
-
-```elixir
-dispatch = StatifierBlocks.Runtime.DurableSubchart.dispatch_fun(MyApp.Charts)
-```
-
-The child then runs as its own persisted execution, linked to the parent's
-execution and invocation and pinned to the child chart's identity, and its
-completion re-enters the
-parent through the driver's own `done.invoke` door long after the process
-that started it is gone. A durable start has one refusal reason the
-in-memory handler cannot have - `child_run_creation_failed` - and the
-driver raises it, since creating the child execution happens after this
-package has answered. Nesting works with no extra wiring; fan-out (one
-invocation, N children) is named by the record and not built.
-
-Which variant runs is the host's session wiring, never the document: the
-same block document compiles to the same bytes either way. A host that
-wires the in-memory module into a durable execution gets a child that does not
-survive the restart the parent was made durable to survive.
-
-Nothing in this package depends on `statifier_persistence`; the durable
-module names no module from it and answers in plain tuples.
 
 ## Document, revision, chart and execution
 
