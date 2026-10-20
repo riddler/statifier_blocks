@@ -434,18 +434,17 @@ defmodule StatifierBlocks.AssetsTest do
       assert default_export(@map_source) == ["StatifierBlocksMap"]
     end
 
-    # The README is where a host copies the registration from, so the shape
-    # it teaches for the Map is held to the entry point above.
-    # Sabotage: rewriting the README's import as the default export's
+    # The mount-the-Map page is where a host copies the registration from, so
+    # the shape it teaches for the Map is held to the entry point above.
+    # Sabotage: rewriting the page's import as the default export's
     # `import { StatifierBlocksMap } from "statifier_blocks"` - a host
     # copying it bundles no Map hook - and this goes red.
-    test "the README teaches the Map hook's own import and its cost" do
-      [_before, section] = "README.md" |> File.read!() |> String.split("\n## Mounting the Map\n")
-      [section | _rest] = String.split(section, "\n## ")
+    test "the mount-the-Map page teaches the Map hook's own import and its cost" do
+      page = File.read!("docs/guides/mount-the-map.md")
 
-      assert section =~ ~s(import { StatifierBlocksMap } from "statifier_blocks/map";)
-      assert section =~ "hooks: { ...StatifierBlocks, StatifierBlocksMap }"
-      assert section =~ "1,606,238 bytes"
+      assert page =~ ~s(import { StatifierBlocksMap } from "statifier_blocks/map";)
+      assert page =~ "hooks: { ...StatifierBlocks, StatifierBlocksMap }"
+      assert page =~ "1,606,238 bytes"
     end
 
     # 1c: the map hook is not "a genuinely self-contained hook with no
