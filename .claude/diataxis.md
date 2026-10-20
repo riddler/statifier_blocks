@@ -33,6 +33,7 @@ contributor_paths:
   - docs/measurements
   - CLAUDE.md
 executed_snippets:
+  - test/statifier_blocks/readme_basic_usage_test.exs
   - test/statifier_blocks/readme_test.exs
   - test/statifier_blocks/readme_registration_test.exs
   - test/statifier_blocks/readme_runtime_test.exs
