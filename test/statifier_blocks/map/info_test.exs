@@ -688,7 +688,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       "slot-label" => "a branch's arms or a parallel's lanes",
       "empty" => "A dashed box saying",
       "empty-text" => "is a place no step fills yet",
-      "caption" => "A one-line caption",
+      "caption" => "A caption on a branch's band",
       "block--selected" => "The selected step's box is outlined",
       "gap" => "a \"+\" at a box's lower right corner",
       "key" => "The key beside the drawing",
