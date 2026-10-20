@@ -11,6 +11,48 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.44.0] 2026-10-19
+
+0.44.0 adds two optional surfaces and checks more before publish. Under
+Added: `core.await` takes an optional `capture` map with
+`core.on_event`'s semantics, and the editor takes an optional
+`advisories` assign through which a host raises findings of its own. The
+changes to existing answers are under Changed:
+`StatifierBlocks.Publish.findings/3` answers an undeclared datamodel path
+at `:error` in a document that declares its own datamodel roots; a
+`StatifierBlocks.Graph` finding on a reference a composite's expansion
+placed is anchored on the composite block, where the compiled
+`interface` now records that reference with `expanded_from`; a
+`core.map` whose `collect_type` the supplied `:datamodel` does not
+declare is reported unchecked, with a new `unresolved_reason`; and the
+Map's how-to-read paragraph, its abandon end, its Finish edge and its
+key's dashed-ring line read new sentences. Under Fixed: a face finding
+on a selected card spans the card, the Expand gesture writes members at
+their type's current version, the read-only config form renders a
+passed `class`, and a drafts shelf that fails to lay out no longer
+blanks the map. 0.44.0 is a minor, because it adds surface and what
+existing functions answer changes. The package gains no Hex dependency.
+
+### Added
+
+- `StatifierBlocks.Editor` takes an optional `advisories` assign: a one-argument function the editor calls with the document on every rebuild, returning `{anchor, message}` or `{anchor, message, opts}` as a `DocumentValidator` does, and each becomes a `:lint` finding at `:warning` unless its `opts` say otherwise, so a host that holds a `core.map`'s child chart can raise a `:warning` on `collect_type` when `BlockType.agrees?/3` says the pair disagrees; `findings_count/3` takes the same function as its `:advisories` option. With the assign unset the editor draws exactly what it drew before.
+- `core.await` takes an optional `capture` map with `core.on_event`'s semantics: each pair writes a value out of the awaited event's `_event.data`, or a `["const", value]` literal, into a datamodel path on the transition the event selects, and the editor draws the same "Capture from the event" rows for it. An await with no `capture` compiles to the same bytes as before; an await that already stored a `capture` key, which was ignored until now, compiles to its assigns, and a malformed one is refused. Since the editor draws those rows for every await, the first time its form posts an edit to an await that holds no `capture`, the block's config gains an empty `capture` map, which compiles to the same bytes as an absent one.
+
+### Changed
+
+- The map's how-to-read paragraph now says a caption sits on a branch's band, or under a group's rules column with its explanation beneath, in place of "a one-line caption".
+- The map's abandon end, the Finish edge into it and the key's dashed-ring line now say an interrupt rule abandons "a group at the end of its flow" in place of "its last step", since a group deeper in the document's tail draws its own abandon end.
+- `StatifierBlocks.Publish.findings/3` answers an undeclared datamodel path at `:error`, not `:info`, when the document declares its own datamodel roots (its `datamodel` key holds an entry), so a host's publish step that refuses on `:error` now refuses such a document; the finding keeps the advisory's anchor, `:lint` source and message, and the editor still shows it at `:info`. A document that declares no roots is unchanged: with only a host-supplied `:datamodel` or `:declare` roots the advisory stays `:info` and refuses nothing, and with nothing declared anywhere there is no advisory.
+- A `StatifierBlocks.Graph` finding on a `core.subchart` or `core.map` that a composite's expansion placed is now anchored `{:block, composite_id}` on the composite block the stored document holds, and the compiled `interface` records that reference under the composite with the expanded member's id as `expanded_from`, in place of the member's id, which the stored document does not hold.
+- A `core.map` whose `collect_type` names a type the compile's `:datamodel` does not declare is now marked `unresolved` in the compiled `interface`, with a new `unresolved_reason` (`:not_declared`, or `:no_datamodel` for a compile without `:datamodel`), and `StatifierBlocks.Graph.check/2` and `consumers_broken/2` report its done-data read as unchecked with the same `:graph` `:warning` a compile without `:datamodel` gets, its message saying the supplied datamodel does not declare the name; before, the read passed without a finding. It is never an `:error`, so a publish step refusing on errors does not refuse on it.
+
+### Fixed
+
+- A drafts shelf that fails to lay out on its own no longer replaces the whole map with the error pane: the drawer is left out and the path is drawn.
+- `Editor.ConfigForm.config_form/1` now renders a `class` a host passes on its read-only form as well as on the editable one, beside the form's own `sb-form sb-form--readonly`.
+- A face finding on a selected card now spans the card's full inner width below the title row, where it had been squeezed to a column about one character wide once the card's controls were revealed.
+- The editor's Expand gesture now writes each member of a composite at its block type's current version, so a member past version 1 (`core.send`, `core.wait`) is stored as authored at that version, instead of being stored at version 1 and migrated on the next compile: with a duration in an accepted spelling the expanded document compiles to the same chart the composite did, and with one in a retired spelling the composite and the expanded document both refuse the same field with the same message.
+
 ## [0.43.1] 2026-10-19
 
 0.43.1 widens the `predicator` requirement so that it admits 9.5: a host
@@ -3886,6 +3928,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.44.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.44.0
 [0.43.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.1
 [0.43.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.0
 [0.42.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.42.1
