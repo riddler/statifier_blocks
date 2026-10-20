@@ -429,13 +429,16 @@ defmodule StatifierBlocks.Map.InfoTest do
 
     # Each end mark says the document finishes there and with which
     # outcome, the solid ring and the dashed one told apart in words; the
-    # edge into an abandon end names the rules that abandon the last step.
+    # edge into an abandon end names the rules that abandon the group.
     # No other edge carries an outcome.
     #
     # Sabotage: made end_explanation/1 answer the done text for every
     # outcome; this went red. Made the end clause of edge/2 leave out the
     # interrupt rules; this went red. Made outcome/1 answer an Outcome fact
-    # for a rejoin into a step; this went red. Each reverted from a copy.
+    # for a rejoin into a step; this went red. Made the abandon end's text say
+    # "its last step" in place of "a group at the end of its flow"; this went
+    # red. Made the Finish edge's text say "the last step" in place of "or a
+    # group at the end of its flow"; this went red. Each reverted from a copy.
     test "every end mark and the edge into it name the outcome" do
       patron = by_id("patron_registration")
 
@@ -452,11 +455,23 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert fact(abandon, "Outcome") == "abandon"
       assert abandon.explanation =~ "dashed ring"
 
+      assert abandon.explanation ==
+               "Where the document finishes when an interrupt rule abandons a group at the end " <>
+                 "of its flow, drawn as a dashed ring: the rule leaves the group, and nothing " <>
+                 "comes after the group."
+
       into_done = patron["blk_pr_verify->blk_pr_root/end/done"]
       assert %Info{kind: :edge, title: "Finish"} = into_done
 
       assert into_done.sentence ==
                "When Run interruptible steps finishes, the document finishes: done"
+
+      finish_explanation =
+        "The arrow into a final mark: the document's last step, or a group at the end " <>
+          "of its flow, is behind it, so when control leaves it this way, the document " <>
+          "finishes with the outcome it names."
+
+      assert into_done.explanation == finish_explanation
 
       assert fact(into_done, "Outcome") == "done"
       assert fact(into_done, "Interrupt rules") == nil
@@ -466,6 +481,7 @@ defmodule StatifierBlocks.Map.InfoTest do
       assert into_abandon.sentence =~ ~r/^When an interrupt rule abandons Group/
       assert fact(into_abandon, "Outcome") == "abandon"
       assert [_one, _two] = fact(into_abandon, "Interrupt rules")
+      assert into_abandon.explanation == finish_explanation
 
       for key <- @library,
           {id, %Info{kind: :edge} = edge} <- by_id(key),
