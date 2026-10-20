@@ -3260,3 +3260,80 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`.
+
+## Note (2026-10-19): an inserted block does not start from its palette entry's `default_config`, and why the insert probe and the inserted block may differ
+
+A dated note, not an amendment: it changes no decision in this record and no
+code. Every code cite below is by anchor, read at `ccdfca7`.
+
+### 1. The question
+
+The editor asks whether a palette type fits a slot before the author has
+configured it, and it asks that of a probe block.
+`StatifierBlocks.Edit.Targets.probe/2` (`lib/statifier_blocks/edit/targets.ex`)
+builds `StatifierBlocks.Palette.new_block/2`'s block and merges the type's
+`palette_entry/0` `default_config` over its config, so that a type whose read
+is declared on a config field asks the question the configured block would
+ask. The drag (`insert_drag_session/2` in `lib/statifier_blocks/editor.ex`)
+and the armed palette's filter (`Targets.accepted_types/4`) both ask it of
+that probe.
+
+Whether the block a pick or a drop actually inserts should also start from
+`default_config` was left open. `Palette.new_block/2`'s `@doc`
+(`lib/statifier_blocks/palette.ex`) says so in those words: "whether an
+inserted block should start from it is an open question, not a settled one".
+
+### 2. The answer
+
+No, ruled by the operator, 2026-10-19: an inserted block does not start from
+`default_config`. `default_config` stays what the type suggests the author is
+about to configure, read by the probe and by nothing else; the inserted block's
+own findings show the author what is still unfilled.
+
+### 3. What an inserted block holds
+
+Both gestures insert through one function: the `"palette-pick"` and
+`"insert-drop"` events each call `insert_from_palette/3`
+(`lib/statifier_blocks/editor.ex`), which commits the block
+`Palette.new_block/2` builds. That block's config is `config_schema/1`'s
+`default:` value for each declared field and nothing else, and the test `a
+palette entry's :default_config is not merged in` in
+`test/statifier_blocks/palette/new_block_test.exs` pins it.
+
+So the ruling's "starts empty" reads, against the code, as: the inserted
+block carries no value from `default_config` and none the author wrote. It is
+not an empty map. Each field holds its own schema default, which is often the
+empty string - `core.send`'s `event` and `delay` both are, as
+`Palette.new_block/2`'s doctest shows - and sometimes is not: `core.wait`'s
+`duration` defaults to `"1h"` (`config_schema/1` in
+`lib/statifier_blocks/core/wait.ex`). No shipped `core.*` type declares a
+`default_config` at `ccdfca7`.
+
+### 4. Why the probe and the inserted block may differ
+
+They answer different questions. The probe's verdict is a prediction about
+the block once the author has configured it; the inserted block is what the
+author has written, which at insert is nothing beyond the type's own
+defaults. Writing `default_config` into the inserted block would store config
+the author never chose in the document, and it would quiet the findings that
+tell the author a field still needs a value.
+
+The consequence, accepted by the ruling, is that a type the probe admits can
+show a finding once it lands. `core.send`'s `validate_config/1` answers a
+finding on `event` while it holds the empty string (`check_event/2` in
+`lib/statifier_blocks/core/send.ex`). A block whose read is declared on a
+`{:path, _}` field declares no read while that field holds `""`
+(`StatifierBlocks.Environment.read_signatures/3` yields nothing for it), so
+decision 5's unsatisfied-read check meets it only once the author names the
+path. Neither is a defect in the probe or in the insert: the probe says
+whether the configured block will fit, and the inserted block's findings say
+what it lacks now.
+
+### 5. What this Note does not decide
+
+Whether an insert's config is checked when the session commits it; that is
+another record's. It changes no code and no `@doc`: `Palette.new_block/2`'s
+sentence calling the question open stands as written and is answered here. It
+adds no README row and flips no status line in this file.
+
+Filed with `sb-3mv1`.
