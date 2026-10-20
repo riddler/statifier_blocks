@@ -1,3 +1,0 @@
-### Changed
-
-- `StatifierBlocks.Publish.findings/3` answers an undeclared datamodel path at `:error`, not `:info`, when the document declares its own datamodel roots (its `datamodel` key holds an entry), so a host's publish step that refuses on `:error` now refuses such a document; the finding keeps the advisory's anchor, `:lint` source and message, and the editor still shows it at `:info`. A document that declares no roots is unchanged: with only a host-supplied `:datamodel` or `:declare` roots the advisory stays `:info` and refuses nothing, and with nothing declared anywhere there is no advisory.
