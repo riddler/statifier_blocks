@@ -4848,7 +4848,7 @@ of 2026-10-19 on `ADR-0008` (an undeclared `collect_type` name) and by the
 release's version bump; `lib/statifier_blocks/graph.ex` and
 `lib/statifier_blocks/compiled.ex` by that `ADR-0008` Amendment;
 `lib/statifier_blocks/composite.ex` by the stamp; and
-`test/statifier_blocks/graph_test.exs` by both, and by the dated Note of
+`test/statifier_blocks/graph_test.exs` by that `ADR-0008` Amendment, and by the dated Note of
 2026-10-19 on `ADR-0008`. None of them changes what this Amendment decides.
 Every cite below was read at `49c6b5b` and is written anchor first, line
 second.
