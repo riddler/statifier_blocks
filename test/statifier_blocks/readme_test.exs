@@ -58,6 +58,17 @@ defmodule StatifierBlocks.ReadmeTest do
     assert compiled.record.document_id == "bdoc_patron_registration"
     assert compiled.record.compiler_version == StatifierBlocks.Compiler.compiler_version()
 
+    # Every SCXML line the page shows; the page elides the namespace URI.
+    assert compiled.scxml =~
+             ~s(<scxml initial="s_blk_root" name="bdoc_patron_registration" version="1.0" xmlns=")
+
+    assert compiled.scxml =~ ~s(<state id="s_blk_root" initial="s_blk_check_details">)
+
+    assert compiled.scxml =~
+             ~s(<state id="s_blk_check_details" initial="s_blk_check_details__running">)
+
+    assert compiled.scxml =~ ~s(<state id="s_blk_check_details__running">)
+
     assert compiled.scxml =~
              ~s(<invoke id="s_blk_check_details__invocation" type="myapp:check_details"/>)
 
@@ -75,10 +86,11 @@ defmodule StatifierBlocks.ReadmeTest do
   end
 
   # Sabotage: emptied the `datamodel:` list in the page's `Document.new/2`
-  # call - red on the candidates assert and the SCXML match; deleting only
-  # the `minimum_age` entry is red on the findings assert too. The example's
-  # branch condition reads two roots, and an example that reads what nothing
-  # declares is the one this test exists to keep the page out of.
+  # call - red on the candidates assert, the first to run. Deleting only the
+  # `minimum_age` entry is red on the candidates assert too; the findings
+  # assert still passes then, so it is not what catches either mutation. The
+  # example's branch condition reads two roots, and an example that reads
+  # what nothing declares is the one this test exists to keep the page out of.
   test "the worked example declares the roots its branch condition reads", ctx do
     document = Keyword.fetch!(ctx.worked, :document)
     palette = Keyword.fetch!(ctx.worked, :palette)
