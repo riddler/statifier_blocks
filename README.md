@@ -120,6 +120,7 @@ walks the same path with a branch, a declared datamodel and the provenance map.
   - [How to theme the editor](docs/theming.md) - make the editor look like your product without forking it
   - [How to mount the Map](docs/guides/mount-the-map.md) - render the Map and its description beside your list of steps and register the Map hook
 - Look up
+  - [Cheatsheet](docs/reference/cheatsheet.cheatmd) - the calls a host makes most, for the document, the palette, compile, publish and the editor mount
   - [Config fields and the handlers this package ships](docs/reference/config-fields-and-handlers.md) - where a config field's value is stored, and the invoke handler the package ships for `core.subchart`
   - [Editor assigns and host seams](docs/reference/editor-assigns-and-host-seams.md) - what the mounted editor holds, every seam a host declares, and the limits the canvas draws within
   - [Upgrading a host from 0.31 to 0.44](docs/upgrading.md) - what a host changes at each minor, and the calls a publish step makes

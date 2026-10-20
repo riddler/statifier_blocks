@@ -1,0 +1,262 @@
+# StatifierBlocks cheatsheet
+
+## Document
+{: .col-2}
+
+### Build a document
+
+```elixir
+alias StatifierBlocks.{Block, Document}
+
+document =
+  Document.new(
+    Block.new("core.sequence",
+      id: "blk_root",
+      slots: %{
+        "body" => [
+          Block.new("myapp.check_details", id: "blk_check_details")
+        ]
+      }
+    ),
+    id: "bdoc_patron_registration"
+  )
+```
+
+`Block.new/2` takes `:id`, `:type_version`, `:config`, `:slots` and `:note`. See [How to build a block document and compile it to a chart](../guides/build-and-compile.md).
+
+### Document options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `:id` | a minted id | The document's id |
+| `:revision` | `0` | The revision number |
+| `:metadata` | `%{}` | Not compiled |
+| `:datamodel` | `[]` | `Document.DatamodelEntry` structs; each names a root |
+| `:accepts` | `[]` | Event names the document accepts |
+
+### Store and read it back
+
+```elixir
+json = Document.to_json(document)
+{:ok, document} = Document.from_json(json)
+```
+
+`to_json/1` raises `ArgumentError` on an invalid document. `from_json/1` answers `{:error, reason}` and never raises.
+
+### Declare a datamodel root
+
+```elixir
+Document.new(root,
+  datamodel: [
+    %Document.DatamodelEntry{
+      id: "visitor_age",
+      description: "The visitor's age, from the details they entered."
+    }
+  ]
+)
+```
+
+## Palette
+{: .col-2}
+
+### Build a palette from your block types
+
+```elixir
+palette =
+  StatifierBlocks.Palette.from_modules(
+    [{"myapp.check_details", MyApp.Blocks.CheckDetails}],
+    core: true
+  )
+```
+
+`core: true` adds the `core.*` vocabulary. See [How to register your own block types](../guides/register-block-types.md).
+
+### Build a palette from a map
+
+```elixir
+palette =
+  StatifierBlocks.Palette.new(
+    Map.merge(StatifierBlocks.Palette.core_types(), %{
+      "myapp.check_details" => MyApp.Blocks.CheckDetails
+    })
+  )
+```
+
+A palette is a value you build for one operation and pass explicitly.
+
+### Declare a step that names an invoke type
+
+```elixir
+defmodule MyApp.Blocks.SendWelcome do
+  @moduledoc "myapp.send_welcome: sends the new patron a welcome message."
+  use StatifierBlocks.InvokeStep,
+    invoke_type: "myapp:send_welcome",
+    palette: %{label: "Send welcome", group: "Registration"}
+end
+```
+
+The block type names the invoke type and never runs it; a handler you register runs it.
+
+### Type a palette
+
+```elixir
+def io(_config), do: %{kinds: [:step], produces: "myapp.patron_application"}
+```
+
+`produces` is a write and `consumes` a read at the document's subject path. See [How to type a palette](../typing-a-palette.md).
+
+### Check the palette can express a stored document
+
+```elixir
+:ok = StatifierBlocks.Plan.expressible(document, palette)
+true = StatifierBlocks.Plan.expressible?(document, palette)
+```
+
+An unexpressible document answers `{:no, reasons}`.
+
+## Compile
+{: .col-2}
+
+### Compile a document
+
+```elixir
+{:ok, compiled} = StatifierBlocks.Compiler.compile(document, palette)
+```
+
+It answers `{:ok, %Compiled{}}` or `{:error, findings}`, never a raise and never a partial success.
+
+### What `Compiled` carries
+
+| Field | Holds |
+| --- | --- |
+| `scxml` | The chart Statifier runs as-is |
+| `provenance` | The map from generated states back to blocks |
+| `record` | `CompilationRecord`: the revision, the chart and the compiler version |
+| `invoke_types` | The invoke types the chart names |
+| `warnings` | `Compiler.Finding`s from a successful compile |
+| `accepts` | The document's `accepts` list |
+| `interface` | Declared outcomes, done-data keys and referenced documents |
+
+### Compile options
+
+| Option | Meaning |
+| --- | --- |
+| `:datamodel` | The host's declared datamodel |
+| `:declare` | `{id, expr}` roots for the chart's `<data>` |
+| `:known_invoke_types` | Lint invoke types against this set |
+| `:entry_type` | The type the flow's entry is checked against |
+| `:terminate` | Compile a root document that finishes: one top-level `<final>` per root outcome |
+| `:child_use` | Compile for use as a child: each `<final>` carries its outcome as donedata |
+
+### Point a running position back at a block
+
+```elixir
+compiled.provenance
+|> StatifierBlocks.Provenance.owners_of_states(active_state_ids)
+|> Enum.map(& &1.block_id)
+```
+
+A state id the map does not know is dropped.
+
+## Publish
+{: .col-2}
+
+### Check before you keep a revision
+
+```elixir
+findings =
+  StatifierBlocks.Publish.findings(document, palette, %{
+    datamodel: datamodel,
+    declare: declare
+  })
+```
+
+Every context key is optional: `:datamodel`, `:declare` and `:chart_outcomes`. It emits nothing. See [How to publish a document](../guides/publish-a-document.md).
+
+### Refuse on a finding's severity
+
+```elixir
+refuses? = Enum.any?(findings, &(&1.severity == :error))
+```
+
+`:error` refuses the publish, `:warning` is your call and `:info` never refuses.
+
+### Adapt the compile's findings
+
+```elixir
+{adapted, _no_anchor} =
+  StatifierBlocks.Finding.from_compiler_all(compiled.warnings)
+```
+
+A compiler finding that names no block has no anchor and comes back in the second list.
+
+### Check a parent against its children
+
+```elixir
+findings =
+  StatifierBlocks.Graph.check(parent_compiled, fn document_id ->
+    {:ok, compiled_child}
+    # or {:error, :not_published}
+  end)
+```
+
+### Check a child revision against its parents
+
+```elixir
+[{parent_document_id, finding}] =
+  StatifierBlocks.Graph.consumers_broken(child_next, [parent_compiled])
+```
+
+The calls judge pairs; walking the graph is yours.
+
+## Editor
+{: .col-2}
+
+### Mount the component
+
+```heex
+<.live_component
+  module={StatifierBlocks.Editor}
+  id="registration-editor"
+  document={@registration}
+  palette={@palette}
+  on_change={&save_registration_draft/1}
+/>
+```
+
+`id`, `document` and `palette` are required. See [How to embed the editor in a LiveView host](../guides/embed-the-editor.md).
+
+### Register the hooks
+
+```javascript
+import StatifierBlocks from "statifier_blocks";
+
+let liveSocket = new LiveSocket("/live", Socket, {
+  hooks: { ...StatifierBlocks },
+});
+```
+
+Register both hooks, `StatifierBlocksDrag` and `StatifierBlocksMeasure`. Without the measure hook no connectors are drawn.
+
+### Import the stylesheet
+
+```css
+@import "../../deps/statifier_blocks/assets/css/statifier_blocks.css";
+```
+
+### Optional assigns
+
+| Assign | Meaning |
+| --- | --- |
+| `on_select` | Called with `%{id:, type:, label:}`, or `nil` |
+| `selected_id` | Moves the selection on the update that carries it |
+| `findings` | Findings you supply, merged with the two the view model derives |
+| `datamodel` | Declared paths; `nil` turns the undeclared-path advisories off |
+| `declare` | The `{id, expr}` roots you pass the compiler as `:declare` |
+| `profile` | Which surfaces this mount draws, and whether it edits |
+
+See [Editor assigns and host seams](editor-assigns-and-host-seams.md) for every assign.
+
+### Without LiveView
+
+`phoenix_live_view` is optional. Without it no `StatifierBlocks.Editor.*` module compiles, and the rest of the package does.
