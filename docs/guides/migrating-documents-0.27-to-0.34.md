@@ -1,4 +1,4 @@
-# Migrating a document from 0.27 to 0.34
+# How to migrate a document from 0.27 to 0.34
 
 This guide shows you how to move a block document written against
 `statifier_blocks` 0.27 onto the outcome vocabulary 0.34 offers: a composite
@@ -12,9 +12,9 @@ the enclosing body to act on **how** a composite finished, which 0.27 could
 not express.
 
 The worked pair is in
-[`test/fixtures/documents/migrating_0_27_to_0_34/`](../../test/fixtures/documents/migrating_0_27_to_0_34/),
+[`test/fixtures/documents/migrating_0_27_to_0_34/`](https://github.com/riddler/statifier_blocks/blob/main/test/fixtures/documents/migrating_0_27_to_0_34/),
 and
-[`test/statifier_blocks/migrating_documents_guide_test.exs`](../../test/statifier_blocks/migrating_documents_guide_test.exs)
+[`test/statifier_blocks/migrating_documents_guide_test.exs`](https://github.com/riddler/statifier_blocks/blob/main/test/statifier_blocks/migrating_documents_guide_test.exs)
 compiles every file in it on the current release.
 
 ## What keeps working unchanged
@@ -210,7 +210,7 @@ These are not part of the outcome vocabulary, and each is in the
 
 ## Where the decisions are recorded
 
-[ADR-0002](../adr/0002-block-type-behaviour.md) records each step, as the
+[ADR-0002](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0002-block-type-behaviour.md) records each step, as the
 Amendments of 2026-09-12 (`C1` to `C5`, declared outcomes), 2026-09-13 (`C6`,
 the composite's own state, and `C7`, the `on_<name>` slots) and 2026-09-14
 (`C8`, `finish_as`).

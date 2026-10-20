@@ -8,7 +8,7 @@ to a datamodel path by name, and every value one reads is read from a path by
 name, so a validation walk carries an **environment** - a map from datamodel
 path to type - through the document, and the question at a position is whether
 what the environment holds at a path satisfies what the block reads there.
-[`docs/adr/0011-typed-environment.md`](adr/0011-typed-environment.md) is the
+[`docs/adr/0011-typed-environment.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0011-typed-environment.md) is the
 record; everything below is the moves.
 
 ## Before you start

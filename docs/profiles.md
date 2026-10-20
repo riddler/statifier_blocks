@@ -7,7 +7,7 @@ One host often serves two audiences out of one codebase: its own engineers,
 who want the whole editor, and staff who should see a canvas, some findings
 and nothing else - or a rendering they cannot type into. The `profile` assign
 is how a mount says which of the two it is.
-[`docs/adr/0005-liveview-editor.md`](adr/0005-liveview-editor.md)'s 2026-09-07
+[`docs/adr/0005-liveview-editor.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0005-liveview-editor.md)'s 2026-09-07
 amendment is the record, with its 2026-09-12 Note for `run?`; everything below
 is the moves.
 

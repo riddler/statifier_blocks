@@ -53,9 +53,9 @@ defmodule StatifierBlocks.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   # Hexdocs configuration. These paths are read off the publisher's disk at
-  # `mix docs` time and need no entry in package()'s files: list - the docs
-  # tarball hexdocs hosts is built separately from the package tarball
-  # `mix deps.get` fetches.
+  # `mix docs` time; the docs tarball hexdocs hosts is built separately from
+  # the package tarball `mix deps.get` fetches. The pages are also listed in
+  # package()'s files: so the package carries the pages hexdocs shows.
   defp docs do
     [
       name: "StatifierBlocks",
@@ -66,6 +66,13 @@ defmodule StatifierBlocks.MixProject do
       extras: [
         "README.md",
         "docs/describing-a-document.md",
+        "docs/guides/flow-patterns.md",
+        "docs/guides/migrating-documents-0.27-to-0.34.md",
+        "docs/host-validators.md",
+        "docs/profiles.md",
+        "docs/theming.md",
+        "docs/typing-a-palette.md",
+        "docs/block-level-flow-graph.md",
         "docs/upgrading.md",
         "CHANGELOG.md"
       ],
@@ -75,7 +82,16 @@ defmodule StatifierBlocks.MixProject do
       # CHANGELOG stay ungrouped at the top. Decision records and planning
       # notes are for contributors and are not extras.
       groups_for_extras: [
-        "How-to guides": ["docs/describing-a-document.md"],
+        "How-to guides": [
+          "docs/describing-a-document.md",
+          "docs/guides/flow-patterns.md",
+          "docs/guides/migrating-documents-0.27-to-0.34.md",
+          "docs/host-validators.md",
+          "docs/profiles.md",
+          "docs/theming.md",
+          "docs/typing-a-palette.md"
+        ],
+        Explanation: ["docs/block-level-flow-graph.md"],
         Upgrading: ["docs/upgrading.md"]
       ],
       # Without this the first hexdocs is one flat list of ~50 modules, which
@@ -115,7 +131,13 @@ defmodule StatifierBlocks.MixProject do
           ~r/^StatifierBlocks\.Predicates($|\.)/
         ]
       ],
-      skip_undefined_reference_warnings_on: ["CHANGELOG.md"]
+      skip_undefined_reference_warnings_on: ["CHANGELOG.md"],
+      # Two pages name a hidden callback in code ticks as a pointer to the
+      # source, not as a link; ex_doc must not try to link them.
+      skip_code_autolink_to: [
+        "StatifierBlocks.Core.Branch.palette_entry/0",
+        "StatifierBlocks.Core.OnEvent.config_schema/1"
+      ]
     ]
   end
 
@@ -135,7 +157,7 @@ defmodule StatifierBlocks.MixProject do
       # file a host validates against, and it is named narrowly rather than as
       # `priv` so a later addition under priv/ has to say that it ships.
       files:
-        ~w(lib/statifier_blocks lib/statifier_blocks.ex priv/schemas assets mix.exs README.md LICENSE CHANGELOG.md),
+        ~w(lib/statifier_blocks lib/statifier_blocks.ex priv/schemas assets mix.exs README.md LICENSE CHANGELOG.md docs/describing-a-document.md docs/upgrading.md docs/guides/flow-patterns.md docs/guides/migrating-documents-0.27-to-0.34.md docs/host-validators.md docs/profiles.md docs/theming.md docs/typing-a-palette.md docs/block-level-flow-graph.md),
       links: %{
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
