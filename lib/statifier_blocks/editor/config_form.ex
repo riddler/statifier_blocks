@@ -247,7 +247,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         )
 
       ~H"""
-      <div class="sb-form sb-form--readonly" data-block-id={@node.block_id} data-read-only="true">
+      <div
+        class={["sb-form sb-form--readonly" | List.wrap(@class)]}
+        data-block-id={@node.block_id}
+        data-read-only="true"
+      >
         <p :for={finding <- @node.form.unrouted} class={["sb-finding", severity_class(finding)]}>
           {finding.message}
         </p>
