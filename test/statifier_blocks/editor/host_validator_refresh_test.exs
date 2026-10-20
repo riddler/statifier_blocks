@@ -25,9 +25,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defmodule RecordCoverage do
       @moduledoc """
-      `docs/host-validators.md`'s rule, as the guide prints it: the `card`
-      record was redefined and `risk_band` is no longer a member, so a config
-      value still reading it reads a path the datamodel no longer covers.
+      A rule of the shape `docs/host-validators.md` illustrates, over this
+      test's fixture: the `card` record was redefined and `risk_band` is no
+      longer a member, so a config value still reading it reads a path the
+      datamodel no longer covers. The guide's own example is in patron
+      registration; this test pins the mechanism, not that example.
       """
 
       @behaviour StatifierBlocks.DocumentValidator
