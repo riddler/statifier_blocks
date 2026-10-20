@@ -1285,6 +1285,60 @@ defmodule StatifierBlocks.Composite do
     {:ok, [{:insert, target, block}]}
   end
 
+  # `ADR-0002`'s Note of 2026-09-07, item 2: an expansion is
+  # at each member's **current** version, as the palette resolves it at
+  # expansion time.
+  #
+  # A subtree carries no version. A `use`-composite writes its members with
+  # `StatifierBlocks.Block.new/2` and a data declaration's template is
+  # instantiated through the same function, so every member `expand!/2`
+  # mints arrives at that function's default of `1`. Two core types are past
+  # version 1 today - `core.send` and `core.wait` - and a member naming one
+  # would meet `StatifierBlocks.Palette.resolve/2`'s version comparison
+  # exactly as a STORED block does and reach that type's `migrate_config/2`.
+  # It is not a stored block: no author wrote its config at an older version,
+  # so there is no older spelling to migrate and the migration would rewrite
+  # a declaration's own literal. Stamping the current version is what
+  # `StatifierBlocks.Palette.new_block/2` already does for an inserted block.
+  #
+  # `expand!/2` carries no palette, so the stamp is a second step its callers
+  # take with the palette they resolved the composite through: the
+  # compiler's Resolve over the members it splices, and the editor's Expand
+  # over the members it writes into the document. One function for both is
+  # what keeps the compiled chart and the expanded document at the same
+  # version for every member.
+  #
+  # The stamp is over the MINTED members only, and `param_map` is keyed by
+  # exactly those - `ADR-0004`'s T3 - so a pass-through child the author
+  # placed arrived from the document carrying its own stored version and
+  # keeps it, migration and all.
+  #
+  # A type this palette does not carry, and a ref that declares no
+  # `current_version/0`, are both left alone: the palette's resolve makes
+  # the finding or the refusal for the first, and there is no current
+  # version to stamp for either.
+  #
+  # `@doc false`, like its siblings above: the shared seam of two callers
+  # inside this package, not a surface a host calls.
+  @doc false
+  @spec at_current_version(Palette.t(), Block.t(), param_map()) :: Block.t()
+  def at_current_version(palette, %Block{} = member, param_map) do
+    slots =
+      Map.new(member.slots, fn {name, children} ->
+        {name, Enum.map(children, &at_current_version(palette, &1, param_map))}
+      end)
+
+    member = %{member | slots: slots}
+
+    with true <- Map.has_key?(param_map, member.id),
+         {:ok, ref} <- Palette.fetch(palette, member.type),
+         version when is_integer(version) <- Palette.call(ref, :current_version, [], nil) do
+      %{member | type_version: version}
+    else
+      _unstamped -> member
+    end
+  end
+
   # -- declaration ------------------------------------------------------
 
   # Refused BY NAME, which is the practice `decode_param/1` already follows:

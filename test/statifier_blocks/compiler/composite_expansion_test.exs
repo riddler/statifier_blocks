@@ -373,9 +373,11 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     # The other half of the seam, and the reason the stamp is taken over the
     # param map rather than over every block in the expansion: a block the
     # document STORES is untouched by it. `Composite.expand!/2` still mints at
-    # `Block.new/2`'s default - the expansion carries no palette - so a member
-    # the editor's Expand has written into a document is an ordinary stored
-    # block at version 1, and it migrates like one.
+    # `Block.new/2`'s default - the expansion carries no palette - so its
+    # members written into a document unstamped are ordinary stored blocks at
+    # version 1, and they migrate like any. (The editor's Expand stamps the
+    # members it writes; `StatifierBlocks.Editor.CompositeExpandTest` pins
+    # that side.)
     test "a stored block at version 1 still migrates" do
       {members, _param_map} = Composite.expand!(deadline("blk_D", "PT30S"), Deadline)
 
