@@ -70,8 +70,8 @@ defmodule StatifierBlocks.MapFixtures do
   def view_model!(key), do: key |> document!() |> ViewModel.build(Palette.core(), [])
 
   @doc "The checked-in graph for `key`, regenerated from the package's own Map."
-  @spec host_graph!(String.t()) :: map()
-  def host_graph!(key) when key in @keys,
+  @spec fixture_graph!(String.t()) :: map()
+  def fixture_graph!(key) when key in @keys,
     do: JSON.decode!(File.read!(Path.join(@graphs, "#{key}.graph.json")))
 
   @doc """
