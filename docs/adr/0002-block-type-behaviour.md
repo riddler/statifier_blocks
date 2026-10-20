@@ -14650,3 +14650,82 @@ What this Note leaves unchanged: decision 10, `core.send`'s config schema
 and descriptor, `StatifierBlocks.Palette.core_types/0`, and every compiled
 byte. This Note carries no `Status:` line, which is this file's convention
 for a Note. Filed with `sb-juri`.
+
+## Note (2026-10-19): `core.await` takes an optional `capture`
+
+A dated Note rather than an amendment. It records a ruling on a type this
+record already ships and decides nothing beyond it: decision 10's table, G14's
+row and every section above this line stand as written, the vocabulary does
+not grow, and no section above is edited. Ruled by the operator, 2026-10-19:
+`core.await` gains an optional event-data capture with `core.on_event`'s
+semantics and labels exactly. Filed with `sb-zol7`.
+
+**Why.** A document whose creating event carries data the flow needs could
+not use `core.await` for that event: the await had no way to write the
+payload, and `_event.data` is in scope only for the transition the event
+selects - the ground the 2026-09-05 Note on `core.on_event`'s `capture` gives
+for putting the assigns on the transition. The arrangement left was a
+`core.group` parked on a `core.wait` with a capturing `core.on_event` on its
+rail, which arms a timer on every execution and cancels it at the first step.
+
+**What `core.await` carries now.** The `capture` map of the 2026-09-05 Note,
+as amended by the two Notes of 2026-09-12 and 2026-09-13 on its source arms,
+its absent-source rule and its control-character refusal, with nothing added
+or taken away:
+
+- the same config key, `capture`, and the same pairs: the key is the
+  datamodel path written, the value is a path inside `_event.data` read or a
+  `["const", value]` literal;
+- the same emission: the `<assign>` `core.on_event` writes for each pair, a
+  path pair's inside the presence-testing `<if>`, in the datamodel paths'
+  sorted order, as children of the transition on the awaited `event`. The
+  deadline's transition carries none: its event is the await's own timer;
+- the same refusal: a malformed map is one `validate_config/1` finding on the
+  `capture` key, with `core.on_event`'s message, reported after the `event`
+  and `timeout` findings. G14's "it refuses nothing else" now reads with this
+  finding beside its two;
+- the same editor rows and label, "Capture from the event", with the source
+  control offered the type's own `fixtures/0` payload for the configured
+  event.
+
+The two types share one implementation, so the semantics cannot drift: the
+validation and the emission moved out of `StatifierBlocks.Core.OnEvent` into
+an internal module, `StatifierBlocks.Core.Capture` (`check/2`, `assigns/1`,
+`path?/1`), which both types call. That module is `@moduledoc false` and
+publishes nothing. On the editor side, `capture_pairs/1` and
+`capture_sources/1` in `StatifierBlocks.Editor` answer for both types where
+they answered for `core.on_event` alone.
+
+**What is not carried.** `core.on_event`'s `payload` declaration (the
+amendment of 2026-09-06, `P1` to `P5`) stays that type's. It adds a
+compile-time refusal of a source path read past a declared payload, and
+nothing about what a capture writes depends on it. `config_schema/1` gains no
+field: decision 7's field-type set still has no member that describes a map,
+which is the ground the 2026-09-05 Note gives for `core.on_event`, and
+`current_version/0` stays 1. No reader-facing sentence changes: the palette
+entry, `explain/0`, `summary/1` and `sentence/1` read as before.
+
+**What compiles differently.** An await whose `capture` is absent or empty
+compiles to the bytes it compiled to before the key existed, pinned against
+goldens compiled with the code at `7fe837c`: three existing fixture
+documents that carry `core.await`, and a new one whose await has a
+deadline. One stored shape does compile
+differently: an await that already carried a well-formed `capture` key. The
+key was not read by `core.await` at `7fe837c` (`validate_config/1` and
+`emit/2` in `lib/statifier_blocks/core/await.ex`, read at `7fe837c`), so it
+compiled to no assign; it now compiles to its assigns. A malformed one, which
+compiled before, is now refused. The two readers that already treated such a
+key as writes now describe what the chart does:
+`StatifierBlocks.Environment.write_signatures/3` reports a `capture` map's
+keys as writes for any block (`defp capture_writes/1`,
+`lib/statifier_blocks/environment.ex`, read at `7fe837c`), and the declared-path
+advisory reads them for any block (`defp capture_findings/4`,
+`lib/statifier_blocks/datamodel.ex`, read at `7fe837c`).
+
+The pins are in `test/statifier_blocks/core/await_test.exs` (the capture
+map's refusal, its emission against `core.on_event`'s for the same pairs, the
+four no-capture goldens, the capture corpus case and a run) and
+`test/statifier_blocks/editor/capture_row_test.exs` (the rows under the
+shared label). The corpus case is `test/fixtures/await_capture/capture.json`
+and its golden. This Note carries no `Status:` line, which is this file's
+convention for a Note.

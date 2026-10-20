@@ -1,0 +1,28 @@
+{
+  "id": "bdoc_AWAITCAPTURE",
+  "revision": 1,
+  "root": {
+    "id": "blk_ROOT",
+    "slots": {
+      "body": [
+        {
+          "config": {
+            "capture": {
+              "loan.copy_id": "copy_id",
+              "loan.desk": "desk.name",
+              "loan.source": ["const", "desk"]
+            },
+            "event": "loan.requested",
+            "timeout": "14d"
+          },
+          "id": "blk_REQ",
+          "type": "core.await",
+          "type_version": 1
+        }
+      ]
+    },
+    "type": "core.sequence",
+    "type_version": 1
+  },
+  "schema_version": 1
+}

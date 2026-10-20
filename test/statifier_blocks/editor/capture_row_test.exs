@@ -6,9 +6,9 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule StatifierBlocks.Editor.CaptureRowTest do
     @moduledoc """
-    `core.on_event`'s capture, authored (ADR-0011 decision 10): a repeated
-    two-control row, one row per pair, a datamodel path written beside a path
-    inside the firing event's payload.
+    The capture map `core.on_event` and `core.await` store, authored
+    (ADR-0011 decision 10): a repeated two-control row, one row per pair, a
+    datamodel path written beside a path inside the firing event's payload.
 
     It is a repeated row and not a field, because ADR-0002 decision 7's
     closed field-type set has no member describing a map and declined to add
@@ -103,9 +103,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       # Sabotage: replaced the `@on_event_type` guard on `capture_pairs/1`
       # with a match on any node -> every selected block grows a capture
-      # section and this goes red (verified).
+      # section and this goes red (verified). The block asked about is the
+      # group: a `core.await` takes a capture map too, and its rows are
+      # asserted in the describe block below.
       test "a block that takes no capture map draws no row", %{conn: conn} do
-        refute has_element?(view(conn, select: "blk_wait"), ".sb-capture")
+        refute has_element?(view(conn, select: "blk_order"), ".sb-capture")
       end
     end
 
@@ -211,6 +213,96 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(
                  view,
                  ~s(.sb-capture__source[list="sb-capture-sources-blk_cancel"])
+               )
+      end
+    end
+
+    describe "core.await's capture" do
+      # The await's rows are `core.on_event`'s rows: the same component, the
+      # same label, the same two controls, the same source candidates drawn
+      # from the type's own fixture payload. Only the selection differs.
+      defp await_view(conn, capture) do
+        config = %{"event" => "order.approved"}
+        config = if capture == nil, do: config, else: Map.put(config, "capture", capture)
+
+        document =
+          Document.new(
+            Block.new("core.sequence",
+              id: "blk_flow",
+              slots: %{"body" => [Block.new("core.await", id: "blk_wait", config: config)]}
+            ),
+            id: "doc_await"
+          )
+
+        {:ok, view, _html} = mount_editor(conn, document: document)
+
+        view
+        |> element(~s([data-block-id="blk_wait"] > .sb-node__chrome > .sb-node__label))
+        |> render_click()
+
+        view
+      end
+
+      # Sabotage: dropped "core.await" from `@capture_types` -> the await
+      # draws no capture section and every test in this block goes red
+      # (verified).
+      test "a stored pair draws its two controls under the on_event label", %{conn: conn} do
+        view = await_view(conn, %{"loan.approver" => "approver"})
+
+        assert has_element?(view, ~s(.sb-capture[data-capture-rows="1"]))
+        assert has_element?(view, ".sb-capture .sb-capture__label", "Capture from the event")
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-capture__row[data-capture-row="0"] input[value="loan.approver"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-capture__row[data-capture-row="0"] input[value="approver"])
+               )
+      end
+
+      test "an await that captures nothing still offers the blank row", %{conn: conn} do
+        view = await_view(conn, nil)
+
+        assert has_element?(view, ~s(.sb-capture[data-capture-rows="0"]))
+        assert has_element?(view, ~s(.sb-capture__row[data-capture-row="0"]))
+      end
+
+      # Sabotage: left `capture_sources/1` guarded on `core.on_event` alone ->
+      # the await's source control has no datalist and this goes red
+      # (verified).
+      test "the awaited event's fixture payload keys are offered", %{conn: conn} do
+        view = await_view(conn, nil)
+
+        assert has_element?(
+                 view,
+                 ~s(datalist#sb-capture-sources-blk_wait[data-capture-sources="2"])
+               )
+
+        assert has_element?(
+                 view,
+                 ~s(datalist#sb-capture-sources-blk_wait option[value="approver"])
+               )
+      end
+
+      test "filling the blank row writes a pair", %{conn: conn} do
+        view = await_view(conn, nil)
+
+        view
+        |> element(~s(form[data-block-id="blk_wait"]))
+        |> render_change(%{
+          "block-id" => "blk_wait",
+          "config" => %{"event" => "order.approved", "timeout" => ""},
+          "capture" => %{"0" => %{"target" => "loan.approver", "source" => "approver"}}
+        })
+
+        assert has_element?(view, ~s(.sb-capture[data-capture-rows="1"]))
+
+        assert has_element?(
+                 view,
+                 ~s(.sb-capture__row[data-capture-row="0"] input[value="loan.approver"])
                )
       end
     end

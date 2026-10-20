@@ -33,7 +33,7 @@ if Code.ensure_loaded?(StatifierUI.Live.State) do
 
     The first block's configured event is `"order.approved"` - `core.await`'s
     own `fixtures/0` sample name
-    (`lib/statifier_blocks/core/await.ex:220-226`). That is deliberate: the
+    (`StatifierBlocks.Core.Await.fixtures/0`). That is deliberate: the
     palette this bead's pane draws is fed by the selected block's *type's*
     fixture sample, taken verbatim, not by the block's configured `event`
     (see `editor.ex`'s `run_events/1`). Configuring the two to agree here is

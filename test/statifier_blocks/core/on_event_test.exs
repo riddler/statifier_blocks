@@ -478,7 +478,7 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # leaving the bytes to iteration. Forty pairs is what makes this
     # assertion able to fail.
     #
-    # sabotage: dropped the `Enum.sort_by/2` from `captures/1` -> the emitted
+    # sabotage: dropped the `Enum.sort_by/2` from `Capture.assigns/1` -> the emitted
     # order followed the map's iteration and this went red (verified; it
     # stays green with the sort under either map representation)
     test "orders the pairs by their datamodel paths, not by the map's iteration" do
@@ -499,7 +499,7 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # that carries no capture compiles to exactly what it compiled to before
     # the key existed, and an emptied one is the same handler.
     #
-    # sabotage: made `captures/1`'s `nil` clause emit a single assign from a
+    # sabotage: made `Capture.assigns/1`'s `nil` clause emit a single assign from a
     # hard-coded pair -> both comparisons went red (verified)
     test "compiles byte-identically to today for a handler with no capture" do
       without = compile!(Map.delete(handler(%{}).config, "capture") |> block())
@@ -517,7 +517,7 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # answered for it, and the answer is the thing under test. A capture
     # silently dropped is the failure the key exists to prevent.
     #
-    # sabotage: had `captures/1`'s malformed arm return `{:ok, []}` ->
+    # sabotage: had `Capture.assigns/1`'s malformed arm return `{:ok, []}` ->
     # `emit/2` answered `{:ok, ...}` with the pair dropped and no assign
     # emitted, taking this red (verified)
     test "refuses a malformed capture rather than dropping the pair" do
@@ -1161,14 +1161,14 @@ defmodule StatifierBlocks.Core.OnEventTest do
     # against bytes captured on `main` at `bbb91e0` rather than against
     # this branch's own other outputs (which is what the additivity test
     # further up this file compares): a handler that captures nothing
-    # recompiles to the same chart, guard or no guard, because `captures/1`
+    # recompiles to the same chart, guard or no guard, because `Capture.assigns/1`
     # answers `[]` and there is nothing to wrap.
     #
-    # sabotage: had `captures/1`'s `nil` clause answer a childless `<if>`
+    # sabotage: had `Capture.assigns/1`'s `nil` clause answer a childless `<if>`
     # rather than `[]` -> this went red, and so did the additivity test
     # further up (verified). Wrapping the `<raise>` instead does NOT reach
     # this test - there is no wrapper to reach when nothing is captured -
-    # which is why the mutation is on `captures/1` rather than `guarded/2`.
+    # which is why the mutation is on `Capture.assigns/1` rather than `guarded/2`.
     test "leaves a handler that captures nothing byte-identical" do
       assert compile!(handler(%{})) == @no_capture_golden
 

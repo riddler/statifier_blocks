@@ -9,7 +9,33 @@ defmodule StatifierBlocks.Core.Await do
   read; `timeout` is an optional `:duration` in the one grammar
   `core.wait`'s `duration` and `core.send`'s `delay` are written in. The
   two outcomes, `received` and `timed_out`, are the two ways an await can
-  end.
+  end. An optional `capture` map, which declares no field, copies values
+  out of the awaited event's payload into the datamodel.
+
+  ## The optional `capture` map
+
+  `capture` is `core.on_event`'s map, with its semantics and its key
+  spelling: the key is a datamodel path written, the value is a path
+  inside `_event.data` read or a `["const", value]` literal, a path the
+  payload does not carry writes nothing, and the pairs are written in
+  their datamodel paths' sorted order. `StatifierBlocks.Core.OnEvent`'s
+  moduledoc records the rules, and one shared implementation validates
+  and emits the map for both types, so the two cannot drift apart. The
+  editor draws the same capture rows for both.
+
+  The assigns ride the transition the awaited event selects, inside it,
+  because `_event.data` is in scope for that transition and for nothing
+  after it: a `core.assign` placed after the await runs in a later
+  microstep with a different `_event`, and the payload is gone. The
+  deadline's transition carries none - its event is this block's own
+  timer and carries no payload of the host's.
+
+  An await whose `capture` is absent or empty compiles to exactly the
+  bytes it compiled to before the key existed, so the key is additive
+  and `current_version/0` stays 1. `core.on_event`'s `payload`
+  declaration is not shared: it adds a compile-time refusal of a read
+  past a declared payload, and nothing about what a capture writes
+  depends on it. See ADR-0002's Note of 2026-10-19.
 
   ## An await is not a wait
 
@@ -67,7 +93,7 @@ defmodule StatifierBlocks.Core.Await do
 
   alias StatifierBlocks.Block
   alias StatifierBlocks.Compiler.{Cancels, Context}
-  alias StatifierBlocks.Core.{Config, Duration, Emit}
+  alias StatifierBlocks.Core.{Capture, Config, Duration, Emit}
   alias StatifierBlocks.Emission
 
   @event_message "must be an event name, like order.approved"
@@ -127,6 +153,7 @@ defmodule StatifierBlocks.Core.Await do
     []
     |> check_event(config)
     |> check_timeout(config)
+    |> Capture.check(config)
     |> Config.verdict()
   end
 
@@ -293,6 +320,23 @@ defmodule StatifierBlocks.Core.Await do
   `done.outcome.s_AWT.timed_out` gets a transition that never fires
   rather than an unresolved target (ADR-0004's outcome amendment, 2c).
 
+  ## A capturing await
+
+  Each `capture` pair becomes the `<assign>` `core.on_event` writes for
+  it, as a child of the awaited transition; a path pair's assign sits
+  inside an `<if>` that tests the path for presence, and a literal pair's
+  is bare:
+
+      <transition event="loan.requested" target="s_AWT__o_received">
+        <if cond="_event.data.copy_id !== undefined">
+          <assign expr="_event.data.copy_id" location="loan.copy_id"/>
+        </if>
+        <assign expr="&quot;desk&quot;" location="loan.source"/>
+      </transition>
+
+  Nothing else in the shape moves, and an await with no `capture` writes
+  the self-closing transition sketched above.
+
   ## What is annotated and what is not
 
   The awaited `event` attribute is stamped as coming from the `event`
@@ -309,10 +353,11 @@ defmodule StatifierBlocks.Core.Await do
          {:ok, received} <- Context.outcome_id(context, @received),
          {:ok, timed_out} <- Context.outcome_id(context, @timed_out),
          {:ok, event} <- event(Map.get(config, "event")),
-         {:ok, delay} <- delay(config) do
+         {:ok, delay} <- delay(config),
+         {:ok, assigns} <- Capture.assigns(Map.get(config, "capture")) do
       arrival =
         [event: event, target: received]
-        |> Emit.transition()
+        |> Emit.transition(assigns)
         |> Emission.attribute_from_config("event", "event")
 
       deadline = deadline(delay, block_id, send_id, timed_out)
