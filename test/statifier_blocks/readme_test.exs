@@ -1,19 +1,19 @@
 defmodule StatifierBlocks.ReadmeTest do
   @moduledoc """
-  The worked example and the README's config-field example are executed,
-  not trusted.
+  The worked example and the config-field example are executed, not trusted.
 
   The worked example is the how-to page `docs/guides/build-and-compile.md`;
-  the config-field example is a section of `README.md`, the package's front
-  door and the page hexdocs shows. A snippet in either that no longer
-  compiles against the real API is a defect a reader hits before anything
-  else. This module extracts the `elixir` code blocks from the page and from
-  the README section, concatenates each in reading order, evaluates it, and
-  asserts the values each claims in its `#=>` comments.
+  the config-field example is a section of the reference page
+  `docs/reference/config-fields-and-handlers.md`. A snippet in either that no
+  longer compiles against the real API is a defect a reader hits before
+  anything else. This module extracts the `elixir` code blocks from the how-to
+  page and from the reference page section, concatenates each in reading
+  order, evaluates it, and asserts the values each claims in its `#=>`
+  comments.
 
   Two consequences worth naming, because both are deliberate:
 
-    * **The README section heading is load-bearing.** `elixir_blocks_under/2`
+    * **The reference page section heading is load-bearing.** `elixir_blocks_under/2`
       finds a section by its `## ` heading; renaming the heading fails this
       test rather than silently checking nothing. The page is read whole,
       every `elixir` block on it, and an empty read fails the same way.
@@ -28,22 +28,30 @@ defmodule StatifierBlocks.ReadmeTest do
 
   use ExUnit.Case, async: false
 
-  @readme Path.join([__DIR__, "..", "..", "README.md"]) |> Path.expand()
-  @external_resource @readme
-
   @page Path.join([__DIR__, "..", "..", "docs", "guides", "build-and-compile.md"])
         |> Path.expand()
   @external_resource @page
 
+  @reference Path.join([
+               __DIR__,
+               "..",
+               "..",
+               "docs",
+               "reference",
+               "config-fields-and-handlers.md"
+             ])
+             |> Path.expand()
+  @external_resource @reference
+
   setup_all do
-    readme = File.read!(@readme)
     page = File.read!(@page)
+    reference = File.read!(@reference)
 
     # Evaluated once for the whole module: the page defines modules, and
     # evaluating it per test would redefine them.
     {_result, worked} = eval_blocks(elixir_blocks_in(page), "docs/guides/build-and-compile.md")
 
-    %{readme: readme, page: page, worked: worked}
+    %{reference: reference, page: page, worked: worked}
   end
 
   # Sabotage: changed the page's document id - red on the `document_id`
@@ -106,22 +114,22 @@ defmodule StatifierBlocks.ReadmeTest do
   end
 
   # Sabotage: dropped the `value_path:` key from `Core.Branch.config_schema/1`
-  # - red, because `value_path/1` then answers `["arm_approved"]` and the
-  # README's `#=>` line no longer matches.
+  # - red, because `value_path/1` then answers `["arm_old_enough"]` and the
+  # reference page's `#=>` line no longer matches.
   test "the config-field example resolves a branch arm's condition through its path", ctx do
-    {_result, binding} = eval_section(ctx.readme, "Config fields and where their values live")
+    {_result, binding} = eval_section(ctx.reference, "Config fields and where their values live")
 
     config = Keyword.fetch!(binding, :config)
     field = Keyword.fetch!(binding, :field)
 
-    assert field.key == "arm_approved"
+    assert field.key == "arm_old_enough"
     assert StatifierBlocks.BlockType.value_path(field) == ["arms", 0, "cond"]
 
     assert StatifierBlocks.BlockType.fetch_value(config, ["arms", 0, "cond"]) ==
-             {:ok, "budget_remaining > amount"}
+             {:ok, "visitor_age >= minimum_age"}
 
-    assert StatifierBlocks.BlockType.put_value(config, ["arms", 0, "cond"], "amount <= 5000") ==
-             %{"arms" => [%{"cond" => "amount <= 5000", "slot" => "arm_approved"}]}
+    assert StatifierBlocks.BlockType.put_value(config, ["arms", 0, "cond"], "visitor_age >= 18") ==
+             %{"arms" => [%{"cond" => "visitor_age >= 18", "slot" => "arm_old_enough"}]}
   end
 
   # Sabotage: edited one `#=>` line on the page to claim a different value
@@ -130,7 +138,7 @@ defmodule StatifierBlocks.ReadmeTest do
   test "every output the two examples claim is the one they produce", ctx do
     claimed =
       (elixir_blocks_in(ctx.page) ++
-         elixir_blocks_under(ctx.readme, "Config fields and where their values live"))
+         elixir_blocks_under(ctx.reference, "Config fields and where their values live"))
       |> Enum.join("\n")
       |> then(&Regex.scan(~r/^\s*#=> (.+)$/m, &1))
       |> Enum.map(fn [_whole, claim] -> claim end)
@@ -138,19 +146,22 @@ defmodule StatifierBlocks.ReadmeTest do
     assert claimed == [
              ~s(["myapp:check_details", "myapp:issue_card"]),
              ~s(["blk_check_details", "blk_issue_card", "blk_old_enough", "blk_root"]),
-             ~s("arm_approved"),
+             ~s("arm_old_enough"),
              ~s(["arms", 0, "cond"]),
-             ~s({:ok, "budget_remaining > amount"}),
-             ~s(%{"arms" => [%{"cond" => "amount <= 5000", "slot" => "arm_approved"}]})
+             ~s({:ok, "visitor_age >= minimum_age"}),
+             ~s(%{"arms" => [%{"cond" => "visitor_age >= 18", "slot" => "arm_old_enough"}]})
            ]
   end
 
   # Sabotage: renamed the "## Config fields and where their values live"
-  # heading in the README - red on the non-empty assert in `eval_blocks/2`,
+  # heading on the reference page - red on the non-empty assert in `eval_blocks/2`,
   # which is the guard against this whole file quietly checking an empty
   # string.
-  defp eval_section(readme, heading) do
-    eval_blocks(elixir_blocks_under(readme, heading), ~s("## #{heading}" in README.md))
+  defp eval_section(page, heading) do
+    eval_blocks(
+      elixir_blocks_under(page, heading),
+      ~s("## #{heading}" in docs/reference/config-fields-and-handlers.md)
+    )
   end
 
   # Sabotage: changed every ```elixir fence on the page to ```text - every
@@ -171,8 +182,8 @@ defmodule StatifierBlocks.ReadmeTest do
 
   # Every ```elixir block between `## <heading>` and the next `## ` heading.
   @spec elixir_blocks_under(binary(), binary()) :: [binary()]
-  defp elixir_blocks_under(readme, heading) do
-    readme
+  defp elixir_blocks_under(page, heading) do
+    page
     |> String.split("\n## ")
     |> Enum.find("", &String.starts_with?(&1, heading <> "\n"))
     |> then(&Regex.scan(~r/^```elixir\n(.*?)^```$/ms, &1))
