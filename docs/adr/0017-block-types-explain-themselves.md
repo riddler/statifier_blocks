@@ -457,3 +457,36 @@ They are met here, not edited.
 None. Each claim holds at `fa7b1d0` as written.
 
 Filed with `sb-2zar`.
+
+## Note (2026-10-19): two exceptions to the wrapped caption lines
+
+A dated Note: it carries no `Status:` line, decides nothing new, and edits
+no clause; it sits at the foot so no line another record cites moves. It
+states two cases the Amendment of 2026-10-10 on decision 4's caption does
+not name. Both were read in the code at `2000e97` on main
+(`2000e9726a85a280df99e5e2305b59f76223286c`, an ancestor of
+`origin/main`), cited by anchor alone.
+
+- The Amendment says a caption that does not fit one line "is wrapped onto
+  lines of its own, each no wider than a box's line". A single word longer
+  than a line is not cut and keeps a line of its own, so that line is wider
+  than a box's. Anchors: `StatifierBlocks.Map` (`lib/statifier_blocks/map.ex`),
+  `defp wrap` and `defp join`, and the `## Captions` section of its
+  moduledoc ("a word longer than a line keeps a line of its own"). The
+  rule is the one the map holds for every wrapped text: nothing on the map
+  truncates, a caption included.
+- The Amendment says a group's rules column says its own caption,
+  "Rules: watch the steps while they run", and then the group type's
+  sentence on the lines under that. Only the sentence is wrapped. The
+  column's own caption is the fixed words and is never wrapped: it is one
+  line, `@rules_caption`, whatever the column's width. Anchors:
+  `StatifierBlocks.Map`, `defp put_caption` (the `"caption"` field takes
+  `@rules_caption`; `"explanation_lines"` takes `wrap(sentence)`) and
+  `defp column_lines`; `assets/js/statifier_blocks_map.js`, `function
+  drawCaption` (one `text` element for the column's caption) against
+  `function drawCaptionLines` (one `text` element per wrapped line).
+
+Neither exception changes what the Amendment decides: the sentence is
+whole, never cut and never ended in "...". The stylesheet comment above the
+`.sb-map__svg .sb-map__caption` rule and a test comment on the resume edge
+are corrected in the same request.
