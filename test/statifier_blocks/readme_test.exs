@@ -1,26 +1,29 @@
 defmodule StatifierBlocks.ReadmeTest do
   @moduledoc """
-  The README's worked example is executed, not trusted.
+  The worked example and the README's config-field example are executed,
+  not trusted.
 
-  `README.md` is the package's front door and the page hexdocs shows, so a
-  snippet there that no longer compiles against the real API is a defect a
-  reader hits before anything else. This module extracts the `elixir` code
-  blocks from the README's two example sections, concatenates each section
-  in reading order, evaluates it, and asserts the values the README claims
-  in its `#=>` comments.
+  The worked example is the how-to page `docs/guides/build-and-compile.md`;
+  the config-field example is a section of `README.md`, the package's front
+  door and the page hexdocs shows. A snippet in either that no longer
+  compiles against the real API is a defect a reader hits before anything
+  else. This module extracts the `elixir` code blocks from the page and from
+  the README section, concatenates each in reading order, evaluates it, and
+  asserts the values each claims in its `#=>` comments.
 
   Two consequences worth naming, because both are deliberate:
 
-    * **The section headings are load-bearing.** `elixir_blocks_under/2`
-      finds a section by its `## ` heading; renaming a heading fails this
-      test rather than silently checking nothing.
+    * **The README section heading is load-bearing.** `elixir_blocks_under/2`
+      finds a section by its `## ` heading; renaming the heading fails this
+      test rather than silently checking nothing. The page is read whole,
+      every `elixir` block on it, and an empty read fails the same way.
     * **The claimed outputs are asserted twice** - once as a value, once as
-      the literal text of the README's `#=>` line. The second half is what
-      catches an output that drifted while the code kept working.
+      the literal text of the `#=>` line. The second half is what catches an
+      output that drifted while the code kept working.
 
-  The example runs no LiveView code, so this test runs in the headless tree
-  too - a README whose first snippet needed Phoenix would be lying about
-  the optional dependency.
+  The examples run no LiveView code, so this test runs in the headless tree
+  too - a worked example that needed Phoenix would be lying about the
+  optional dependency.
   """
 
   use ExUnit.Case, async: false
@@ -28,50 +31,66 @@ defmodule StatifierBlocks.ReadmeTest do
   @readme Path.join([__DIR__, "..", "..", "README.md"]) |> Path.expand()
   @external_resource @readme
 
+  @page Path.join([__DIR__, "..", "..", "docs", "guides", "build-and-compile.md"])
+        |> Path.expand()
+  @external_resource @page
+
   setup_all do
     readme = File.read!(@readme)
+    page = File.read!(@page)
 
-    # Evaluated once for the whole module: the section defines modules, and
+    # Evaluated once for the whole module: the page defines modules, and
     # evaluating it per test would redefine them.
-    {_result, worked} = eval_section(readme, "A worked example")
+    {_result, worked} = eval_blocks(elixir_blocks_in(page), "docs/guides/build-and-compile.md")
 
-    %{readme: readme, worked: worked}
+    %{readme: readme, page: page, worked: worked}
   end
 
-  # Sabotage: changed the README's `Palette.core_types()` merge to
-  # `Palette.new(%{...})` (dropping the core vocabulary) - red, because the
-  # compile then fails to resolve `core.sequence`.
-  test "the worked example compiles the card-processing document it claims to", ctx do
+  # Sabotage: changed the page's document id - red on the `document_id`
+  # assert. Dropping `Palette.core_types()` from the page's palette turns
+  # every test in this module red instead, through `setup_all`: the compile
+  # then fails to resolve `core.sequence` before any assertion runs.
+  test "the worked example compiles the patron-registration document it claims to", ctx do
     compiled = Keyword.fetch!(ctx.worked, :compiled)
 
-    assert compiled.invoke_types == ["myapp:authorize", "myapp:capture"]
+    assert compiled.invoke_types == ["myapp:check_details", "myapp:issue_card"]
     assert compiled.warnings == []
-    assert compiled.record.document_id == "bdoc_card_capture"
+    assert compiled.record.document_id == "bdoc_patron_registration"
     assert compiled.record.compiler_version == StatifierBlocks.Compiler.compiler_version()
 
-    assert compiled.scxml =~ ~s(<invoke id="s_blk_authorize__invocation" type="myapp:authorize"/>)
-    assert compiled.scxml =~ ~s(<invoke id="s_blk_capture__invocation" type="myapp:capture"/>)
+    assert compiled.scxml =~
+             ~s(<invoke id="s_blk_check_details__invocation" type="myapp:check_details"/>)
+
+    assert compiled.scxml =~
+             ~s(<invoke id="s_blk_issue_card__invocation" type="myapp:issue_card"/>)
+
+    assert compiled.scxml =~
+             ~s(<transition event="done.state.s_blk_check_details" target="s_blk_old_enough" type="internal"/>)
+
+    assert compiled.scxml =~
+             ~s(<transition event="done.state.s_blk_old_enough" target="s_blk_root__o_done" type="internal"/>)
 
     assert Keyword.fetch!(ctx.worked, :blocks_in_play) ==
-             ["blk_approved", "blk_authorize", "blk_capture", "blk_root"]
+             ["blk_check_details", "blk_issue_card", "blk_old_enough", "blk_root"]
   end
 
-  # Sabotage: emptied the `datamodel:` list in the README's `Document.new/2`
-  # call - red on all three asserts, which is the point: the example's branch
-  # condition reads two roots, and an example that reads what nothing declares
-  # is the one this test exists to keep the README out of.
+  # Sabotage: emptied the `datamodel:` list in the page's `Document.new/2`
+  # call - red on the candidates assert and the SCXML match; deleting only
+  # the `minimum_age` entry is red on the findings assert too. The example's
+  # branch condition reads two roots, and an example that reads what nothing
+  # declares is the one this test exists to keep the page out of.
   test "the worked example declares the roots its branch condition reads", ctx do
     document = Keyword.fetch!(ctx.worked, :document)
     palette = Keyword.fetch!(ctx.worked, :palette)
     compiled = Keyword.fetch!(ctx.worked, :compiled)
 
     assert StatifierBlocks.Datamodel.candidates(document, nil) ==
-             ["amount", "budget_remaining"]
+             ["minimum_age", "visitor_age"]
 
     assert StatifierBlocks.Datamodel.findings(document, palette, nil) == []
 
     assert compiled.scxml =~
-             ~s(<datamodel><data id="budget_remaining"/><data id="amount"/></datamodel>)
+             ~s(<datamodel><data id="visitor_age"/><data id="minimum_age"/></datamodel>)
   end
 
   # Sabotage: dropped the `value_path:` key from `Core.Branch.config_schema/1`
@@ -93,20 +112,20 @@ defmodule StatifierBlocks.ReadmeTest do
              %{"arms" => [%{"cond" => "amount <= 5000", "slot" => "arm_approved"}]}
   end
 
-  # Sabotage: edited one `#=>` line in the README to claim a different value
+  # Sabotage: edited one `#=>` line on the page to claim a different value
   # - red here, which is the half of this file that catches prose drift a
   # still-passing snippet would hide.
-  test "every output the two example sections claim is the one they produce", ctx do
+  test "every output the two examples claim is the one they produce", ctx do
     claimed =
-      ["A worked example", "Config fields and where their values live"]
-      |> Enum.flat_map(&elixir_blocks_under(ctx.readme, &1))
+      (elixir_blocks_in(ctx.page) ++
+         elixir_blocks_under(ctx.readme, "Config fields and where their values live"))
       |> Enum.join("\n")
       |> then(&Regex.scan(~r/^\s*#=> (.+)$/m, &1))
       |> Enum.map(fn [_whole, claim] -> claim end)
 
     assert claimed == [
-             ~s(["myapp:authorize", "myapp:capture"]),
-             ~s(["blk_approved", "blk_authorize", "blk_capture", "blk_root"]),
+             ~s(["myapp:check_details", "myapp:issue_card"]),
+             ~s(["blk_check_details", "blk_issue_card", "blk_old_enough", "blk_root"]),
              ~s("arm_approved"),
              ~s(["arms", 0, "cond"]),
              ~s({:ok, "budget_remaining > amount"}),
@@ -114,15 +133,28 @@ defmodule StatifierBlocks.ReadmeTest do
            ]
   end
 
-  # Sabotage: renamed the "## A worked example" heading in the README - red
-  # on the non-empty assert, which is the guard against this whole file
-  # quietly checking an empty string.
+  # Sabotage: renamed the "## Config fields and where their values live"
+  # heading in the README - red on the non-empty assert in `eval_blocks/2`,
+  # which is the guard against this whole file quietly checking an empty
+  # string.
   defp eval_section(readme, heading) do
-    blocks = elixir_blocks_under(readme, heading)
+    eval_blocks(elixir_blocks_under(readme, heading), ~s("## #{heading}" in README.md))
+  end
 
-    refute blocks == [], ~s(no elixir code blocks found under "## #{heading}" in README.md)
+  # Sabotage: changed every ```elixir fence on the page to ```text - every
+  # test red through `setup_all`, on the non-empty assert here.
+  defp eval_blocks(blocks, where) do
+    refute blocks == [], "no elixir code blocks found under #{where}"
 
     blocks |> Enum.join("\n\n") |> Code.eval_string([], __ENV__)
+  end
+
+  # Every ```elixir block on a page, in reading order.
+  @spec elixir_blocks_in(binary()) :: [binary()]
+  defp elixir_blocks_in(page) do
+    ~r/^```elixir\n(.*?)^```$/ms
+    |> Regex.scan(page)
+    |> Enum.map(fn [_whole, code] -> code end)
   end
 
   # Every ```elixir block between `## <heading>` and the next `## ` heading.

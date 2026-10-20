@@ -10,8 +10,8 @@ defmodule StatifierBlocks do
   it produces is a build product. Nothing decompiles a chart back into blocks.
 
   This module is the package's root and carries no functions. The map below
-  is where to start; the README's worked example runs the whole path end to
-  end.
+  is where to start; the guide "How to build a block document and compile
+  it to a chart" runs the whole path end to end.
 
   ## The model
 
