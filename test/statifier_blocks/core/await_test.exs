@@ -15,7 +15,8 @@ defmodule StatifierBlocks.Core.AwaitTest do
 
   alias Statifier.Effect.Cancel
   alias StatifierBlocks.{Block, Compiler, Document, Palette}
-  alias StatifierBlocks.Core.{Await, Wait}
+  alias StatifierBlocks.Compiler.Context
+  alias StatifierBlocks.Core.{Await, OnEvent, Wait}
 
   doctest StatifierBlocks.Core.Await, only: [summary: 1]
 
@@ -319,6 +320,247 @@ defmodule StatifierBlocks.Core.AwaitTest do
     end
   end
 
+  describe "the optional capture map" do
+    # The map is `core.on_event`'s, key, rules and message, so the refusal
+    # is asserted against that type's own answer for the same pairs rather
+    # than restated as a literal: two spellings of one rule would be free
+    # to drift.
+    #
+    # Sabotage: dropped `Capture.check/2` from `validate_config/1` - red
+    # here and on the ordering test below (verified).
+    test "refuses a malformed map exactly as core.on_event does" do
+      for capture <- [
+            %{"loan.copy_id" => ""},
+            %{"loan copy" => "copy_id"},
+            %{"loan.copy_id" => ["konst", "x"]},
+            %{"loan.copy_id" => ["const", "a\u0001b"]},
+            "copy_id"
+          ] do
+        assert {:error, [{"capture", message}]} =
+                 Await.validate_config(%{"event" => "loan.requested", "capture" => capture})
+
+        assert {:error, [{"capture", ^message}]} =
+                 OnEvent.validate_config(%{
+                   "event" => "loan.requested",
+                   "outcome" => "abandon",
+                   "capture" => capture
+                 })
+      end
+    end
+
+    # Sabotage: made `Capture.check/2`'s `nil` arm a finding - red on the
+    # absent case, and on every test here that compiles an await
+    # (verified).
+    test "admits an absent map, an empty one, a path pair and a literal pair" do
+      for capture <- [nil, %{}, %{"loan.copy_id" => "copy_id"}, %{"loan.source" => ["const", 1]}] do
+        config =
+          if capture == nil,
+            do: %{"event" => "loan.requested"},
+            else: %{"event" => "loan.requested", "capture" => capture}
+
+        assert Await.validate_config(config) == :ok
+      end
+    end
+
+    # The finding is the map's own and lands after the declared fields'.
+    #
+    # Sabotage: checked the capture ahead of the event in
+    # `validate_config/1` - red, because the capture finding came first
+    # (verified).
+    test "reports capture after the two declared fields" do
+      assert {:error, [{"event", _event}, {"timeout", _timeout}, {"capture", _capture}]} =
+               Await.validate_config(%{"event" => "", "timeout" => "soon", "capture" => "x"})
+    end
+
+    # The capture declares no field: `config_schema/1` is the two fields
+    # the first test of this file pins, whatever the config holds, because
+    # decision 7's field-type set has no member that describes a map.
+    #
+    # Sabotage: declared a `capture` field whenever the config holds one -
+    # red here (verified).
+    test "adds no field to config_schema/1" do
+      assert Await.config_schema(%{"capture" => %{"loan.copy_id" => "copy_id"}}) ==
+               Await.config_schema(%{})
+    end
+  end
+
+  describe "emit/2 with a capture" do
+    # The emission is `core.on_event`'s: the same pairs compile to the same
+    # assigns, guards and order, compared as bytes against that type's
+    # compile of the same map.
+    #
+    # Sabotage: reversed the assigns before `emit/2` handed them to the
+    # awaited transition - red on both maps (verified). Dropping the sort
+    # in `Capture.assigns/1` moves both types at once, so this test cannot
+    # see it; `core.on_event`'s forty-pair ordering test is the one that
+    # goes red on that mutation (verified).
+    test "compiles a capture to the assigns core.on_event emits for it" do
+      for capture <- [
+            %{"loan.copy_id" => "copy_id", "loan.source" => ["const", "desk"]},
+            for(n <- 0..39, into: %{}, do: {"d.k#{String.pad_leading("#{n}", 2, "0")}", "s#{n}"})
+          ] do
+        awaited = assigns(compile!(await_capturing(capture, "14d")).scxml)
+        handled = assigns(compile!(group_around_handler(capture)).scxml)
+
+        assert awaited != ""
+        assert awaited == handled
+      end
+    end
+
+    # The assigns ride the transition the awaited event selects, ahead of
+    # nothing and inside it, because `_event.data` is in scope there and
+    # nowhere else. The timer's transition carries none: its event is the
+    # await's own and has no payload of the host's.
+    #
+    # Sabotage: put the assigns on the timer's transition as well - red
+    # (verified).
+    test "puts the assigns on the awaited transition and not on the timer's" do
+      scxml = compile!(await_capturing(%{"loan.copy_id" => "copy_id"}, "14d")).scxml
+
+      assert scxml =~
+               ~s(<transition event="loan.requested" target="s_blk_AWT__o_received">) <>
+                 ~s(<if cond="_event.data.copy_id !== undefined">) <>
+                 ~s(<assign expr="_event.data.copy_id" location="loan.copy_id"/></if>) <>
+                 ~s(</transition>)
+
+      assert scxml =~
+               ~s(<transition event="statifier_blocks.await.blk_AWT" ) <>
+                 ~s(target="s_blk_AWT__o_timed_out"/>)
+    end
+
+    # An absent map and an empty one are the await with no capture, byte
+    # for byte.
+    #
+    # Sabotage: made `Capture.assigns/1`'s `nil` clause emit an `<if>` -
+    # red on the `refute`, and the golden tests below went red with it
+    # (verified).
+    test "compiles an absent or empty capture to the bytes of an await with none" do
+      without = compile!(await_capturing(nil, "14d")).scxml
+
+      assert compile!(await_capturing(%{}, "14d")).scxml == without
+      refute without =~ "<assign"
+      refute without =~ "<if"
+    end
+
+    # `emit/2` is asked directly, for `core.on_event`'s reason: the Config
+    # stage refuses this config first, so a compile would go red whether or
+    # not `emit/2` answered for it.
+    #
+    # Sabotage: had `Capture.assigns/1`'s malformed arm answer `{:ok, []}` -
+    # red, because the pair was dropped silently (verified).
+    test "refuses a malformed capture rather than dropping the pair" do
+      assert {:error, [{"capture", _message}]} =
+               Await.emit(
+                 await_capturing(%{"loan.copy_id" => ""}, ""),
+                 Context.new("blk_AWT", "bdoc_T")
+               )
+    end
+  end
+
+  describe "documents with no capture compile as they did before the map" do
+    # The goldens were compiled from these fixture documents at the commit
+    # this capture's change was branched from, before any of its code was
+    # written; a document that carries no capture on any `core.await`
+    # compiles to exactly those bytes. A golden is replaced only by a change
+    # that says in its own commit why its document's bytes moved.
+    #
+    # Sabotage: emitted an `<if>` on the awaited transition for an await
+    # with no capture - red on all four (verified).
+    for {name, path} <- [
+          {"patron_registration", "test/fixtures/documents/patron_registration.json"},
+          {"composed", "test/fixtures/documents/flow_patterns/composed.json"},
+          {"bounded_step", "test/fixtures/documents/flow_patterns/bounded_step.json"},
+          {"deadline", "test/fixtures/await_capture/deadline.json"}
+        ] do
+      test "#{name} compiles byte-identically to its golden" do
+        assert compiled(unquote(path)) ==
+                 File.read!("test/fixtures/await_capture/#{unquote(name)}.scxml")
+      end
+    end
+  end
+
+  describe "the capture corpus case" do
+    # One await with a deadline, a path pair, a nested path pair and a
+    # literal pair, pinned as bytes. The golden is this change's own
+    # output; what makes it a claim rather than a restatement is the test
+    # beside it, which says its assigns are `core.on_event`'s.
+    #
+    # Sabotage: dropped the assigns from the awaited transition's children
+    # in `emit/2` - red here, on the emission tests above and on the runs
+    # below (verified).
+    test "compiles byte-identically to its golden" do
+      assert compiled("test/fixtures/await_capture/capture.json") ==
+               File.read!("test/fixtures/await_capture/capture.scxml")
+    end
+
+    # Sabotage: reversed the assigns before `emit/2` handed them to the
+    # awaited transition - red (verified).
+    test "carries the assigns core.on_event emits for the same map" do
+      {:ok, document} = Document.from_json(File.read!("test/fixtures/await_capture/capture.json"))
+      [%Block{config: %{"capture" => capture}}] = document.root.slots["body"]
+
+      assert assigns(compiled("test/fixtures/await_capture/capture.json")) ==
+               assigns(compile!(group_around_handler(capture)).scxml)
+    end
+  end
+
+  describe "the compiled chart, run with a capture" do
+    # The run a creating event's data needs: the awaited event carries the
+    # id the next step reads, and the await writes it on the way out.
+    #
+    # Sabotage: dropped the assigns from the awaited transition - red, and
+    # `loan` came back empty (verified).
+    test "the awaited event writes its payload into the datamodel" do
+      machine_state =
+        run_capturing(%{"loan.copy_id" => "copy_id", "loan.source" => ["const", "desk"]},
+          event: "loan.requested",
+          data: %{"copy_id" => "copy-42"}
+        )
+
+      assert machine_state.datamodel["loan"] == %{"copy_id" => "copy-42", "source" => "desk"}
+
+      assert MapSet.member?(
+               Statifier.active_leaf_states(machine_state),
+               "s_blk_AWT__o_received"
+             )
+    end
+
+    # `core.on_event`'s absent-source rule, unchanged on this type: a path
+    # the payload does not carry writes nothing, and a literal still writes.
+    #
+    # Sabotage: emitted every path pair's assign unguarded - red, because
+    # `copy_id` came back as the engine's unbound marker (verified).
+    test "a source the payload omits leaves its destination unwritten" do
+      machine_state =
+        run_capturing(%{"loan.copy_id" => "copy_id", "loan.source" => ["const", "desk"]},
+          event: "loan.requested",
+          data: %{}
+        )
+
+      assert machine_state.datamodel["loan"] == %{"source" => "desk"}
+    end
+
+    # The deadline's way out writes nothing: its event is not the awaited
+    # one.
+    #
+    # Sabotage: put the assigns on the timer transition too - red, because
+    # the literal pair was written on the timeout (verified).
+    test "the timer's event writes nothing" do
+      machine_state =
+        run_capturing(%{"loan.source" => ["const", "desk"]},
+          event: "statifier_blocks.await.blk_AWT",
+          data: %{}
+        )
+
+      assert machine_state.datamodel["loan"] == %{}
+
+      assert MapSet.member?(
+               Statifier.active_leaf_states(machine_state),
+               "s_blk_AWT__o_timed_out"
+             )
+    end
+  end
+
   defp cancels(effects), do: for({:cancel, cancel} <- effects, do: cancel)
 
   defp await(timeout) do
@@ -345,6 +587,55 @@ defmodule StatifierBlocks.Core.AwaitTest do
         ]
       }
     )
+  end
+
+  defp await_capturing(capture, timeout) do
+    config = %{"event" => "loan.requested", "timeout" => timeout}
+    config = if capture == nil, do: config, else: Map.put(config, "capture", capture)
+
+    Block.new("core.await", id: "blk_AWT", config: config)
+  end
+
+  defp group_around_handler(capture) do
+    Block.new("core.group",
+      id: "blk_GRP",
+      slots: %{
+        "body" => [Block.new("core.wait", id: "blk_STEP", config: %{"duration" => "48h"})],
+        "interrupts" => [
+          Block.new("core.on_event",
+            id: "blk_INT",
+            config: %{"event" => "loan.requested", "outcome" => "abandon", "capture" => capture}
+          )
+        ]
+      }
+    )
+  end
+
+  # Every `<if>`-wrapped or bare `<assign>` in a compiled chart, in order,
+  # as one string: the part of the emission a capture owns.
+  defp assigns(scxml) do
+    ~r/<if cond="[^"]*"><assign [^>]*\/><\/if>|<assign [^>]*\/>/
+    |> Regex.scan(scxml)
+    |> Enum.map_join(&hd/1)
+  end
+
+  defp compiled(path) do
+    {:ok, document} = Document.from_json(File.read!(path))
+    {:ok, compiled} = Compiler.compile(document, Palette.core())
+    compiled.scxml
+  end
+
+  defp run_capturing(capture, opts) do
+    {:ok, machine} = Statifier.compile(compile!(await_capturing(capture, "14d")).scxml)
+    {machine_state, _effects} = Statifier.initialize(machine, datamodel: %{"loan" => %{}})
+
+    {:ok, machine_state, _effects} =
+      Statifier.send_event(
+        machine_state,
+        Statifier.Event.external(Keyword.fetch!(opts, :event), data: Keyword.fetch!(opts, :data))
+      )
+
+    machine_state
   end
 
   defp compile!(root) do

@@ -705,9 +705,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # and the chip it will become read alike.
     @on_event_type "core.on_event"
 
+    # The types that store a `capture` map, and so draw its rows: the two
+    # core types that hold for an event and can copy its payload into the
+    # datamodel on the transition it selects (`StatifierBlocks.Core.Capture`).
+    @capture_types ["core.on_event", "core.await"]
+
     # The tag a literal capture source carries in the stored document -
     # `["const", value]` (ADR-0002's Note of 2026-09-12, `N1`). Spelled here
-    # rather than reached for, because `StatifierBlocks.Core.OnEvent` holds
+    # rather than reached for, because `StatifierBlocks.Core.Capture` holds
     # it as a private attribute and this package does not publish it.
     @const_tag "const"
 
@@ -3162,7 +3167,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # row: `validate_config/1` is the authority that refuses it, and there
     # is no control here that could repair it.
     @spec capture_pairs(map()) :: [{String.t(), String.t() | {:const, term()}}] | nil
-    defp capture_pairs(%{selected_node: %ViewModel.Node{type: @on_event_type} = node} = assigns) do
+    defp capture_pairs(%{selected_node: %ViewModel.Node{type: type} = node} = assigns)
+         when type in @capture_types do
       case Map.get(selected_config(assigns, node.block_id), "capture") do
         pairs when is_map(pairs) ->
           pairs
@@ -3198,7 +3204,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # struct this package does not own reads as no fixture: the loader is
     # statifier-ui's, and this package does not depend on it.
     @spec capture_sources(map()) :: [String.t()]
-    defp capture_sources(%{selected_node: %ViewModel.Node{type: @on_event_type} = node} = assigns) do
+    defp capture_sources(%{selected_node: %ViewModel.Node{type: type} = node} = assigns)
+         when type in @capture_types do
       with %Block{} = block <- block_by_id(assigns.document, node.block_id),
            {:ok, module, resolved} <- Palette.resolve(assigns.palette, block) do
         module

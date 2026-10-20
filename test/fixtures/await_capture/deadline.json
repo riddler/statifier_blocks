@@ -1,0 +1,23 @@
+{
+  "id": "bdoc_AWAITDEADLINE",
+  "revision": 1,
+  "root": {
+    "id": "blk_ROOT",
+    "slots": {
+      "body": [
+        {
+          "config": {
+            "event": "copy.returned",
+            "timeout": "14d"
+          },
+          "id": "blk_RET",
+          "type": "core.await",
+          "type_version": 1
+        }
+      ]
+    },
+    "type": "core.sequence",
+    "type_version": 1
+  },
+  "schema_version": 1
+}
