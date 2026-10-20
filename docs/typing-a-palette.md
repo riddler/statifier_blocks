@@ -11,13 +11,27 @@ what the environment holds at a path satisfies what the block reads there.
 [`docs/adr/0011-typed-environment.md`](https://github.com/riddler/statifier_blocks/blob/main/docs/adr/0011-typed-environment.md) is the
 record; everything below is the moves.
 
+The example is patron registration: a visitor becomes a library patron
+through a few screens. One step checks the details the visitor entered, and a
+later step issues a library card to a visitor whose details say enough to
+hold one.
+
+Every snippet on this page runs, in order, as one script:
+[`test/statifier_blocks/typing_a_palette_test.exs`](https://github.com/riddler/statifier_blocks/blob/main/test/statifier_blocks/typing_a_palette_test.exs)
+evaluates them on every build and asserts every `#=>` output against what
+the code answers.
+
 ## Before you start
 
 The types themselves live in the datamodel document, which
 [`statifier_datamodel`](https://github.com/riddler/statifier_datamodel) owns:
 `sd-ADR-0001` is the record that defines the document, its `types` key and the
-read check. This package takes it as a dependency and calls it; it defines no
-second read check and no compatibility or coverage module of its own.
+read check. The read check is that package's
+`StatifierDatamodel.Types.satisfies/3` - unknown is permissive both ways,
+identity is nominal, and a record satisfies a shape when it covers the
+shape's required fields. This package takes it as a dependency and calls it;
+it defines no second read check and no compatibility or coverage module of
+its own.
 
 The dependency resolves from Hex, at a floor of 0.4:
 
@@ -54,19 +68,19 @@ datamodel = %{
     %{"scope" => "global", "label" => "Global", "entries" => []},
     %{
       "scope" => "local",
-      "label" => "This run",
+      "label" => "This registration",
       "entries" => [
         %{
-          "name" => "current_txn",
-          "path" => "cards.current_txn",
+          "name" => "visitor",
+          "path" => "registration.visitor",
           "type" => "object",
-          "label" => "Current transaction"
+          "label" => "Visitor"
         },
         %{
-          "name" => "settlement",
-          "path" => "cards.settlement",
+          "name" => "library_card",
+          "path" => "registration.library_card",
           "type" => "object",
-          "label" => "Settlement"
+          "label" => "Library card"
         }
       ]
     },
@@ -74,33 +88,33 @@ datamodel = %{
   ],
   "types" => [
     %{
-      "name" => "cards.credit_txn",
+      "name" => "myapp.patron_application",
       "kind" => "record",
-      "label" => "Credit card transaction",
+      "label" => "Patron application",
       "fields" => [
-        %{"name" => "amount_minor", "type" => "integer", "required?" => true},
-        %{"name" => "currency", "type" => "string", "required?" => true},
-        %{"name" => "authorized_at", "type" => "datetime"},
-        %{"name" => "expires_on", "type" => "date"}
+        %{"name" => "full_name", "type" => "string", "required?" => true},
+        %{"name" => "age", "type" => "integer", "required?" => true},
+        %{"name" => "submitted_at", "type" => "datetime"},
+        %{"name" => "birth_date", "type" => "date"}
       ]
     },
     %{
-      "name" => "cards.settlement",
+      "name" => "myapp.library_card",
       "kind" => "record",
-      "label" => "Settlement",
+      "label" => "Library card",
       "fields" => [
-        %{"name" => "amount_minor", "type" => "integer", "required?" => true},
-        %{"name" => "currency", "type" => "string", "required?" => true},
-        %{"name" => "settled_on", "type" => "date", "required?" => true}
+        %{"name" => "card_number", "type" => "string", "required?" => true},
+        %{"name" => "full_name", "type" => "string", "required?" => true},
+        %{"name" => "issued_on", "type" => "date", "required?" => true}
       ]
     },
     %{
-      "name" => "Settleable",
+      "name" => "CardApplicant",
       "kind" => "shape",
-      "label" => "Settleable",
+      "label" => "Card applicant",
       "fields" => [
-        %{"name" => "amount_minor", "type" => "integer", "required?" => true},
-        %{"name" => "currency", "type" => "string", "required?" => true}
+        %{"name" => "full_name", "type" => "string", "required?" => true},
+        %{"name" => "age", "type" => "integer", "required?" => true}
       ]
     }
   ]
@@ -108,8 +122,9 @@ datamodel = %{
 
 declarations = StatifierDatamodel.Declarations.from_document(datamodel)
 
-txn_label = StatifierBlocks.Environment.type_label(declarations, "cards.credit_txn")
-#=> "Credit card transaction"
+application_label =
+  StatifierBlocks.Environment.type_label(declarations, "myapp.patron_application")
+#=> "Patron application"
 ```
 
 A declared name is not a path: the `types` key on its own contributes nothing
@@ -126,21 +141,21 @@ entry's `fields` are:
 
 ```elixir
 %{
-  "name" => "current_txn",
-  "path" => "cards.current_txn",
-  "type" => "cards.credit_txn",
-  "label" => "Current transaction"
+  "name" => "visitor",
+  "path" => "registration.visitor",
+  "type" => "myapp.patron_application",
+  "label" => "Visitor"
 }
 ```
 
-With that entry in `scopes`, `cards.current_txn.amount_minor` is a declared
+With that entry in `scopes`, `registration.visitor.age` is a declared
 path: it is offered as an expression candidate, it draws the control its
 declared type asks for, and a block that writes there gets no undeclared-path
 advisory. Nothing about it is a special case here - this package reads the
 projection off `StatifierDatamodel.Index` and never asks whether the fields
 beneath a path were written inline or reached through a name. The Datamodel
-tab's Type cell for the entry itself reads `cards.credit_txn`, the name the
-author wrote.
+tab's Type cell for the entry itself reads `myapp.patron_application`, the
+name the author wrote.
 
 Write the declaration out inline instead when the shape is one path's alone;
 name it when the same record sits at more than one path, or when a step's
@@ -148,8 +163,8 @@ name it when the same record sits at more than one path, or when a step's
 
 ## Name the document's subject
 
-A one-subject document - a card moving through a flow, a signup running to
-completion - has one path everything is about. Name it once, on the palette
+A one-subject document - one visitor's registration moving through a few
+screens - has one path everything is about. Name it once, on the palette
 entry of the block type your documents start with:
 
 1. Add `subject:` to that type's `palette_entry/0`. It is read from the
@@ -159,8 +174,8 @@ entry of the block type your documents start with:
    there.
 
 ```elixir
-defmodule MyApp.Typing.Authorize do
-  @moduledoc "myapp.authorize: places a hold on the card."
+defmodule MyApp.Typing.CheckDetails do
+  @moduledoc "myapp.check_details: checks the details a visitor entered."
 
   @behaviour StatifierBlocks.BlockType
 
@@ -178,10 +193,10 @@ defmodule MyApp.Typing.Authorize do
   def validate_config(_config), do: :ok
 
   @impl true
-  def io(_config), do: %{kinds: [:step], produces: "cards.credit_txn"}
+  def io(_config), do: %{kinds: [:step], produces: "myapp.patron_application"}
 
   @impl true
-  def palette_entry, do: %{label: "Authorize", subject: "cards.current_txn"}
+  def palette_entry, do: %{label: "Check details", subject: "registration.visitor"}
 
   @impl true
   def emit(_block, context) do
@@ -213,9 +228,41 @@ independent signatures.
 A field declaring `expects` and no `writes` is a read and **not** also a
 write: it says what the block needs at the path, not what it leaves there.
 
+Each signature is an ordinary field declaration, so you can build one and
+read it on its own. `BlockType.value_path/1` says where the field's value
+lives in the block's config, and the field's `type` is its signature:
+
 ```elixir
-defmodule MyApp.Typing.Settle do
-  @moduledoc "myapp.settle: settles a hold this flow already placed."
+alias StatifierBlocks.BlockType
+
+read = %{
+  key: "applicant",
+  type: {:path, %{expects: "CardApplicant"}},
+  label: "Applicant",
+  required?: true,
+  default: "registration.visitor"
+}
+
+write = %{
+  key: "assign_to",
+  type: {:path, %{writes: "myapp.library_card"}},
+  label: "Write the card to",
+  required?: true,
+  default: "registration.library_card"
+}
+
+read_path = BlockType.value_path(read)
+#=> ["applicant"]
+
+write_signature = %{write.key => write.type}
+#=> %{"assign_to" => {:path, %{writes: "myapp.library_card"}}}
+```
+
+Put both on the block type that needs them:
+
+```elixir
+defmodule MyApp.Typing.IssueCard do
+  @moduledoc "myapp.issue_card: issues a library card to a visitor whose details allow one."
 
   @behaviour StatifierBlocks.BlockType
 
@@ -229,18 +276,18 @@ defmodule MyApp.Typing.Settle do
   def config_schema(_config),
     do: [
       %{
-        key: "subject",
-        type: {:path, %{expects: "Settleable"}},
-        label: "Transaction",
+        key: "applicant",
+        type: {:path, %{expects: "CardApplicant"}},
+        label: "Applicant",
         required?: true,
-        default: "cards.current_txn"
+        default: "registration.visitor"
       },
       %{
         key: "assign_to",
-        type: {:path, %{writes: "cards.settlement"}},
-        label: "Write the settlement to",
+        type: {:path, %{writes: "myapp.library_card"}},
+        label: "Write the card to",
         required?: true,
-        default: "cards.settlement"
+        default: "registration.library_card"
       }
     ]
 
@@ -251,7 +298,7 @@ defmodule MyApp.Typing.Settle do
   def io(_config), do: %{kinds: [:step]}
 
   @impl true
-  def palette_entry, do: %{label: "Settle"}
+  def palette_entry, do: %{label: "Issue card"}
 
   @impl true
   def emit(_block, context) do
@@ -281,49 +328,52 @@ document =
       id: "blk_root",
       slots: %{
         "body" => [
-          Block.new("myapp.authorize",
-            id: "blk_authorize",
-            config: %{"invoke_type" => "myapp:authorize"}
+          Block.new("myapp.check_details",
+            id: "blk_check_details",
+            config: %{"invoke_type" => "myapp:check_details"}
           ),
-          Block.new("myapp.settle",
-            id: "blk_settle",
-            config: %{"subject" => "cards.current_txn", "assign_to" => "cards.settlement"}
+          Block.new("myapp.issue_card",
+            id: "blk_issue_card",
+            config: %{
+              "applicant" => "registration.visitor",
+              "assign_to" => "registration.library_card"
+            }
           )
         ]
       }
     ),
-    id: "bdoc_card_settle"
+    id: "bdoc_patron_registration"
   )
 
 palette =
   Palette.new(
     Map.merge(Palette.core_types(), %{
-      "myapp.authorize" => MyApp.Typing.Authorize,
-      "myapp.settle" => MyApp.Typing.Settle
+      "myapp.check_details" => MyApp.Typing.CheckDetails,
+      "myapp.issue_card" => MyApp.Typing.IssueCard
     })
   )
 
 ctx = %{datamodel: datamodel}
 
-known_at_settle = Environment.at(palette, document, {"blk_root", "body", 1}, ctx)
-#=> %{"cards.current_txn" => "cards.credit_txn", "cards.current_txn.amount_minor" => "integer", "cards.current_txn.authorized_at" => "datetime", "cards.current_txn.currency" => "string", "cards.current_txn.expires_on" => "date", "cards.settlement" => "object"}
+known_at_issue_card = Environment.at(palette, document, {"blk_root", "body", 1}, ctx)
+#=> %{"registration.library_card" => "object", "registration.visitor" => "myapp.patron_application", "registration.visitor.age" => "integer", "registration.visitor.birth_date" => "date", "registration.visitor.full_name" => "string", "registration.visitor.submitted_at" => "datetime"}
 
 verdict = Assignability.validate(palette, document, ctx)
 #=> :ok
 ```
 
-`cards.settlement` is in that map without any block having written it: the
-environment seeds every path the datamodel declares, at the type it declares
-there (ADR-0011 decision 2, amended 2026-09-06), and a type a block writes
-replaces the seeded one from that position on - which is what
-`cards.current_txn` shows, seeded `object` and then written
-`cards.credit_txn` by the entry block's `produces`.
+`registration.library_card` is in that map without any block having written
+it: the environment seeds every path the datamodel declares, at the type it
+declares there (ADR-0011 decision 2, amended 2026-09-06), and a type a block
+writes replaces the seeded one from that position on - which is what
+`registration.visitor` shows, seeded `object` and then written
+`myapp.patron_application` by the entry block's `produces`.
 
-The four paths beneath `cards.current_txn` are there because that write names
+The four paths beneath `registration.visitor` are there because that write names
 a **record** (ADR-0011's Amendment of 2026-09-07): a write signature whose
 type is a record, a shape, or an inline shape puts an entry at the path and
 one at every member beneath it, at the member's own type, recursively and to
-any depth. So a later step reading `cards.current_txn.amount_minor` is
+any depth. So a later step reading `registration.visitor.age` is
 checked against `integer` rather than getting the nothing-is-known advisory,
 and a declaration-only field naming that path is unnecessary. Nothing expands
 through a `list`, and an explicit write signature at one of those member
@@ -335,21 +385,23 @@ advisory, meets the declared type instead - so a document that validated may
 refuse once its host supplies a datamodel, and the fix is either the block's
 declaration or the document's.
 
-The settle step expects `Settleable` and the environment holds
-`cards.credit_txn`. That is not identity, so the check asks coverage:
-`cards.credit_txn` has `amount_minor` and `currency`, which is the whole of
-`Settleable`'s required set. Satisfied.
+The issue-card step expects `CardApplicant` and the environment holds
+`myapp.patron_application`. That is not identity, so the check asks coverage:
+`myapp.patron_application` has `full_name` and `age`, which is the whole of
+`CardApplicant`'s required set. Satisfied.
 
 To see a refusal, point the read at a shape the record does not cover:
 
 ```elixir
-by_coverage = Environment.satisfies(declarations, "cards.credit_txn", "Settleable")
+by_coverage =
+  Environment.satisfies(declarations, "myapp.patron_application", "CardApplicant")
 #=> :covers
 
-refused = Environment.satisfies(declarations, "cards.settlement", "cards.credit_txn")
+refused =
+  Environment.satisfies(declarations, "myapp.library_card", "myapp.patron_application")
 #=> :not_assignable
 
-permissive = Environment.satisfies(declarations, :unknown, "Settleable")
+permissive = Environment.satisfies(declarations, :unknown, "CardApplicant")
 #=> :unknown
 ```
 
@@ -419,8 +471,8 @@ it now runs **last**, after unknown, after identity and after coverage. So:
 
 ```elixir
 _typed_palette =
-  Palette.new(Map.merge(Palette.core_types(), %{"myapp.settle" => MyApp.Typing.Settle}),
-    assignability: MyApp.Typing.Settle
+  Palette.new(Map.merge(Palette.core_types(), %{"myapp.issue_card" => MyApp.Typing.IssueCard}),
+    assignability: MyApp.Typing.IssueCard
   )
 ```
 
@@ -429,7 +481,7 @@ _typed_palette =
 Four surfaces show the environment, and none of them changes a verdict:
 
 - **Findings carry the declared label.** A finding about a path renders the
-  declaration's `label`, so an author reads "Credit card transaction" rather
+  declaration's `label`, so an author reads "Patron application" rather
   than a nominal name they have to look up. A declaration with no `label`
   renders its name.
 - **The Datamodel tab answers "what is known here".** Select a block and the

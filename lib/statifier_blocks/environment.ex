@@ -541,8 +541,8 @@ defmodule StatifierBlocks.Environment do
 
   A spelling that names a declaration in `declarations` renders that
   declaration's **label**, which is the human-readable name the record asks a
-  finding and the Datamodel tab to carry so an author reads "Credit card
-  transaction" instead of a nominal name they have to go and look up. Every
+  finding and the Datamodel tab to carry so an author reads "Patron
+  application" instead of a nominal name they have to go and look up. Every
   other spelling renders exactly as it did before there were declarations:
   one of the nine scalars as its own word, an opaque string a host carries as
   itself, `:unknown` as `unknown`, and a list as what it holds.
@@ -554,16 +554,16 @@ defmodule StatifierBlocks.Environment do
 
       iex> alias StatifierBlocks.Environment
       iex> declarations = StatifierDatamodel.Declarations.from_document(%{"types" => [
-      ...>   %{"name" => "cards.credit_txn", "kind" => "record",
-      ...>     "label" => "Credit card transaction", "fields" => []}]})
-      iex> Environment.type_label(declarations, "cards.credit_txn")
-      "Credit card transaction"
-      iex> Environment.type_label(declarations, "myapp.card_txn")
-      "myapp.card_txn"
+      ...>   %{"name" => "myapp.patron_application", "kind" => "record",
+      ...>     "label" => "Patron application", "fields" => []}]})
+      iex> Environment.type_label(declarations, "myapp.patron_application")
+      "Patron application"
+      iex> Environment.type_label(declarations, "myapp.library_card")
+      "myapp.library_card"
       iex> Environment.type_label(declarations, :unknown)
       "unknown"
-      iex> Environment.type_label(declarations, {:list, "cards.credit_txn"})
-      "list of Credit card transaction"
+      iex> Environment.type_label(declarations, {:list, "myapp.patron_application"})
+      "list of Patron application"
   """
   @spec type_label(Declarations.t(), term()) :: String.t()
   def type_label(_declarations, :unknown), do: "unknown"

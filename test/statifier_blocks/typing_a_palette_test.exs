@@ -1,7 +1,6 @@
 defmodule StatifierBlocks.TypingAPaletteTest do
   @moduledoc """
-  `docs/typing-a-palette.md` and the README's typing section are executed,
-  not trusted.
+  `docs/typing-a-palette.md` is executed, not trusted.
 
   The how-to is the page a host reads when it types its first palette, so a
   snippet there that no longer compiles against the real API is a defect the
@@ -9,9 +8,10 @@ defmodule StatifierBlocks.TypingAPaletteTest do
   block from the how-to, concatenates them in reading order - they are one
   program, and later blocks use names earlier ones bound - evaluates the
   result, and asserts every value the page claims in a `#=>` comment. The
-  README's `## Typing a palette` section is evaluated the same way.
+  field-signature snippet that the README's typing section used to carry
+  lives on the page now, and its claims are asserted here with the rest.
 
-  Three consequences worth naming, because all three are deliberate:
+  Two consequences worth naming, because both are deliberate:
 
     * **Every fence is checked, and all but one of them runs.**
       `elixir_blocks/1` takes them all rather than a named section's, so a
@@ -23,10 +23,6 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     * **The claimed outputs are asserted twice** - once as a value, once as
       the literal text of the `#=>` line - which is what catches an output
       that drifted while the code kept working.
-    * **The two documents are evaluated in separate `setup_all` calls but
-      define no module in common.** The how-to's modules are namespaced
-      `MyApp.Typing.*`; the README's section defines none at all, so
-      neither redefines what the other bound.
 
   Nothing here needs LiveView, so it runs in the headless tree too - a
   typing guide whose first snippet needed Phoenix would be lying about the
@@ -36,19 +32,14 @@ defmodule StatifierBlocks.TypingAPaletteTest do
   use ExUnit.Case, async: false
 
   @how_to Path.join([__DIR__, "..", "..", "docs", "typing-a-palette.md"]) |> Path.expand()
-  @readme Path.join([__DIR__, "..", "..", "README.md"]) |> Path.expand()
   @external_resource @how_to
-  @external_resource @readme
 
   setup_all do
     how_to = File.read!(@how_to)
-    readme = File.read!(@readme)
 
     how_to_blocks = elixir_blocks(how_to)
-    readme_blocks = elixir_blocks_under(readme, "Typing a palette")
 
     refute how_to_blocks == [], "no elixir code blocks found in docs/typing-a-palette.md"
-    refute readme_blocks == [], ~s(no elixir code blocks under "## Typing a palette" in README.md)
 
     # Evaluated once for the whole module: the how-to defines modules, and
     # evaluating it per test would redefine them.
@@ -58,35 +49,27 @@ defmodule StatifierBlocks.TypingAPaletteTest do
       |> Enum.join("\n\n")
       |> Code.eval_string([], file: @how_to)
 
-    {_readme_result, readme_binding} =
-      readme_blocks |> Enum.join("\n\n") |> Code.eval_string([], file: @readme)
-
-    %{
-      how_to: how_to,
-      readme: readme,
-      how_to_binding: how_to_binding,
-      readme_binding: readme_binding
-    }
+    %{how_to: how_to, how_to_binding: how_to_binding}
   end
 
-  # Sabotage: deleted the `"label" => "Credit card transaction"` line from
-  # the how-to's `cards.credit_txn` declaration - red here
-  # (`left: {:ok, %{label: "Credit card transaction"}}` against a
-  # declaration carrying none), restored, re-ran green (verified).
+  # Sabotage: deleted the `"label" => "Patron application"` line from the
+  # how-to's `myapp.patron_application` declaration - red here
+  # (`left: {:ok, %{label: "Patron application"}}` against a declaration
+  # carrying none), restored, re-ran green (verified).
   test "the how-to's datamodel document declares the types it claims", ctx do
     declarations = Keyword.fetch!(ctx.how_to_binding, :declarations)
 
-    assert {:ok, %{label: "Credit card transaction"}} =
-             StatifierDatamodel.Declarations.fetch(declarations, "cards.credit_txn")
+    assert {:ok, %{label: "Patron application"}} =
+             StatifierDatamodel.Declarations.fetch(declarations, "myapp.patron_application")
 
     assert {:ok, %{kind: :shape}} =
-             StatifierDatamodel.Declarations.fetch(declarations, "Settleable")
+             StatifierDatamodel.Declarations.fetch(declarations, "CardApplicant")
 
-    assert Keyword.fetch!(ctx.how_to_binding, :txn_label) == "Credit card transaction"
+    assert Keyword.fetch!(ctx.how_to_binding, :application_label) == "Patron application"
   end
 
-  # Sabotage: removed `subject: "cards.current_txn"` from the how-to's
-  # `palette_entry/0` - red (`left: nil, right: "cards.current_txn"`),
+  # Sabotage: removed `subject: "registration.visitor"` from the how-to's
+  # `palette_entry/0` - red (`left: nil, right: "registration.visitor"`),
   # restored, re-ran green (verified). This is the assert that keeps the
   # guide's central claim - the sugar is a read and a write at the subject
   # path - from going stale.
@@ -94,23 +77,23 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     palette = Keyword.fetch!(ctx.how_to_binding, :palette)
     document = Keyword.fetch!(ctx.how_to_binding, :document)
 
-    assert StatifierBlocks.Environment.subject_path(palette, document) == "cards.current_txn"
+    assert StatifierBlocks.Environment.subject_path(palette, document) == "registration.visitor"
 
     # The entry block writes a record at the subject path, so the walk also
     # holds one entry per field of it (ADR-0011's Amendment of 2026-09-07).
-    assert Keyword.fetch!(ctx.how_to_binding, :known_at_settle) ==
+    assert Keyword.fetch!(ctx.how_to_binding, :known_at_issue_card) ==
              %{
-               "cards.current_txn" => "cards.credit_txn",
-               "cards.current_txn.amount_minor" => "integer",
-               "cards.current_txn.currency" => "string",
-               "cards.current_txn.authorized_at" => "datetime",
-               "cards.current_txn.expires_on" => "date",
-               "cards.settlement" => "object"
+               "registration.visitor" => "myapp.patron_application",
+               "registration.visitor.full_name" => "string",
+               "registration.visitor.age" => "integer",
+               "registration.visitor.submitted_at" => "datetime",
+               "registration.visitor.birth_date" => "date",
+               "registration.library_card" => "object"
              }
   end
 
-  # Sabotage: changed the how-to's `expects:` from `"Settleable"` to
-  # `"cards.settlement"` - red here (`left: {:error, ...}, right: :ok`),
+  # Sabotage: changed the how-to's `expects:` from `"CardApplicant"` to
+  # `"myapp.library_card"` - red here (`left: {:error, ...}, right: :ok`),
   # restored, re-ran green (verified): a guide that teaches a signature the
   # walk then refuses is the failure this test exists to prevent.
   test "the how-to's typed document validates", ctx do
@@ -121,40 +104,38 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     assert Keyword.fetch!(ctx.how_to_binding, :permissive) == :unknown
   end
 
+  # Sabotage: changed the field-signature snippet's read `key:` from
+  # `"applicant"` to `"subject"` - red here (`left: ["subject"],
+  # right: ["applicant"]`), restored, re-ran green (verified). Every value
+  # below is read out of the snippet's own binding rather than recomputed
+  # here, which is what makes a sabotage bite: an earlier draft recomputed the
+  # call and stayed green through it. The four values are the ones the
+  # README's typing section claimed before the section moved to this page:
+  # the coverage verdict and the declared label are the page's own
+  # `by_coverage` and `application_label`, which make the same two calls.
+  test "the field-signature snippet produces the values it claims", ctx do
+    assert Keyword.fetch!(ctx.how_to_binding, :read_path) == ["applicant"]
+    assert Keyword.fetch!(ctx.how_to_binding, :by_coverage) == :covers
+    assert Keyword.fetch!(ctx.how_to_binding, :application_label) == "Patron application"
+
+    assert Keyword.fetch!(ctx.how_to_binding, :write_signature) ==
+             %{"assign_to" => {:path, %{writes: "myapp.library_card"}}}
+  end
+
   # Sabotage: edited the how-to's first `#=> :covers` line to claim
   # `:identical` - red (the claim lists differed on that one row), restored,
   # re-ran green (verified) - the half that catches prose drift a passing
   # snippet hides.
   test "every output the how-to claims is the one it produces", ctx do
     assert claims(ctx.how_to) == [
-             ~s("Credit card transaction"),
-             ~s(%{"cards.current_txn" => "cards.credit_txn", "cards.current_txn.amount_minor" => "integer", "cards.current_txn.authorized_at" => "datetime", "cards.current_txn.currency" => "string", "cards.current_txn.expires_on" => "date", "cards.settlement" => "object"}),
+             ~s("Patron application"),
+             ~s(["applicant"]),
+             ~s(%{"assign_to" => {:path, %{writes: "myapp.library_card"}}}),
+             ~s(%{"registration.library_card" => "object", "registration.visitor" => "myapp.patron_application", "registration.visitor.age" => "integer", "registration.visitor.birth_date" => "date", "registration.visitor.full_name" => "string", "registration.visitor.submitted_at" => "datetime"}),
              ~s(:ok),
              ~s(:covers),
              ~s(:not_assignable),
              ~s(:unknown)
-           ]
-  end
-
-  # Sabotage: pointed the README section's `Environment.satisfies/3` at
-  # `"cards.settlement"` as the held type - red
-  # (`left: :not_assignable, right: :covers`), restored, re-ran green
-  # (verified). Every value below is read out of the snippet's own binding
-  # rather than recomputed here, which is what makes that sabotage bite: an
-  # earlier draft recomputed the call and stayed green through it.
-  test "the README section produces the values it claims", ctx do
-    assert Keyword.fetch!(ctx.readme_binding, :read_path) == ["subject"]
-    assert Keyword.fetch!(ctx.readme_binding, :satisfied) == :covers
-    assert Keyword.fetch!(ctx.readme_binding, :label) == "Credit card transaction"
-
-    assert Keyword.fetch!(ctx.readme_binding, :write_signature) ==
-             %{"assign_to" => {:path, %{writes: "cards.settlement"}}}
-
-    assert claims(readme_section(ctx.readme)) == [
-             ~s(["subject"]),
-             ~s(:covers),
-             ~s("Credit card transaction"),
-             ~s(%{"assign_to" => {:path, %{writes: "cards.settlement"}}})
            ]
   end
 
@@ -193,7 +174,7 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     # Named rather than derived: the counts are the module's contract with the
     # guide, so a fence added on either side of the split is a red test and a
     # deliberate decision rather than a silent change of what runs.
-    assert length(executed) == 7
+    assert length(executed) == 8
     assert [fence] = excluded
 
     {{name, requirement}, []} = Code.eval_string(fence, [], file: @how_to)
@@ -221,27 +202,11 @@ defmodule StatifierBlocks.TypingAPaletteTest do
     |> Enum.map(fn [_whole, claim] -> claim end)
   end
 
-  @spec readme_section(binary()) :: binary()
-  defp readme_section(readme) do
-    readme
-    |> String.split("\n## ")
-    |> Enum.find("", &String.starts_with?(&1, "Typing a palette\n"))
-  end
-
   # Every ```elixir block in the document, in reading order.
   @spec elixir_blocks(binary()) :: [binary()]
   defp elixir_blocks(markdown) do
     markdown
     |> then(&Regex.scan(~r/^```elixir\n(.*?)^```$/ms, &1))
     |> Enum.map(fn [_whole, code] -> code end)
-  end
-
-  # Every ```elixir block between `## <heading>` and the next `## ` heading.
-  @spec elixir_blocks_under(binary(), binary()) :: [binary()]
-  defp elixir_blocks_under(markdown, heading) do
-    markdown
-    |> String.split("\n## ")
-    |> Enum.find("", &String.starts_with?(&1, heading <> "\n"))
-    |> elixir_blocks()
   end
 end
