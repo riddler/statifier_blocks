@@ -517,3 +517,56 @@ They are met here, not edited.
   `type_expr_findings/2` at `block_type.ex:1151`.
 
 Filed with `sb-ods3`.
+
+## Note (2026-10-19): the test that pins D4's narrowed scope
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. This record and its amendment stay accepted.
+It answers one sentence of the Note above on D4, "A test will pin the
+narrowed scope" (`:453`), and names the test that does.
+
+The record names config-independent declarations as D4's premise for host
+types. A host type whose `config_schema/1` declares the same field types for
+every config is inside D4's guarantee. A host type whose declared field
+types depend on its config is outside the generated definition's guarantee:
+the definition is typed from `config_schema(%{})` alone, so a config the
+package accepts can be refused by it. The test shows both halves.
+
+- The test is "the generated definition is read from config_schema(%{}): a
+  config-dependent select is outside the guarantee", in
+  `test/statifier_blocks/schema_for_palette_test.exs` (`:668`, read at
+  `b173930`). It landed in `7fe837c`. Its host type, `LoanDesk` (`:124`), is
+  a library loan desk whose `loan_period` select offers the media periods
+  when `item_kind` is `"media"` and the book periods otherwise, so
+  `config_schema(%{})` declares the book periods.
+- A book config validates against the generated definition. A media config
+  has no binding finding (`StatifierBlocks.BlockType.field_type_findings/2`,
+  `lib/statifier_blocks/block_type.ex:1232`, read at `b173930`), passes the
+  package's config check as the test names it (`defp package_accepts?/2`,
+  `:358`: the declared field types, then `validate_config/1`), decodes, and
+  is refused by the generated definition. The generated `loan_period` enum is the book periods, the
+  `config_schema(%{})` answer.
+- The generated definition is read from that one answer:
+  `StatifierBlocks.Schema.HostDefinition`'s `defp read_fields/1`
+  (`lib/statifier_blocks/schema/host_definition.ex:64`, read at `b173930`)
+  asks `config_schema/1` about `%{}`, as `StatifierBlocks.Palette.new_block/2`
+  (`lib/statifier_blocks/palette.ex:691`, read at `b173930`) does.
+
+The same commit changed the wording the Note above quotes from
+`StatifierBlocks.Schema.for_palette/1`'s `@doc`. At `b173930` it reads that
+every document the package admits validates when every block whose type the
+palette carries answers `:ok` from `validate_config/1` and holds, in each
+field its `config_schema/1` declares for `config_schema(%{})`, as
+`Palette.new_block/2` asks it, a value the field's type admits
+(`lib/statifier_blocks/schema.ex:123-127`). The moduledoc paragraph on
+generated definitions now says a type whose declared field types vary with
+its config is typed from the `config_schema(%{})` answer alone (`:62-68`).
+No schema output changed.
+
+Cites that have moved, each anchor still naming the thing cited: read at
+`b173930`, `defp read_fields/1` is at `host_definition.ex:64`, the
+`for_palette/1` `@doc` condition at `schema.ex:123-127`, and the test
+"every generated host document whose blocks the package accepts validates"
+at `schema_for_palette_test.exs:485`.
+
+Filed with `sb-w9yj`.
