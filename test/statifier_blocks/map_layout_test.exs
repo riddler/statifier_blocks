@@ -233,9 +233,10 @@ defmodule StatifierBlocks.MapLayoutTest do
     end
 
     # The whole of that resume edge, not only its ends. The head's middle
-    # sits lower than the rule's top on this fixture, so a path that went
-    # straight across at the head's middle would run down through the
-    # rule's own box. Every run of the drawn path is level or upright, the
+    # sits lower than the rule's top here only because the test draws the
+    # head leaf taller than the server holds it (see `taller/3` below), so
+    # a path that went straight across at the head's middle would run down
+    # through the rule's own box. Every run of the drawn path is level or upright, the
     # first goes up, and none passes through the inside of the rule's box;
     # the path only touches the box where it leaves its top.
     #

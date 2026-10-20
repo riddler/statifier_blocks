@@ -4966,10 +4966,12 @@ button.sb-inspector__group-row:hover {
   fill: var(--sb-fg-muted);
 }
 
-/* A container's one-line caption: under a group's rules column's label,
-   and on a branch's band; and the delay a dotted timer edge is labelled
-   with. Same 12px as every other line, so the width estimate holds; set
-   apart by its slant. */
+/* A caption: a branch's band's one line; under a group's rules column's
+   label, the column's own caption on one unwrapped line and the group
+   type's sentence on the lines under it, each line its own text; the
+   words on an edge, and the delay a dotted timer edge is labelled with.
+   Same 12px as every other line, so the width estimate holds; set apart
+   by its slant. */
 .sb-map__svg .sb-map__caption {
   fill: var(--sb-fg-muted);
   font-style: italic;
