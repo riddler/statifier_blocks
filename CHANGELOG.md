@@ -17,10 +17,12 @@ Docs release: 0.44.1 changes documentation only. The README is cut to a
 short introduction with a Basic usage block and a Documentation map, the
 guides and reference pages that map links are published on HexDocs, and
 the teaching examples are re-cut to patron registration. No function
-body, typespec or option changes; in `lib/` and the stylesheet only
-`@moduledoc` and `@doc` text, doctest literals and comments change, so a
-host that changes nothing sees every answer 0.44.0 gave. The package
-gains no Hex dependency.
+body, typespec or option changes; apart from the `@compiler_version`
+string, `lib/` and the stylesheet change only in `@moduledoc` and `@doc`
+text, doctest literals and comments. No function answers differently
+from 0.44.0, except that `StatifierBlocks.Compiler.compiler_version/0`
+answers the new package version and a compiled record carries it as its
+compiler version. The package gains no Hex dependency.
 
 ### Added
 
