@@ -72,6 +72,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
          # for one that did - `nil` included - so `publish_attr/1` can tell a
          # host passing nothing from a host passing `nil`.
          publish_status: Map.get(session, "publish_status", :error),
+         # `{module, function, args}` or `nil`: the function is built on this
+         # side, for `on_change`'s reason - a session carries no functions.
+         advisories: Map.get(session, "advisories"),
          test_pid: session["test_pid"]
        )}
     end
@@ -102,7 +105,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         on_select={if @on_select?, do: selection_notifier(@test_pid)}
         on_collapse={if @on_collapse?, do: collapse_notifier(@test_pid)}
         on_drawer_resize={height_notifier(@test_pid)}
-        {profile_attr(@profile) ++ publish_attr(@publish_status)}
+        {profile_attr(@profile) ++ publish_attr(@publish_status) ++ advisories_attr(@advisories)}
       >
         <:header :if={@header}>
           <p class="host-header">{@header}</p>
@@ -122,6 +125,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # test mounts, and `publish_status: nil` is a host naming `nil`.
     defp publish_attr(:error), do: []
     defp publish_attr({:ok, status}), do: [publish_status: status]
+
+    # The `advisories` attr on `profile_attr/1`'s terms: absent unless the
+    # test named one. A test names `{module, function, args}` and the host's
+    # function is `module.function(document, ...args)`, built here.
+    defp advisories_attr(nil), do: []
+
+    defp advisories_attr({module, function, args}),
+      do: [advisories: fn document -> apply(module, function, [document | args]) end]
 
     # A host swapping the open document, which is 8A's half of the split: which
     # document is open is the host's decision, and 2A says the drawer closes
@@ -270,7 +281,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     profile map, and its default - `nil` - mounts with the attr **absent**,
     which is the unprofiled editor rather than a host naming the default. The
     `:publish_status` is passed only when the test names it, `nil` included,
-    for `:profile`'s reason. The
+    for `:profile`'s reason. `:advisories` is `{module, function, args}`,
+    passed as the attr only when named, and the host's function is
+    `module.function(document, ...args)`. The
     `:datamodel` default is `nil` - no datamodel supplied - which is what the
     editor's own default is and what ADR-0005 amendment 11f makes meaningful.
     `:declare` defaults to `[]`, the compile call's roots the editor reads
@@ -318,6 +331,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "on_collapse" => Keyword.get(opts, :on_collapse, true),
         "profile" => Keyword.get(opts, :profile),
         "publish_status" => Keyword.fetch(opts, :publish_status),
+        "advisories" => Keyword.get(opts, :advisories),
         "test_pid" => test_pid
       }
     end
