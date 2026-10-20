@@ -58,8 +58,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     ## A finding on the card face (ADR-0005's Note of 2026-09-08, item 2)
 
     A finding that draws on a face draws **inside the card's own box** -
-    it is a child of `.sb-node__chrome`, in the same text column the title
-    and the chip row occupy, rather than a sibling of the chrome under it.
+    it is a child of `.sb-node__chrome`, a row below the title and the chip
+    row that spans the chrome grid, rather than a sibling of the chrome under it.
     On a leaf the two positions look alike; on a CONTAINER they do not. A
     container's node box is as wide as everything it holds and its card is
     the chrome centred inside that box, so a finding placed under the

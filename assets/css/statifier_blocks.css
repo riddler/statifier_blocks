@@ -1203,7 +1203,7 @@
  * 2026-09-08, item 2).
  *
  * The containment is the PLACEMENT: the row is a child of the card element
- * and sits in the card's own text column, so it is inside the card's border
+ * and sits in the card's own chrome grid, so it is inside the card's border
  * and padding on a leaf and on a container alike. Under the chrome instead -
  * where it used to be - a container's node box is `max-content` wide and the
  * row spanned it, drawing a full-width tinted line between the card and the
@@ -1213,9 +1213,20 @@
  * No explicit `grid-row`: rows 1 to 3 are the title, the second line and the
  * invoke line, and a card may carry several findings, so auto-placement
  * stacks them after whichever of those exist. `minmax(0, 1fr)` on the column
- * is what lets a long sentence wrap rather than widen the card. */
+ * is what lets a long sentence wrap rather than widen the card.
+ *
+ * The row spans every column, `1 / -1`, so it takes the card's full inner
+ * width below the chrome row. Placed in column 2 alone it had only what the
+ * title column left: with the strip's members revealed on a selected card the
+ * strip column grows to the widest of its members and the title column
+ * shrinks to its minimum, which left a sentence a few characters wide per
+ * line on a 14rem card. A row spanning all columns cannot be placed in a row
+ * that any other chrome cell holds, so it auto-places below them. `min-width: 0`
+ * keeps the spanning row from asking the flexible column for its longest
+ * word's width, which would grow the card instead of wrapping. */
 .sb-node__chrome > .sb-finding {
-  grid-column: 2;
+  grid-column: 1 / -1;
+  min-width: 0;
   overflow-wrap: break-word;
 }
 
