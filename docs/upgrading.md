@@ -88,9 +88,8 @@ release below.
     `StatifierBlocks.Graph.consumers_broken/2`, judges a child's next revision
     against the published parents that name it.
 
-  The order they run in, with the compile between them, is the README's
-  [At publish](https://github.com/riddler/statifier_blocks/blob/main/README.md#at-publish)
-  section.
+  The order they run in, with the compile between them, is
+  [How to publish a document](guides/publish-a-document.md).
 
 ## 0.33 to 0.34
 
