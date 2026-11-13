@@ -338,6 +338,111 @@ defmodule StatifierBlocks.CompositeTest do
     def summary(_config), do: ["one lane"]
   end
 
+  # -- the library loan's reminder step: a composite handed its own id -----
+
+  defmodule ReminderStep do
+    @moduledoc """
+    A reminder whose invoked handler is told which step asked: the composite
+    block's own id is written to the datamodel and passed as a param.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "library.reminder_step",
+      params: [
+        %{
+          key: "invoke_type",
+          type: :string,
+          label: "Send with",
+          required?: true,
+          default: "library:send_reminder"
+        }
+      ],
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params, context) do
+      [
+        Block.new("core.assign",
+          id: "ref",
+          config: %{"path" => "loan.step_ref", "value" => inspect(context.block_id)}
+        ),
+        Block.new("core.invoke",
+          id: "send",
+          config: %{
+            "invoke_type" => params["invoke_type"],
+            "assign_to" => "",
+            "params" => "step_ref=loan.step_ref"
+          }
+        )
+      ]
+    end
+  end
+
+  defmodule ContextShape do
+    @moduledoc "Writes the expansion context it was handed, raw, into its one member."
+    use StatifierBlocks.Composite, name: "library.context_shape", params: []
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(_params, context) do
+      [
+        Block.new("core.assign",
+          id: "ref",
+          config: %{
+            "path" => "loan.step_ref",
+            "value" => if(is_map(context), do: Map.get(context, :block_id), else: context),
+            "shape" => if(is_map(context), do: "map", else: "other")
+          }
+        )
+      ]
+    end
+  end
+
+  defmodule BrokenByContext do
+    @moduledoc """
+    One broken `subtree/2` answer per param value, so each refusal is met
+    through the two-argument route.
+    """
+    use StatifierBlocks.Composite,
+      name: "library.broken_by_context",
+      params: [%{key: "how", type: :string, label: "How", required?: true, default: "empty"}]
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(%{"how" => "empty"}, _context), do: []
+
+    def subtree(%{"how" => "local_from_id"}, context),
+      do: [Block.new("core.assign", id: context.block_id, config: assign())]
+
+    def subtree(%{"how" => "duplicate"}, _context),
+      do: [
+        Block.new("core.assign", id: "ref", config: assign()),
+        Block.new("core.assign", id: "ref", config: assign())
+      ]
+
+    def subtree(%{"how" => "separator"}, _context),
+      do: [Block.new("core.assign", id: "_ref", config: assign())]
+
+    defp assign, do: %{"path" => "loan.step_ref", "value" => "1"}
+  end
+
+  defmodule MisMapped do
+    @moduledoc "A pass-through slot mapped to a local id its `subtree/2` never writes."
+    use StatifierBlocks.Composite,
+      name: "library.mis_mapped",
+      params: [],
+      slots: [%{name: "after", to: {"missing", "body"}}]
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(_params, _context),
+      do: [Block.new("core.sequence", id: "ref")]
+  end
+
   # -- helpers -----------------------------------------------------------
 
   defp palette do
@@ -349,6 +454,10 @@ defmodule StatifierBlocks.CompositeTest do
         "myapp.reviews" => Reviews,
         "myapp.two_in_one" => TwoInOne,
         "myapp.value_first" => ValueFirst,
+        "library.broken_by_context" => BrokenByContext,
+        "library.context_shape" => ContextShape,
+        "library.mis_mapped" => MisMapped,
+        "library.reminder_step" => ReminderStep,
         "signup.confirm_contact" => ConfirmContact,
         "signup.reads" => Reads
       })
@@ -1126,6 +1235,227 @@ defmodule StatifierBlocks.CompositeTest do
       refute Code.ensure_loaded?(MisspelledComposite)
     end
   end
+
+  describe "subtree/2: the subtree is handed the composite block's own id" do
+    # Sabotage: dropped `subtree: 1` from the behaviour's `@optional_callbacks`
+    # - red, the module then compiles with a "required by behaviour" warning.
+    test "a module defining only subtree/2 compiles as a composite, without a warning" do
+      {_result, diagnostics} =
+        Code.with_diagnostics(fn ->
+          Code.eval_string("""
+          defmodule StatifierBlocksTestOnlySubtree2 do
+            use StatifierBlocks.Composite, name: "library.only_two", params: []
+
+            @impl StatifierBlocks.Composite
+            def subtree(_params, _context),
+              do: [StatifierBlocks.Block.new("core.sequence", id: "body")]
+          end
+          """)
+        end)
+
+      assert diagnostics == []
+      assert Composite.composite?(StatifierBlocksTestOnlySubtree2)
+      assert Composite.composite?(ReminderStep)
+      refute function_exported?(ReminderStep, :subtree, 1)
+    end
+
+    # Sabotage: refused only a module missing `subtree/1` - red on the message,
+    # which no longer names `subtree/2`.
+    test "a module defining neither arity is refused, naming both" do
+      message = ~r/StatifierBlocksTestNoSubtree .*defines no subtree\/1 and no subtree\/2/
+
+      assert_raise CompileError, message, fn ->
+        Code.eval_string("""
+        defmodule StatifierBlocksTestNoSubtree do
+          use StatifierBlocks.Composite, name: "library.empty", params: []
+        end
+        """)
+      end
+    end
+
+    # Sabotage: dropped the both-arities clause from `refute_subtree_arities!/1`
+    # - red, the module compiled.
+    test "a module defining both arities is refused, saying to define one" do
+      message = ~r/StatifierBlocksTestBothSubtrees defines both subtree\/1 and subtree\/2/
+
+      assert_raise CompileError, message, fn ->
+        Code.eval_string("""
+        defmodule StatifierBlocksTestBothSubtrees do
+          use StatifierBlocks.Composite, name: "library.both", params: []
+
+          @impl StatifierBlocks.Composite
+          def subtree(_params), do: [StatifierBlocks.Block.new("core.sequence", id: "body")]
+
+          @impl StatifierBlocks.Composite
+          def subtree(_params, _context),
+            do: [StatifierBlocks.Block.new("core.sequence", id: "body")]
+        end
+        """)
+      end
+
+      refute Code.ensure_loaded?(StatifierBlocksTestBothSubtrees)
+    end
+
+    # Sabotage: handed `subtree/2` the probe id "blk" instead of the block's own
+    # - red on the assigned value.
+    test "the subtree is handed the composite block's id" do
+      block = reminder("blk_LR")
+
+      assert {[ref, send], param_map} = Composite.expand!(block, ReminderStep)
+      assert {ref.id, send.id} == {"blk_LR_ref", "blk_LR_send"}
+      assert ref.config == %{"path" => "loan.step_ref", "value" => ~s("blk_LR")}
+      assert param_map == %{"blk_LR_ref" => nil, "blk_LR_send" => "invoke_type"}
+    end
+
+    # Sabotage: built the context from the first id this process saw rather
+    # than the block's own - red on the second block.
+    test "two blocks of one type each see their own id" do
+      {first, _} = Composite.expand!(reminder("blk_LR"), ReminderStep)
+      {second, _} = Composite.expand!(reminder("blk_LS"), ReminderStep)
+
+      assert hd(first).config["value"] == ~s("blk_LR")
+      assert hd(second).config["value"] == ~s("blk_LS")
+      refute inspect(first) =~ "blk_LS"
+      refute inspect(second) =~ "blk_LR"
+    end
+
+    # Sabotage: appended `System.unique_integer/0` to the context's id - red,
+    # the two expansions then differ.
+    test "the expansion is stable" do
+      assert Composite.expand!(reminder("blk_LR"), ReminderStep) ==
+               Composite.expand!(reminder("blk_LR"), ReminderStep)
+    end
+
+    # Sabotage: handed `subtree/2` the stored config rather than `params_of/2`'s
+    # merge - red, the default invoke type is then missing.
+    test "defaults sit under the stored config" do
+      {[_ref, send], _} = Composite.expand!(reminder("blk_LR"), ReminderStep)
+
+      assert send.config["invoke_type"] == "library:send_reminder"
+    end
+
+    # Sabotage: passed the bare id as the second argument - red, the shape the
+    # fixture records is then not a map.
+    test "the context is a map carrying the id under :block_id" do
+      block = Block.new("library.context_shape", id: "blk_CTX")
+
+      assert {[ref], _} = Composite.expand!(block, ContextShape)
+      assert ref.config["value"] == "blk_CTX"
+      assert ref.config["shape"] == "map"
+    end
+
+    # Sabotage: left the message naming `subtree/1` - red on the arity.
+    test "an empty answer from subtree/2 is refused, naming the arity" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Composite.expand!(broken("blk_E", "empty"), BrokenByContext)
+        end
+
+      assert error.message =~ "subtree/2 must answer a non-empty list"
+    end
+
+    # Sabotage: dropped the `"blk_"` prefix check from `check_local_ids!/2` -
+    # red, the local id built from the composite's id then mints.
+    test "a local id built from the composite id is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Composite.expand!(broken("blk_X", "local_from_id"), BrokenByContext)
+        end
+
+      assert error.message =~ ~s(subtree/2 answered a block whose id "blk_X" looks like)
+    end
+
+    # Sabotage: escaped the id before handing it over (`inspect/1` of it) -
+    # red, the context then carries quotes the document's id does not.
+    test "the id is passed through raw" do
+      block = Block.new("library.context_shape", id: "blk_O'R")
+      assert {[ref], _} = Composite.expand!(block, ContextShape)
+      assert ref.config["value"] == "blk_O'R"
+      assert ref.id == "blk_O'R_ref"
+
+      assert {[ref, send], _} = Composite.expand!(reminder("blk_O'R"), ReminderStep)
+      assert {ref.id, send.id} == {"blk_O'R_ref", "blk_O'R_send"}
+    end
+
+    # Sabotage: dropped the duplicate check - red, nothing raises.
+    test "a duplicate local id from subtree/2 is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Composite.expand!(broken("blk_D", "duplicate"), BrokenByContext)
+        end
+
+      assert error.message =~ ~s(subtree/2 answered duplicate local ids: ["ref"])
+    end
+
+    # Sabotage: dropped the `"__"` check from `mint_id/3` - red, nothing raises.
+    test "a minted id carrying the role separator is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Composite.expand!(broken("blk_LR", "separator"), BrokenByContext)
+        end
+
+      assert error.message =~ ~s(subtree/2's local id "_ref" mints "blk_LR__ref")
+    end
+
+    # Sabotage: skipped `check_mapping!/3` on the two-argument route - red,
+    # nothing raises.
+    test "a pass-through mapping that does not fit a subtree/2 answer is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          Composite.expand!(Block.new("library.mis_mapped", id: "blk_MM"), MisMapped)
+        end
+
+      assert error.message =~ ~s(maps to "missing")
+    end
+
+    # Sabotage: reversed the members of the probe block's expansion only - red,
+    # the derived root is then the invoke and its outcomes differ.
+    test "the probe derivations agree with the real expansion" do
+      block = reminder("blk_LR")
+
+      assert ReminderStep.outcomes(%{}) == Composite.outcomes(palette(), block)
+      assert ReminderStep.io(%{}).kinds == Composite.io(palette(), block).kinds
+    end
+
+    # Sabotage: had `expand/2` expand the block under the probe id - red, the
+    # pair then differs.
+    test "expand/2 answers the same pair for a subtree/2 type" do
+      block = reminder("blk_LR")
+
+      assert {:ok, pair} = Composite.expand(block, ReminderStep)
+      assert pair == Composite.expand!(block, ReminderStep)
+    end
+
+    # Sabotage: let `expand/2` re-raise - red, the refusal escapes.
+    test "a refused subtree/2 answer is {:error, message} from expand/2" do
+      result =
+        try do
+          Composite.expand(broken("blk_E", "empty"), BrokenByContext)
+        rescue
+          error -> {:raised, error}
+        end
+
+      assert {:error, message} = result
+      assert message =~ "subtree/2 must answer a non-empty list"
+    end
+
+    # Sabotage: dropped the expansion root from the members `expand!/2`
+    # answers - red, the walk then sees no write at "loan.step_ref".
+    test "the environment walk sees the member's write through a subtree/2 expansion" do
+      block = reminder("blk_LR")
+
+      assert {"path", "loan.step_ref", :unknown} in Environment.write_signatures(
+               palette(),
+               document([block]),
+               block
+             )
+    end
+  end
+
+  defp reminder(id), do: Block.new("library.reminder_step", id: id, config: %{})
+
+  defp broken(id, how),
+    do: Block.new("library.broken_by_context", id: id, config: %{"how" => how})
 
   defp ids(blocks), do: Enum.map(blocks, & &1.id)
 end

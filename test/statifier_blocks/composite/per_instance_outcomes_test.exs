@@ -627,6 +627,8 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
     # The behaviour's first optional callback, and the reason it is optional:
     # every composite written before this section implements neither
     # spelling, and none of them is broken by the callback's existence.
+    # Both subtree arities are optional too; requiring one of them is
+    # `__before_compile__/1`'s job, not the behaviour's.
     #
     # Sabotage: dropped the `@optional_callbacks` attribute - red (verified).
     # Every composite written before this section implements neither spelling,
@@ -638,7 +640,9 @@ defmodule StatifierBlocks.Composite.PerInstanceOutcomesTest do
       assert {:declared_outcomes, 1} in callbacks
       assert {:declared_outcomes, 1} in optional
       assert {:subtree, 1} in callbacks
-      refute {:subtree, 1} in optional
+      assert {:subtree, 2} in callbacks
+      assert {:subtree, 1} in optional
+      assert {:subtree, 2} in optional
     end
 
     # `per_instance_declarer?/1` is the question the whole threading turns

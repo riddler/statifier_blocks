@@ -184,6 +184,69 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     end
   end
 
+  # -- the library loan's reminder step: a composite handed its own id -----
+
+  defmodule ReminderStep do
+    @moduledoc """
+    A reminder whose invoked handler is told which step asked: the composite
+    block's own id is written to the datamodel and passed as a param.
+    """
+
+    use StatifierBlocks.Composite,
+      name: "library.reminder_step",
+      params: [
+        %{
+          key: "invoke_type",
+          type: :string,
+          label: "Send with",
+          required?: true,
+          default: "library:send_reminder"
+        }
+      ],
+      version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(params, context) do
+      [
+        Block.new("core.assign",
+          id: "ref",
+          config: %{"path" => "loan.step_ref", "value" => inspect(context.block_id)}
+        ),
+        Block.new("core.invoke",
+          id: "send",
+          config: %{
+            "invoke_type" => params["invoke_type"],
+            "assign_to" => "",
+            "params" => "step_ref=loan.step_ref"
+          }
+        )
+      ]
+    end
+  end
+
+  defmodule LoanReminders do
+    @moduledoc "A `subtree/1` composite holding one reminder step: the nesting case."
+
+    use StatifierBlocks.Composite, name: "library.loan_reminders", params: [], version: 1
+
+    alias StatifierBlocks.Block
+
+    @impl StatifierBlocks.Composite
+    def subtree(_params), do: [Block.new("library.reminder_step", id: "first")]
+  end
+
+  defmodule RaisesWithContext do
+    @moduledoc "A `subtree/2` that raises for every block it is handed."
+
+    use StatifierBlocks.Composite, name: "library.raises_with_context", params: [], version: 1
+
+    @impl StatifierBlocks.Composite
+    def subtree(_params, context),
+      do: raise(ArgumentError, "no reminder can be built for #{context.block_id}")
+  end
+
   describe "E1/E4: a composite compiles to the bytes its expansion compiles to" do
     # Sabotage: made `Compiler.resolve/2` fall through to `resolve_children/3`
     # for a composite - red at the first assertion, because the composite's
@@ -388,6 +451,98 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     end
   end
 
+  describe "subtree/2: the composite block's own id reaches the chart" do
+    # Sabotage: handed `subtree/2` the probe id "blk" instead of the block's own
+    # - red on the assign's expression.
+    test "the id reaches the chart as the member's literal" do
+      assert {:ok, compiled} = Compiler.compile(reminder_document(), palette())
+
+      assert compiled.scxml =~ ~s(<assign expr="&quot;blk_LR&quot;" location="loan.step_ref"/>)
+      assert compiled.scxml =~ ~s(<param expr="loan.step_ref" name="step_ref"/>)
+    end
+
+    # Sabotage: made Resolve rewrite the assign member's value after
+    # `expand!/2` (a second expansion under another id) - red, the bytes differ.
+    test "the composite compiles to its expansion's bytes" do
+      block = reminder("blk_LR")
+      {members, _param_map} = Composite.expand!(block, ReminderStep)
+
+      assert {:ok, composed} = Compiler.compile(document([block]), palette())
+      assert {:ok, expanded} = Compiler.compile(document(members), palette())
+
+      assert composed.scxml == expanded.scxml
+      assert composed.provenance == expanded.provenance
+    end
+
+    # Sabotage: appended `System.unique_integer/0` to the context's id - red,
+    # the two compiles differ.
+    test "the compile is deterministic" do
+      assert {:ok, one} = Compiler.compile(reminder_document(), palette())
+      assert {:ok, two} = Compiler.compile(reminder_document(), palette())
+
+      assert one.scxml == two.scxml
+      assert one.record.document_hash == two.record.document_hash
+      assert one.record.chart_identity == two.record.chart_identity
+    end
+
+    # Sabotage: blamed every expanded member on no param - red, the finding
+    # then carries no config key.
+    test "a finding inside the expansion names the composite and the param" do
+      document = document([reminder("blk_LR", %{"invoke_type" => "library:post_card"})])
+
+      assert {:ok, compiled} =
+               Compiler.compile(document, palette(),
+                 known_invoke_types: MapSet.new(["library:send_reminder"])
+               )
+
+      assert [%Finding{} = warning] = compiled.warnings
+      assert warning.block_id == "blk_LR"
+      assert warning.config_key == "invoke_type"
+    end
+
+    # Sabotage: cut the context's id to its first two segments, which hands
+    # the nested `subtree/2` the outer composite's id - red, "blk_OUT" is written.
+    test "a nested composite is handed its own minted id" do
+      document = document([Block.new("library.loan_reminders", id: "blk_OUT")])
+
+      assert {:ok, compiled} = Compiler.compile(document, palette())
+
+      assert compiled.scxml =~
+               ~s(<assign expr="&quot;blk_OUT_first&quot;" location="loan.step_ref"/>)
+
+      assert compiled.scxml =~ ~s(id="s_blk_OUT_first_ref")
+      assert compiled.scxml =~ ~s(id="s_blk_OUT_first_send")
+      refute compiled.scxml =~ "&quot;blk_OUT&quot;"
+    end
+
+    # Sabotage: made the compiler's `expand/2` re-raise - red, `compile/3`
+    # raises out instead of answering a finding.
+    test "a subtree/2 that raises is a finding, not a raise" do
+      document = document([Block.new("library.raises_with_context", id: "blk_BAD")])
+
+      result =
+        try do
+          Compiler.compile(document, palette())
+        rescue
+          error -> {:raised, error}
+        end
+
+      assert {:error, [%Finding{} = finding]} = result
+      assert finding.stage == :resolve
+      assert {:composite_expansion_failed, "blk_BAD", _why} = finding.reason
+    end
+
+    # Sabotage: handed `subtree/2` the probe id "blk" - red, the run writes
+    # "blk".
+    test "the chart runs and writes the reference" do
+      assert {:ok, compiled} = Compiler.compile(reminder_document(), palette())
+      {:ok, machine} = Statifier.compile(compiled.scxml)
+      {machine_state, _effects} = Statifier.initialize(machine, datamodel: %{"loan" => %{}})
+
+      assert machine_state.datamodel["loan"]["step_ref"] == "blk_LR"
+    end
+  end
+
   # -- helpers -----------------------------------------------------------
 
   defp palette do
@@ -396,6 +551,9 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
         "myapp.guarded_step" => GuardedStep,
         "myapp.crowded" => Crowded,
         "myapp.deadline" => Deadline,
+        "library.loan_reminders" => LoanReminders,
+        "library.raises_with_context" => RaisesWithContext,
+        "library.reminder_step" => ReminderStep,
         "signup.confirm_contact" => ConfirmContact
       })
     )
@@ -439,6 +597,16 @@ defmodule StatifierBlocks.Compiler.CompositeExpansionTest do
     Block.new("myapp.crowded",
       id: id,
       config: %{"failure_path" => "cards.authorization.failure"}
+    )
+  end
+
+  defp reminder(id, config \\ %{}),
+    do: Block.new("library.reminder_step", id: id, config: config)
+
+  defp reminder_document do
+    Document.new(
+      Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => [reminder("blk_LR")]}),
+      id: "bdoc_T"
     )
   end
 

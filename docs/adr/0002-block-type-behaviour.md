@@ -14729,3 +14729,197 @@ four no-capture goldens, the capture corpus case and a run) and
 shared label). The corpus case is `test/fixtures/await_capture/capture.json`
 and its golden. This Note carries no `Status:` line, which is this file's
 convention for a Note.
+
+## Amendment (2026-11-13): a module composite may define `subtree/2`, handed an expansion context carrying the composite block's own id - `C11`
+
+**Status: proposed (2026-11-13, bead `sb-fqba`, recording the operator's
+ruling of 2026-11-13, "An optional subtree/2 that receives an expansion
+context carrying the block id; subtree/1 unchanged").** A decision record
+merges at proposed, and this one stays proposed until the code that builds it
+has shipped in a published version of this package. The code lands in the same
+request, after this section.
+
+Additive: every decision, Amendment and Note above this line stands exactly as
+it stands, and no text above this line is edited by this section. Four clauses
+are **narrowed by addition** below, each quoted and none edited:
+
+- The Amendment of 2026-09-07 on decision 5 (`:6360`): "`use
+  StatifierBlocks.Composite` takes two things and nothing else" (`:6413`),
+  already softened by the Note at `:7412`. The second thing is now a subtree
+  of either arity.
+- The same Amendment's purity paragraph (`:6433`-`:6439`): "`subtree/1` is a
+  **pure** function from the param map to the blocks ... same params in, same
+  subtree out, forever". For a composite defining `subtree/2`, purity is over
+  the params **and the composite block's own id**: same params and same id in,
+  same subtree out, forever. Nothing else joins the inputs.
+- `C9`'s first ground (`:13176`-`:13179`): "`subtree/1` ... is the one
+  callback `StatifierBlocks.Composite` declares today", and its sentence "The
+  behaviour gains its first `@optional_callbacks` attribute" (`:13221`-
+  `:13223`). Both were true when written. After this section the behaviour
+  declares `subtree/1`, `subtree/2` and `declared_outcomes/1`, all three
+  optional, and a module defines exactly one of the two subtree arities.
+- The repeated sentence that no `@callback` is added, removed or re-arity'd
+  (`:7300`-`:7301` and its siblings) is scoped to
+  `StatifierBlocks.BlockType`'s callbacks. `subtree` is
+  `StatifierBlocks.Composite`'s, so those sentences stand unchanged; this note
+  heads off the misreading.
+
+Every `lib/` cite below was **read at `b31b839`** and is written anchor
+first, line second; a later reader re-locates by the anchor and not by the
+number. Code that this request adds is cited by anchor alone.
+
+### `C11`. The declaration: an optional `subtree/2`, over the params and an expansion context
+
+`StatifierBlocks.Composite` declares a second subtree callback beside
+`subtree/1` (`@callback subtree(Block.config()) :: [Block.t()]`,
+`composite.ex:275`):
+
+    @callback subtree(Block.config(), expansion_context()) :: [Block.t()]
+
+`expansion_context()` is a map with one required key, `:block_id`, holding the
+composite block's own id as the document stores it. It is a map rather than
+the bare id so that a later key is an addition, not a change of arity, and it
+is named "expansion context" because `StatifierBlocks.Compiler.Context` (the
+`emit/2` argument) already exists and is a different thing.
+
+Everything this file says of `subtree/1` holds of `subtree/2`, with the
+inputs widened as the purity bullet above says: the answer is a non-empty list
+of blocks, its head is the expansion root, its ids are local and minted by
+`expand!/2`, and every refusal `expand!/2` raises for a `subtree/1` answer it
+raises for a `subtree/2` answer, naming the arity it called.
+
+### `C11b`. Exactly one subtree, refused at module compile
+
+A module that uses the composite declaration defines `subtree/1` or
+`subtree/2`. Defining neither is refused as the module compiles, as defining
+no `subtree/1` was (`defmacro __before_compile__/1`, `composite.ex:415`), and
+the message now names both arities. Defining both is refused as the module
+compiles too, in the shape `C9` refuses the `:outcomes` option written beside
+`declared_outcomes/1` (`defp refute_both_outcome_spellings!/1`,
+`composite.ex:467`): the two are two answers to one question, and letting
+`subtree/2` win silently would hide the other definition. Both arities are
+listed in `@optional_callbacks`, so a module defining one of them compiles
+without a warning for the other; the `use` injects neither.
+
+### `C11c`. One expansion, and every caller passes its real block
+
+`expand!/2` (`def expand!/2`, `composite.ex:662`) asks
+`Palette.declares?(ref, :subtree, 2)` and, when it is true, calls the subtree
+with the params and an expansion context built from `block.id`; otherwise it
+makes the call it makes today (`Palette.call(ref, :subtree, [params], nil)`,
+`composite.ex:671`). Nothing after the call moves: local-id checks, the
+pass-through mapping check, minting, the param map and the splice are
+unchanged. `expand/2` calls `expand!/2`, so the two spellings stay one
+expansion (the Note of 2026-09-08, item 3).
+
+The question goes through `Palette.declares?/3`, never through
+`function_exported?(module, :subtree, 2)`. For a `{module, state}` entry it
+asks for one arity higher (`def declares?/3`, `palette.ex:649`), and
+`StatifierBlocks.Composite.Data` defines only `subtree/2` as `(state,
+params)` (`def subtree/2`, `composite/data.ex:506`), which is `subtree/1` in
+the behaviour's terms. The data kind therefore keeps today's path.
+
+Every caller already hands `expand!/2` or `expand/2` the block as the
+document stores it: the compiler's Resolve (`defp expand/2`,
+`compiler.ex:1097`), the environment walk (the two `Composite.expand!`
+calls, `environment.ex:474` and `:799`) and the editor's Expand
+(`Composite.expand(block, module)`, `editor.ex:2430`). So Expand still writes
+what Resolve builds, and the byte-identity this file states for it
+(`:8310`-`:8317`) holds for a `subtree/2` composite. The two probe
+derivations behind `io/1` and `outcomes/1` expand a probe block whose id is
+`"blk"` (`defp probe_block/2`, `composite.ex:1458`), and a `subtree/2`
+composite is handed that id there. The two readers inside the module that
+serve both the probe derivations and the palette-carrying `io/2` and
+`outcomes/2` (`defp io_over/3`, `composite.ex:1008`; `defp outcomes_over/3`,
+`composite.ex:1054`) expand whichever block they are handed: the probe block
+for the callbacks, the real block for `io/2` and `outcomes/2`.
+
+### `C11d`. The id may appear in member config values only; stated, not enforced
+
+The composite block's id may be written into a member's config values and
+nowhere else. A local id, a member's type, a slot or the shape of the subtree
+that varies with the id breaks the composite: a local id that is a minted
+block id is refused as a freshly minted UXID (`defp check_local_ids!/2`,
+`composite.ex:1465`), and a structure that varies with the id makes the probe
+derivations above answer differently from the real expansion. This rule is
+**stated, not enforced**: enforcing it would expand every composite twice,
+under two ids, on every compile, for a rule the probe-agreement test already
+watches for the package's own fixture.
+
+The id is not a licence to hand-spell a generated name. A state id or an
+outcome event is still "spelled once, by the compiler's function for it ...
+never by string concatenation" (`:9290`-`:9296`), and it is not a way to
+name an outcome. An outcome name must be role-shaped (`:12083`-`:12087`);
+whether a given raw id passes that shape depends on its spelling (an id the
+package mints is lowercase and can pass it, an id like `blk_LR` cannot), so
+the shape is no guard against this use and the rule above is what forbids
+it. Minted ids are still a function of
+the composite block's id and the local ids alone (`defp mint_id/3`,
+`composite.ex:1559`), so `C10`'s finding (`:13810`) and `ADR-0004` decision
+6's determinism inputs are unchanged: the expansion context is built from
+`block.id`, which is part of the document's bytes.
+
+### `C11e`. The id is passed raw
+
+A block id is an opaque non-empty string. The package hands it to `subtree/2`
+unchanged and does not escape it, and it adds no helper that spells a string
+as an expression literal. A subtree that splices the id into an expression
+spells it as a literal of the field it writes into; `inspect/1` produces a
+double-quoted string the expression language reads back unchanged for an
+ordinary id, but it is Elixir's spelling and not that language's, and the two
+differ on control characters and some escapes. This is a correctness hazard
+for the composite's author and not a privilege boundary: the id is a field of
+the document the caller already holds, handed only to a callback of a type
+that caller registered.
+
+### `C11f`. Module composites only; a data composite is unchanged
+
+A data composite gets no way to name the composite's id in this section. Its
+template arms are the record's to add, with "the record that adds an arm and
+says which producer emits it" (`:7143`-`:7145`), and `C9e` (`:13332`) already
+set the module-composites-only precedent. A data composite expands, compiles
+and behaves exactly as before.
+
+### The alternative declined, and its reason
+
+The proposed `outcome_of:` Amendment (`:9181`, status `:9183`, kept proposed
+by the Note of 2026-09-19 at `:14025`) resolves a tagged whole config value at
+expansion and keeps the subtree a function of params alone. A tagged
+whole-value reference to the composite's id was the alternative to this
+section, and the operator ruled for `subtree/2` instead, not both: a
+whole-value reference cannot be interpolated into a larger string, such as
+`core.invoke`'s flattened params field or a quoted expression. The
+`outcome_of:` Amendment does not itself argue for or against a wider callback
+and never mentions a second subtree arity; it is an adjacent channel, it stays
+proposed and unbuilt, and this section supersedes no sentence of it.
+
+### What this section does not decide
+
+- **A data composite's spelling of the id**, a third template arm. Open, for
+  the request that needs it.
+- **A package helper that spells a string as an expression literal.** Open,
+  for a host that asks.
+- **`core.invoke`'s params field.** It stays name=path by documentation;
+  the guide's mention of a quoted literal on a params row describes what the
+  code admits, not a designed feature. The
+  request that builds this section pins what the field already admits, a
+  quoted literal with no whitespace, and decides nothing about it.
+- **Collapse.** It emits data declarations only, so a `subtree/2` composite is
+  not Collapse-representable; nothing changes there.
+- **What a host's handler does with the reference**, including authorizing a
+  lookup keyed by it. That is the host's.
+
+### What builds this, and what it is asked to prove
+
+`sb-fqba`'s code, in the same request. It is asked to prove that a module
+defining only `subtree/2` compiles and its members carry the composite's id;
+that each expansion sees its own block's id, two blocks of one type and a
+nested composite included; that a document holding such a composite compiles
+to the bytes of its expanded form and deterministically; that a module
+defining neither arity or both does not compile; that a broken `subtree/2`
+answer is a Resolve finding naming the arity; that the compiled chart runs
+and writes the reference; and that every `subtree/1` composite and every data
+composite compiles to the bytes it compiles to at `b31b839`, with no golden
+edited.
+
+Filed with `sb-fqba`.

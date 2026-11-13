@@ -72,6 +72,71 @@ defmodule StatifierBlocks.Composite do
   no `:id`, and a minted id is different on every call, which would make
   `subtree/1` impure and the expansion unstable.
 
+  ## Handing the subtree its own block id: `subtree/2`
+
+  A composite defines **exactly one** of `subtree/1` and `subtree/2`. The
+  second is handed the same params and an `t:expansion_context/0`, a map
+  carrying the composite block's own id under `:block_id`, so a member's
+  config can name the composite it was expanded from - a reminder step whose
+  invoked handler is told which step asked:
+
+      defmodule Library.ReminderStep do
+        use StatifierBlocks.Composite,
+          name: "library.reminder_step",
+          params: [
+            %{key: "invoke_type", type: :string, label: "Send with",
+              required?: true, default: "library:send_reminder"}
+          ],
+          version: 1
+
+        @impl true
+        def subtree(params, context) do
+          [
+            Block.new("core.assign",
+              id: "ref",
+              config: %{"path" => "loan.step_ref", "value" => inspect(context.block_id)}
+            ),
+            Block.new("core.invoke",
+              id: "send",
+              config: %{
+                "invoke_type" => params["invoke_type"],
+                "assign_to" => "",
+                "params" => "step_ref=loan.step_ref"
+              }
+            )
+          ]
+        end
+      end
+
+  Everything said of `subtree/1` holds of `subtree/2`, with its input widened
+  from the params to the params **and the composite block's own id**: same
+  params and same id in, same subtree out, forever. Three rules come with the
+  id:
+
+    * **It may appear in member config values only.** A local id, a member's
+      type or the shape of the subtree that varies with it is not refused
+      here, but it breaks the composite: a local id that is a minted block
+      id (`"blk_"`-prefixed) is refused as a freshly minted UXID, and the
+      derived `io/1` and `outcomes/1` expand a probe block whose id is
+      `"blk"`, so a structure that varies with the id answers them
+      differently from the real expansion. Nor is it a way to spell a
+      generated state id or outcome event by hand, or to name an outcome.
+    * **It is passed raw.** A block id is an opaque non-empty string, and the
+      package does not escape it. A subtree splicing it into an expression
+      spells it as a literal of the field it writes into. `inspect/1` writes
+      an ordinary id as a double-quoted string the expression language reads
+      back unchanged, as above, but it is Elixir's spelling and not that
+      language's: the two differ on control characters and some escapes.
+    * **Each expansion is handed its own block's id.** Two blocks of one type
+      see their own ids, and a composite nested in another sees the id minted
+      for it by the outer expansion.
+
+  A data composite (`StatifierBlocks.Composite.Data`) has no spelling of the
+  id; its template expands exactly as before. A host that rewrites one of its
+  composites from `subtree/1` to `subtree/2` changes what that composite's
+  documents compile to, and bumps the composite's `:version`, as for any edit
+  to a subtree.
+
   ## What the `use` derives
 
   | Callback | The composite's answer | Overridable |
@@ -254,6 +319,15 @@ defmodule StatifierBlocks.Composite do
           outcomes: [String.t()]
         }
 
+  @typedoc """
+  What `c:subtree/2` is handed beside the params: the **composite block's
+  own id** under `:block_id`.
+
+  A map rather than the bare id, so a later key is an addition and not a
+  change of arity.
+  """
+  @type expansion_context :: %{required(:block_id) => Block.id()}
+
   @separator "_"
 
   # `ADR-0002`'s Amendment of 2026-09-13, `C7` item 1: one slot per declared
@@ -273,6 +347,18 @@ defmodule StatifierBlocks.Composite do
   mints the document's ids from the composite block's own id.
   """
   @callback subtree(Block.config()) :: [Block.t()]
+
+  @doc """
+  The blocks this composite stands for, given its params and the
+  `t:expansion_context/0` naming the composite block's own id.
+
+  `subtree/1` with one more input, and pure over both: same params and same
+  id in, same subtree out, forever. A composite defines this **or**
+  `subtree/1`, never both - writing both, or neither, is refused as the
+  module compiles. The id may appear in member config values only, and is
+  passed raw (see the moduledoc).
+  """
+  @callback subtree(Block.config(), expansion_context()) :: [Block.t()]
 
   @doc """
   The outcome names **this instance** declares, read from its own config.
@@ -311,7 +397,7 @@ defmodule StatifierBlocks.Composite do
   """
   @callback declared_outcomes(Block.config()) :: [String.t()]
 
-  @optional_callbacks declared_outcomes: 1
+  @optional_callbacks declared_outcomes: 1, subtree: 1, subtree: 2
 
   # The recognized set of `use StatifierBlocks.Composite` options. It is the
   # same list the `__using__/1` doc below writes: an option added to one is
@@ -356,7 +442,7 @@ defmodule StatifierBlocks.Composite do
   with the declaration that results - it is simply not the one that was
   written.
 
-  The using module must define `subtree/1`.
+  The using module defines exactly one of `subtree/1` and `subtree/2`.
   """
   defmacro __using__(opts) do
     quote do
@@ -413,14 +499,7 @@ defmodule StatifierBlocks.Composite do
 
   @doc false
   defmacro __before_compile__(env) do
-    unless Module.defines?(env.module, {:subtree, 1}) do
-      raise CompileError,
-        file: env.file,
-        line: env.line,
-        description:
-          "#{inspect(env.module)} uses StatifierBlocks.Composite but defines no subtree/1. " <>
-            "A composite is params plus a pure subtree; there is nothing to expand without it."
-    end
+    refute_subtree_arities!(env)
 
     refute_both_outcome_spellings!(env)
 
@@ -448,6 +527,36 @@ defmodule StatifierBlocks.Composite do
     )
 
     nil
+  end
+
+  # Exactly one subtree. Neither leaves nothing to expand; both are two answers
+  # to one question, and letting `subtree/2` win silently would hide the other
+  # definition - the shape `refute_both_outcome_spellings!/1` below refuses.
+  @spec refute_subtree_arities!(Macro.Env.t()) :: :ok
+  defp refute_subtree_arities!(env) do
+    case {Module.defines?(env.module, {:subtree, 1}), Module.defines?(env.module, {:subtree, 2})} do
+      {false, false} ->
+        raise CompileError,
+          file: env.file,
+          line: env.line,
+          description:
+            "#{inspect(env.module)} uses StatifierBlocks.Composite but defines no subtree/1 " <>
+              "and no subtree/2. A composite is params plus a pure subtree; there is nothing " <>
+              "to expand without one. Define subtree/1, or subtree/2 to be handed the " <>
+              "composite block's own id."
+
+      {true, true} ->
+        raise CompileError,
+          file: env.file,
+          line: env.line,
+          description:
+            "#{inspect(env.module)} defines both subtree/1 and subtree/2. A composite " <>
+              "answers its subtree one way: define subtree/2 if the subtree needs the " <>
+              "composite block's own id, and subtree/1 otherwise - one of them, not both."
+
+      _exactly_one ->
+        :ok
+    end
   end
 
   # `C9`'s precedence clause, stated once and refused by name, in the shape
@@ -654,9 +763,15 @@ defmodule StatifierBlocks.Composite do
   chances for the compiled chart and the expanded document to disagree, and a
   second spelling that calls the first is not a second implementation.
 
-  Raises when the declaration is broken: a `subtree/1` that answers an empty
-  list, a non-block, a duplicated local id, or a local id that would mint an
-  id carrying `__`.
+  A type defining `subtree/2` is handed the params and an
+  `t:expansion_context/0` carrying `block`'s own id, so every caller passes
+  the block as the document stores it; a type defining `subtree/1`, and every
+  data composite, is handed the params alone.
+
+  Raises when the declaration is broken: a `subtree/1` or `subtree/2` that
+  answers an empty list, a non-block, a duplicated local id, or a local id
+  that would mint an id carrying `__`. Each message names the arity that was
+  called.
   """
   @spec expand!(Block.t(), Palette.type_ref()) :: {[Block.t()], param_map()}
   def expand!(%Block{} = block, ref) do
@@ -668,11 +783,11 @@ defmodule StatifierBlocks.Composite do
 
     params = params_of(ref, block.config)
 
-    subtree = Palette.call(ref, :subtree, [params], nil)
+    subtree = Palette.call(ref, :subtree, subtree_args(ref, params, block), nil)
 
     unless is_list(subtree) and subtree != [] and Enum.all?(subtree, &match?(%Block{}, &1)) do
       raise ArgumentError,
-            "#{inspect(ref)}.subtree/1 must answer a non-empty list of " <>
+            "#{inspect(ref)}.#{subtree_name(ref)} must answer a non-empty list of " <>
               "StatifierBlocks.Block structs, got: #{inspect(subtree)}"
     end
 
@@ -1430,6 +1545,23 @@ defmodule StatifierBlocks.Composite do
 
   # -- expansion --------------------------------------------------------
 
+  # What the subtree is handed. The question goes through
+  # `Palette.declares?/3`, which asks a `{module, state}` entry for one arity
+  # higher: `Composite.Data`'s own `subtree/2` is `(state, params)`, a
+  # `subtree/1` in the behaviour's terms, and is not mistaken for this one.
+  @spec subtree_args(Palette.type_ref(), Block.config(), Block.t()) :: [term()]
+  defp subtree_args(ref, params, %Block{id: id}) do
+    if Palette.declares?(ref, :subtree, 2),
+      do: [params, %{block_id: id}],
+      else: [params]
+  end
+
+  # The arity a refusal names: the one `subtree_args/3` called.
+  @spec subtree_name(Palette.type_ref()) :: String.t()
+  defp subtree_name(ref) do
+    if Palette.declares?(ref, :subtree, 2), do: "subtree/2", else: "subtree/1"
+  end
+
   # The params `subtree/1` is handed: the declaration's defaults, with the
   # block's stored config over them. A document may carry a config that
   # predates a param, and a composite is not the place to discover a missing
@@ -1468,12 +1600,12 @@ defmodule StatifierBlocks.Composite do
     Enum.each(ids, fn id ->
       unless is_binary(id) and id != "" do
         raise ArgumentError,
-              "#{inspect(module)}.subtree/1 answered a block with a non-string id: #{inspect(id)}"
+              "#{inspect(module)}.#{subtree_name(module)} answered a block with a non-string id: #{inspect(id)}"
       end
 
       if String.starts_with?(id, "blk_") do
         raise ArgumentError,
-              "#{inspect(module)}.subtree/1 answered a block whose id #{inspect(id)} looks like " <>
+              "#{inspect(module)}.#{subtree_name(module)} answered a block whose id #{inspect(id)} looks like " <>
                 "a freshly minted UXID. A subtree writes stable LOCAL ids; expand!/2 mints the " <>
                 "document's ids from the composite block's own id."
       end
@@ -1483,7 +1615,7 @@ defmodule StatifierBlocks.Composite do
 
     if duplicates != [] do
       raise ArgumentError,
-            "#{inspect(module)}.subtree/1 answered duplicate local ids: " <>
+            "#{inspect(module)}.#{subtree_name(module)} answered duplicate local ids: " <>
               "#{inspect(Enum.uniq(duplicates))}. Minting is injective per composite, so the " <>
               "local ids must be unique within one subtree."
     end
@@ -1561,7 +1693,7 @@ defmodule StatifierBlocks.Composite do
 
     if String.contains?(minted, "__") do
       raise ArgumentError,
-            "#{inspect(module)}.subtree/1's local id #{inspect(local_id)} mints " <>
+            "#{inspect(module)}.#{subtree_name(module)}'s local id #{inspect(local_id)} mints " <>
               ~s(#{inspect(minted)}, which carries "__". ADR-0004 decision 3 reserves "__" ) <>
               "for the role separator and its unstate_id/1 stops inverting when a block id " <>
               "carries one."

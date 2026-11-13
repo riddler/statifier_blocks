@@ -285,6 +285,68 @@ Know three things before you reach for one:
   `Composite.mapping_errors/2` answers the three refusals a mapping can
   earn against its own subtree.
 
+### If a member needs the composite's own id
+
+Define `subtree/2` instead of `subtree/1` when a member's config has to
+name the composite it was expanded from - a reminder step whose invoked
+handler is told which step asked. It is handed the same params and an
+expansion context, a map carrying the composite block's own id under
+`:block_id`:
+
+```elixir
+defmodule MyApp.ReminderStep do
+  alias StatifierBlocks.Block
+
+  use StatifierBlocks.Composite,
+    name: "myapp.reminder_step",
+    params: [
+      %{key: "invoke_type", type: :string, label: "Send with",
+        required?: true, default: "library:send_reminder"}
+    ],
+    version: 1
+
+  @impl true
+  def subtree(params, context) do
+    [
+      Block.new("core.assign",
+        id: "ref",
+        config: %{"path" => "loan.step_ref", "value" => inspect(context.block_id)}),
+      Block.new("core.invoke",
+        id: "send",
+        config: %{
+          "invoke_type" => params["invoke_type"],
+          "assign_to" => "",
+          "params" => "step_ref=loan.step_ref"
+        })
+    ]
+  end
+end
+```
+
+- **Define one of the two.** A module defining both `subtree/1` and
+  `subtree/2`, or neither, does not compile.
+- **Use the id in member config values only.** The local ids, the member
+  types and the shape of the subtree stay functions of the params alone:
+  the derived `io/1` and `outcomes/1` expand a probe block whose id is
+  `"blk"`, so a structure that varies with the id answers them differently
+  from the real expansion, and a local id that is a minted block id is
+  refused.
+- **Spell it for the field it lands in.** The id is passed raw, unescaped.
+  `core.assign`'s `value` is an expression, so a string is written with
+  its quotes, which `inspect/1` produces for an ordinary id; `inspect/1` is
+  Elixir's spelling, though, and differs from the expression language's on
+  control characters and some escapes. The code also admits a quoted
+  literal on a `core.invoke` params row, as
+  `"step_ref=" <> inspect(context.block_id)`, for an id with no
+  whitespace; the field is documented as name=path, so the `core.assign`
+  member above is the spelling that holds for any id.
+- **Bump the composite's `:version` when you switch.** Rewriting a
+  composite from `subtree/1` to `subtree/2` changes what its documents
+  compile to, as any edit to a subtree does.
+
+A `Composite.Data` declaration has no way to name the composite's id; its
+template expands as it always has.
+
 ### If your users save block types
 
 You do not have to generate a module per type.
