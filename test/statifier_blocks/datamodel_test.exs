@@ -205,6 +205,17 @@ defmodule StatifierBlocks.DatamodelTest do
   end
 
   describe "a capture's targets reach the advisory (ADR-0011 decision 10)" do
+    defp timeout_capturing_await do
+      Block.new("core.await",
+        id: "blk_AWT",
+        config: %{
+          "event" => "copy.returned",
+          "timeout" => "14d",
+          "timeout_capture" => %{"loan.wait_ended" => ["const", "timed_out"]}
+        }
+      )
+    end
+
     defp handler(id, capture) do
       Block.new("core.on_event",
         id: id,
@@ -250,6 +261,25 @@ defmodule StatifierBlocks.DatamodelTest do
              ) == []
 
       assert Datamodel.findings(document([handler("blk_odd", "not a map")]), palette(), []) == []
+    end
+
+    # sabotage: dropped the `timeout_capture` read from `capture_findings/4` -> red (verified).
+    test "an undeclared timeout capture target draws the advisory on its own key" do
+      assert [%Finding{} = finding] =
+               Datamodel.findings(document([timeout_capturing_await()]), palette(), [
+                 "loan.copy_id"
+               ])
+
+      assert finding.anchor == {:config, "blk_AWT", "timeout_capture"}
+      assert finding.severity == :info
+      assert finding.message =~ "loan.wait_ended"
+    end
+
+    # sabotage: checked the `timeout_capture` paths against nothing declared -> red (verified).
+    test "a declared timeout capture target draws nothing" do
+      assert Datamodel.findings(document([timeout_capturing_await()]), palette(), [
+               "loan.wait_ended"
+             ]) == []
     end
   end
 

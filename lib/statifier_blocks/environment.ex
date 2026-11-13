@@ -76,7 +76,7 @@ defmodule StatifierBlocks.Environment do
       `datamodel_path?: true`, write `:unknown` there - the path becomes
       known without becoming typed;
     * a `capture` config map writes `:unknown` at each of its keys, one per
-      pair;
+      pair, and so does a `timeout_capture` map after it;
     * `{:path, %{expects: T}}` reads `T` there.
 
   ## Member expansion
@@ -190,6 +190,11 @@ defmodule StatifierBlocks.Environment do
   # walk reads the config directly, which is what ADR-0011 decision 2's third
   # write-signature form asks for.
   @capture_key "capture"
+
+  # `core.await`'s literal-only map for its deadline's transition. It
+  # carries no field declaration for `capture`'s reason and is read the
+  # same way, off any block's config.
+  @timeout_capture_key "timeout_capture"
 
   @doc """
   The environment at `target`, as a map from datamodel path to type.
@@ -1247,12 +1252,22 @@ defmodule StatifierBlocks.Environment do
   # the pair's key, which is what puts those paths in front of ADR-0005 clause
   # 11e's declared-path advisory through the same mechanism as every other
   # datamodel path.
+  #
+  # A `timeout_capture` map is read the same way and reported after the
+  # `capture` pairs, each map in its keys' sorted order, anchored on its
+  # own key. The walk does not ask which transition a pair rides: like a
+  # handler's capture, it is a write the block may leave behind.
   @spec capture_writes(Block.config()) :: [signature()]
   defp capture_writes(config) do
-    case Map.get(config, @capture_key) do
+    map_writes(config, @capture_key) ++ map_writes(config, @timeout_capture_key)
+  end
+
+  @spec map_writes(Block.config(), String.t()) :: [signature()]
+  defp map_writes(config, key) do
+    case Map.get(config, key) do
       pairs when is_map(pairs) ->
         for {path, _source} <- Enum.sort(pairs), is_binary(path), path != "" do
-          {@capture_key, path, :unknown}
+          {key, path, :unknown}
         end
 
       _absent_or_not_a_map ->

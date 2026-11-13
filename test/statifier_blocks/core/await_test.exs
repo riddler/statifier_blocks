@@ -561,6 +561,300 @@ defmodule StatifierBlocks.Core.AwaitTest do
     end
   end
 
+  describe "the optional timeout_capture map" do
+    # Sabotage: admitted only an empty map in `Capture.check_literals/3` - red (verified).
+    test "admits a literal pair on an await with a deadline" do
+      assert Await.validate_config(
+               timeout_config(%{"loan.wait_ended" => ["const", "timed_out"]}, "14d")
+             ) ==
+               :ok
+    end
+
+    # Sabotage: made `Capture.check_literals/3`'s `nil` arm a finding - red (verified).
+    test "admits an absent, nil or empty map" do
+      assert Await.validate_config(%{"event" => "copy.returned", "timeout" => "14d"}) == :ok
+
+      for pairs <- [nil, %{}] do
+        assert Await.validate_config(timeout_config(pairs, "14d")) == :ok
+      end
+    end
+
+    # A path source is the one form `capture` admits and this key does not:
+    # the timer's event carries no payload to read it from.
+    #
+    # Sabotage: admitted a path source in `literal_pair?/1` - red (verified).
+    test "refuses a path source, naming the literal as the only form" do
+      assert {:error, [{"timeout_capture", message}]} =
+               Await.validate_config(timeout_config(%{"loan.wait_ended" => "reason"}, "14d"))
+
+      assert message =~ ~s(["const", value])
+      assert message =~ "A path to read is not accepted here"
+    end
+
+    # Sabotage: admitted a non-map, a blank path and a float in `Capture`, one at a time - red each (verified).
+    test "refuses a non-map, a blank destination and a literal it cannot spell" do
+      for pairs <- ["loan.wait_ended", %{"" => ["const", 1]}, %{"loan.fee" => ["const", 1.5]}] do
+        assert {:error, [{"timeout_capture", _message}]} =
+                 Await.validate_config(timeout_config(pairs, "14d"))
+      end
+    end
+
+    # The control-character refusal is `capture`'s own, landing on this key.
+    #
+    # Sabotage: dropped the control-character check from `check_literals/3` - red (verified).
+    test "refuses a control character in a literal, naming the codepoint" do
+      assert {:error, [{"timeout_capture", message}]} =
+               Await.validate_config(timeout_config(%{"loan.note" => ["const", <<1>>]}, "14d"))
+
+      assert message =~ "U+0001"
+    end
+
+    # Sabotage: checked timeout_capture ahead of capture in `validate_config/1` - red (verified).
+    test "reports timeout_capture after the declared fields and capture" do
+      assert {:error,
+              [
+                {"event", _event},
+                {"timeout", _timeout},
+                {"capture", _capture},
+                {"timeout_capture", _tc}
+              ]} =
+               Await.validate_config(%{
+                 "event" => "",
+                 "timeout" => "soon",
+                 "capture" => "x",
+                 "timeout_capture" => "y"
+               })
+    end
+
+    # With no deadline there is no transition to write on, and the map is
+    # admitted for the reason both outcomes stay declared for every config.
+    #
+    # Sabotage: admitted only an empty map in `Capture.check_literals/3` - red here too (verified).
+    test "admits pairs on an await with no deadline" do
+      assert Await.validate_config(%{
+               "event" => "copy.returned",
+               "timeout_capture" => %{"loan.wait_ended" => ["const", "timed_out"]}
+             }) == :ok
+    end
+
+    # Sabotage: declared no field when the key is stored, then bumped `current_version/0` - red each time (verified).
+    test "adds no field to config_schema/1 and stays at version 1" do
+      assert Await.config_schema(timeout_config(%{"loan.wait_ended" => ["const", "x"]}, "14d")) ==
+               Await.config_schema(%{})
+
+      assert Await.current_version() == 1
+    end
+  end
+
+  describe "emit/2 with a timeout_capture" do
+    # Sabotage: dropped the assigns from the timeout transition in `deadline/5` - red (verified).
+    test "writes the pair as an assign on the timeout transition" do
+      scxml =
+        compile!(timeout_capturing(%{"loan.wait_ended" => ["const", "timed_out"]}, "14d")).scxml
+
+      assert scxml =~
+               ~s(<transition event="statifier_blocks.await.blk_AWT" ) <>
+                 ~s(target="s_blk_AWT__o_timed_out">) <>
+                 ~s(<assign expr="&quot;timed_out&quot;" location="loan.wait_ended"/>) <>
+                 ~s(</transition>)
+
+      assert scxml =~ ~s(<transition event="copy.returned" target="s_blk_AWT__o_received"/>)
+    end
+
+    # Sabotage: reversed the assigns before `deadline/5` took them - red (verified).
+    test "writes the pairs in sorted path order, unguarded" do
+      scxml =
+        compile!(
+          timeout_capturing(
+            %{"loan.wait_ended" => ["const", "timed_out"], "loan.reminders" => ["const", 0]},
+            "14d"
+          )
+        ).scxml
+
+      assert scxml =~
+               ~s(target="s_blk_AWT__o_timed_out">) <>
+                 ~s(<assign expr="0" location="loan.reminders"/>) <>
+                 ~s(<assign expr="&quot;timed_out&quot;" location="loan.wait_ended"/>) <>
+                 ~s(</transition>)
+
+      refute scxml =~ "<if"
+    end
+
+    # Sabotage: put the timeout assigns on the awaited transition as well - red (verified).
+    test "each transition carries only its own map" do
+      config = %{
+        "event" => "copy.returned",
+        "timeout" => "14d",
+        "capture" => %{"loan.copy_id" => "copy_id", "loan.wait_ended" => ["const", "returned"]},
+        "timeout_capture" => %{"loan.wait_ended" => ["const", "timed_out"]}
+      }
+
+      scxml = compile!(Block.new("core.await", id: "blk_AWT", config: config)).scxml
+
+      assert scxml =~
+               ~s(<transition event="copy.returned" target="s_blk_AWT__o_received">) <>
+                 ~s(<if cond="_event.data.copy_id !== undefined">) <>
+                 ~s(<assign expr="_event.data.copy_id" location="loan.copy_id"/></if>) <>
+                 ~s(<assign expr="&quot;returned&quot;" location="loan.wait_ended"/>) <>
+                 ~s(</transition>)
+
+      assert scxml =~
+               ~s(<transition event="statifier_blocks.await.blk_AWT" ) <>
+                 ~s(target="s_blk_AWT__o_timed_out">) <>
+                 ~s(<assign expr="&quot;timed_out&quot;" location="loan.wait_ended"/>) <>
+                 ~s(</transition>)
+    end
+
+    # Sabotage: made `literal_assigns/2` answer an assign for an empty map - red (verified).
+    test "compiles an absent or empty map to the bytes of an await with none" do
+      without = compile!(timeout_capturing(:absent, "14d")).scxml
+
+      assert compile!(timeout_capturing(%{}, "14d")).scxml == without
+
+      assert without =~
+               ~s(<transition event="statifier_blocks.await.blk_AWT" ) <>
+                 ~s(target="s_blk_AWT__o_timed_out"/>)
+    end
+
+    # Sabotage: put the pairs on the awaited transition when no deadline is stored - red (verified).
+    test "pairs on an await with no deadline emit nothing" do
+      with_pairs =
+        compile!(timeout_capturing(%{"loan.wait_ended" => ["const", "timed_out"]}, "")).scxml
+
+      assert with_pairs == compile!(timeout_capturing(:absent, "")).scxml
+      refute with_pairs =~ "<assign"
+    end
+
+    # `emit/2` is asked directly, for the reason the capture's malformed
+    # case gives: the Config stage refuses this config first.
+    #
+    # Sabotage: had `literal_assigns/2`'s malformed arm answer `{:ok, []}` - red (verified).
+    test "refuses a malformed map rather than dropping the pair" do
+      assert {:error, [{"timeout_capture", _message}]} =
+               Await.emit(
+                 timeout_capturing(%{"loan.wait_ended" => ""}, "14d"),
+                 Context.new("blk_AWT", "bdoc_T")
+               )
+    end
+  end
+
+  describe "the timeout_capture corpus case" do
+    # One await with a deadline and one literal pair, pinned as bytes. The
+    # golden is this change's own output; the emission tests above are what
+    # make it a claim rather than a restatement.
+    #
+    # Sabotage: dropped the assigns from the timeout transition in `deadline/5` - red (verified).
+    test "compiles byte-identically to its golden" do
+      assert compiled("test/fixtures/await_capture/timeout_capture.json") ==
+               File.read!("test/fixtures/await_capture/timeout_capture.scxml")
+    end
+  end
+
+  describe "the compiled chart, run with a timeout_capture" do
+    # Sabotage: dropped the assigns from the timeout transition in `deadline/5` - red (verified).
+    test "the timer's event writes the literal" do
+      machine_state =
+        run(timeout_capturing(%{"loan.wait_ended" => ["const", "timed_out"]}, "14d"),
+          event: "statifier_blocks.await.blk_AWT",
+          data: %{}
+        )
+
+      assert machine_state.datamodel["loan"] == %{"wait_ended" => "timed_out"}
+
+      assert MapSet.member?(
+               Statifier.active_leaf_states(machine_state),
+               "s_blk_AWT__o_timed_out"
+             )
+    end
+
+    # Sabotage: put the timeout assigns on the awaited transition as well - red (verified).
+    test "the awaited event writes its own map only" do
+      config = %{
+        "event" => "copy.returned",
+        "timeout" => "14d",
+        "capture" => %{"loan.copy_id" => "copy_id", "loan.wait_ended" => ["const", "returned"]},
+        "timeout_capture" => %{"loan.wait_ended" => ["const", "timed_out"]}
+      }
+
+      machine_state =
+        run(Block.new("core.await", id: "blk_AWT", config: config),
+          event: "copy.returned",
+          data: %{"copy_id" => "copy-42"}
+        )
+
+      assert machine_state.datamodel["loan"] == %{
+               "copy_id" => "copy-42",
+               "wait_ended" => "returned"
+             }
+
+      assert MapSet.member?(
+               Statifier.active_leaf_states(machine_state),
+               "s_blk_AWT__o_received"
+             )
+    end
+
+    # The assign runs inside the microstep the timer selects, before the
+    # timed_out final raises its outcome, so a branch after the await reads
+    # the value.
+    #
+    # Sabotage: dropped the assigns from the timeout transition - red, the branch took no arm (verified).
+    test "the value is written before anything downstream runs" do
+      branch =
+        Block.new("core.branch",
+          id: "blk_SEEN",
+          config: %{
+            "arms" => [%{"slot" => "arm_ended", "cond" => ~s(loan.wait_ended == "timed_out")}]
+          },
+          slots: %{
+            "arm_ended" => [
+              Block.new("core.assign",
+                id: "blk_MARK",
+                config: %{"path" => "loan.seen", "value" => ~s("seen")}
+              )
+            ]
+          }
+        )
+
+      root =
+        Block.new("core.sequence",
+          id: "blk_SEQ",
+          slots: %{
+            "body" => [
+              timeout_capturing(%{"loan.wait_ended" => ["const", "timed_out"]}, "14d"),
+              branch
+            ]
+          }
+        )
+
+      machine_state =
+        run(root, event: "statifier_blocks.await.blk_AWT", data: %{})
+
+      assert machine_state.datamodel["loan"] == %{"wait_ended" => "timed_out", "seen" => "seen"}
+    end
+  end
+
+  defp timeout_capturing(pairs, timeout) do
+    config = %{"event" => "copy.returned", "timeout" => timeout}
+    config = if pairs == :absent, do: config, else: Map.put(config, "timeout_capture", pairs)
+
+    Block.new("core.await", id: "blk_AWT", config: config)
+  end
+
+  defp timeout_config(pairs, timeout), do: timeout_capturing(pairs, timeout).config
+
+  defp run(root, opts) do
+    {:ok, machine} = Statifier.compile(compile!(root).scxml)
+    {machine_state, _effects} = Statifier.initialize(machine, datamodel: %{"loan" => %{}})
+
+    {:ok, machine_state, _effects} =
+      Statifier.send_event(
+        machine_state,
+        Statifier.Event.external(Keyword.fetch!(opts, :event), data: Keyword.fetch!(opts, :data))
+      )
+
+    machine_state
+  end
+
   defp cancels(effects), do: for({:cancel, cancel} <- effects, do: cancel)
 
   defp await(timeout) do

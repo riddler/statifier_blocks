@@ -171,6 +171,10 @@ defmodule StatifierBlocks.Datamodel do
   # both read it off the config directly, and both spell the key once.
   @capture_key "capture"
 
+  # `core.await`'s literal-only map for its deadline's transition, read
+  # off the config for the same reason and spelled once in each module too.
+  @timeout_capture_key "timeout_capture"
+
   # The word a cell carrying no type shows. `StatifierBlocks.Shell` spells the
   # same word for the same reason on a declared PATH with no entry describing
   # it (`declared_shape/1`); this one is about a declared FIELD whose type
@@ -879,7 +883,8 @@ defmodule StatifierBlocks.Datamodel do
   # `StatifierBlocks.Environment` reads them: the key has no field to hang
   # a declaration on, so the config is the only place the pairs exist. The
   # finding anchors on `capture`, which is the key `validate_config/1`
-  # already anchors this map's own findings to.
+  # already anchors this map's own findings to. A `timeout_capture` map's
+  # keys are read the same way after it, anchored on `timeout_capture`.
   @spec capture_findings(
           Block.id(),
           Block.config(),
@@ -887,12 +892,24 @@ defmodule StatifierBlocks.Datamodel do
           MapSet.t(String.t())
         ) :: [Finding.t()]
   defp capture_findings(id, config, declared, roots) do
-    case Map.get(config, @capture_key) do
+    map_findings(id, @capture_key, config, declared, roots) ++
+      map_findings(id, @timeout_capture_key, config, declared, roots)
+  end
+
+  @spec map_findings(
+          Block.id(),
+          String.t(),
+          Block.config(),
+          MapSet.t(String.t()),
+          MapSet.t(String.t())
+        ) :: [Finding.t()]
+  defp map_findings(id, key, config, declared, roots) do
+    case Map.get(config, key) do
       pairs when is_map(pairs) ->
         pairs
         |> Map.keys()
         |> Enum.sort()
-        |> Enum.flat_map(&advisory(id, @capture_key, &1, declared, roots))
+        |> Enum.flat_map(&advisory(id, key, &1, declared, roots))
 
       _absent_or_not_a_map ->
         []

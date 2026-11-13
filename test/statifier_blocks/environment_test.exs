@@ -642,6 +642,56 @@ defmodule StatifierBlocks.EnvironmentTest do
       assert Map.get(after_group, "cards.receipt") == :unknown
     end
 
+    # sabotage: dropped the `timeout_capture` read from `capture_writes/1` -> red (verified)
+    test "a timeout capture's keys are writes" do
+      await =
+        Block.new("core.await",
+          id: "blk_AWT",
+          config: %{
+            "event" => "copy.returned",
+            "timeout" => "14d",
+            "timeout_capture" => %{"loan.wait_ended" => ["const", "timed_out"]}
+          }
+        )
+
+      assert Environment.write_signatures(palette(), document([await]), await) ==
+               [{"timeout_capture", "loan.wait_ended", :unknown}]
+    end
+
+    # sabotage: read `timeout_capture` ahead of `capture` in `capture_writes/1` -> red (verified)
+    test "both capture maps report, capture first, each in sorted order" do
+      await =
+        Block.new("core.await",
+          id: "blk_AWT",
+          config: %{
+            "event" => "copy.returned",
+            "timeout" => "14d",
+            "capture" => %{"loan.copy_id" => "copy_id"},
+            "timeout_capture" => %{
+              "loan.wait_ended" => ["const", "timed_out"],
+              "loan.reminders" => ["const", 0]
+            }
+          }
+        )
+
+      assert Environment.write_signatures(palette(), document([await]), await) == [
+               {"capture", "loan.copy_id", :unknown},
+               {"timeout_capture", "loan.reminders", :unknown},
+               {"timeout_capture", "loan.wait_ended", :unknown}
+             ]
+    end
+
+    # sabotage: reported a string stored under the key as a path -> red (verified)
+    test "a malformed timeout capture reports nothing" do
+      await =
+        Block.new("core.await",
+          id: "blk_AWT",
+          config: %{"event" => "copy.returned", "timeout" => "14d", "timeout_capture" => "x"}
+        )
+
+      assert Environment.write_signatures(palette(), document([await]), await) == []
+    end
+
     # sabotage: dropped the `arms/5` step from `through/5` -> a container
     # stops handing its children's writes out and the settlement assertion
     # goes red (verified)

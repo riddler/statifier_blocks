@@ -368,5 +368,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert has_element?(view, ".sb-form .sb-finding")
       end
     end
+
+    describe "an await's timeout_capture, which the form does not draw" do
+      alias StatifierBlocks.Editor.ConfigForm
+      alias StatifierBlocks.{Palette, ViewModel}
+
+      # The form draws no row for the key, so a post must carry it over
+      # from the base config rather than replace it away.
+      #
+      # Sabotage: dropped the key from the base `ConfigForm.decode/3` reduces over - red (verified).
+      test "survives a form post that changes the deadline" do
+        pairs = %{"loan.wait_ended" => ["const", "timed_out"]}
+        base = %{"event" => "copy.returned", "timeout" => "14d", "timeout_capture" => pairs}
+
+        document =
+          Document.new(
+            Block.new("core.sequence",
+              id: "blk_loan",
+              slots: %{"body" => [Block.new("core.await", id: "blk_wait", config: base)]}
+            ),
+            id: "doc_loan"
+          )
+
+        fields =
+          document |> ViewModel.build(Palette.core(), []) |> ViewModel.fields_for("blk_wait")
+
+        params = %{"config" => %{"event" => "copy.returned", "timeout" => "7d"}}
+
+        assert %{"timeout" => "7d", "timeout_capture" => ^pairs} =
+                 ConfigForm.decode(fields, params, base)
+      end
+    end
   end
 end

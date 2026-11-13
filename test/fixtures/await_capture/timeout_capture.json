@@ -1,0 +1,26 @@
+{
+  "id": "bdoc_AWAITTIMEOUTCAPTURE",
+  "revision": 1,
+  "root": {
+    "id": "blk_ROOT",
+    "slots": {
+      "body": [
+        {
+          "config": {
+            "event": "copy.returned",
+            "timeout": "14d",
+            "timeout_capture": {
+              "loan.wait_ended": ["const", "timed_out"]
+            }
+          },
+          "id": "blk_RET",
+          "type": "core.await",
+          "type_version": 1
+        }
+      ]
+    },
+    "type": "core.sequence",
+    "type_version": 1
+  },
+  "schema_version": 1
+}
