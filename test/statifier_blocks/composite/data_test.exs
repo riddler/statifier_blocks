@@ -259,6 +259,19 @@ defmodule StatifierBlocks.Composite.DataTest do
       refute function_exported?(Data, :config_schema, 1)
     end
 
+    # `Data.subtree/2` is `(state, params)`: the behaviour's `subtree/1` at one
+    # higher arity, never the two-argument subtree handed the block's id.
+    # Sabotage: chose the arity in `Composite` with `function_exported?(module,
+    # :subtree, 2)` instead of `Palette.declares?/3` - red, the data kind is
+    # then handed `(params, context)` and expands to nothing it answers today.
+    test "a data composite is not mistaken for a two-argument subtree" do
+      refute Palette.declares?(ref(), :subtree, 2)
+      assert Palette.declares?(ref(), :subtree, 1)
+
+      assert {:ok, {[root], _param_map}} = Composite.expand(block(), ref())
+      assert root.id == "blk_AD_call"
+    end
+
     # Sabotage: derived `slots/2` from the expansion root - red.
     test "slots/1 is [] and config_schema/1 is the params" do
       assert Palette.call(ref(), :slots, [%{}], :absent) == []

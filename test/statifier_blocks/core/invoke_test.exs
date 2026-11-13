@@ -106,6 +106,38 @@ defmodule StatifierBlocks.Core.InvokeTest do
       assert path =~ "datamodel path"
     end
 
+    # What the field already admits, pinned: the right-hand side is checked
+    # for a non-empty, space-free spelling, not for being a datamodel path,
+    # so a quoted literal passes and reaches the <param> verbatim.
+    # Sabotage: made `path?/1` refuse a right-hand side carrying a quote - red.
+    test "a quoted literal on a params row is admitted and emitted verbatim" do
+      for {row, expr} <- [
+            {~s(step_ref="blk_LR"), "&quot;blk_LR&quot;"},
+            {~s(step_ref='blk_LR'), "'blk_LR'"}
+          ] do
+        config = %{"invoke_type" => "library:send_reminder", "assign_to" => "", "params" => row}
+
+        assert Invoke.validate_config(config) == :ok
+
+        root = Block.new("core.invoke", id: "blk_INV", config: config)
+        assert compile!(root).scxml =~ ~s(<param expr="#{expr}" name="step_ref"/>)
+      end
+    end
+
+    # Sabotage: dropped the no-space test from `path?/1` - red, the row with
+    # whitespace inside its literal then validates.
+    test "whitespace inside a quoted literal is refused, as for any right-hand side" do
+      config = %{
+        "invoke_type" => "library:send_reminder",
+        "assign_to" => "",
+        "params" => ~s(step_ref="blk LR")
+      }
+
+      assert {:error, [{"params", message}]} = Invoke.validate_config(config)
+      assert message =~ "step_ref"
+      assert message =~ "datamodel path"
+    end
+
     # sabotage: made `param_rows/1` sort the rows -> the order the author
     # wrote is lost and this goes red (verified)
     test "param_rows/1 reads the rows in the order they were written" do
