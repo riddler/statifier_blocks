@@ -17,6 +17,13 @@ defmodule StatifierBlocks.Core.Capture do
   # The `payload` declaration and its refusal stay `core.on_event`'s: they
   # read the pairs through `path?/1` here, and nothing about a capture's
   # emission depends on them.
+  #
+  # A literal-only map is the same map with the path form taken away:
+  # `check_literals/3` and `literal_assigns/2` admit and emit only
+  # `["const", value]` pairs, under whatever key the caller stores them, for
+  # a transition whose event carries no payload to read a path from
+  # (`core.await`'s `timeout_capture`). The literal spelling, the sort and
+  # the control-character refusal are the ones below, not copies of them.
 
   alias StatifierBlocks.Core.Config
   alias StatifierBlocks.Emission
@@ -59,7 +66,7 @@ defmodule StatifierBlocks.Core.Capture do
 
       capture when is_map(capture) ->
         if Enum.all?(capture, &pair?/1) do
-          control_finding(findings, capture)
+          control_finding(findings, capture, @capture_key)
         else
           [{@capture_key, capture_message()} | findings]
         end
@@ -83,7 +90,7 @@ defmodule StatifierBlocks.Core.Capture do
   # back today, but a parser's tolerance is not the wire format's contract,
   # so the document is refused at compile instead.
   #
-  # The finding lands on the `capture` key for the reason `check/2`
+  # The finding lands on the map's own key for the reason `check/2`
   # gives: the key is the only anchor an editor has. The message names the
   # offending codepoint so an author can find it in a string whose damage
   # is invisible on screen.
@@ -97,10 +104,10 @@ defmodule StatifierBlocks.Core.Capture do
   # A control character in the PATH form is not this clause's business: a
   # path is refused for containing whitespace already, and what an
   # otherwise-shaped path spells is `path?/1`'s question.
-  defp control_finding(findings, capture) do
+  defp control_finding(findings, capture, key) do
     case control_codepoint(capture) do
       nil -> findings
-      codepoint -> [{@capture_key, control_message(codepoint)} | findings]
+      codepoint -> [{key, control_message(codepoint)} | findings]
     end
   end
 
@@ -236,6 +243,64 @@ defmodule StatifierBlocks.Core.Capture do
   end
 
   def assigns(_other), do: {:error, [{@capture_key, capture_message()}]}
+
+  # `check/2` for a literal-only map stored under `key`: absent (or `nil`)
+  # and empty are admitted, every pair must be a datamodel path to a
+  # `["const", value]` literal this module can spell, and a literal
+  # carrying a raw C0 control character is refused exactly as a capture
+  # literal is. One finding for the whole key, for `check/2`'s reason.
+  @spec check_literals([{String.t(), String.t()}], map(), String.t()) ::
+          [{String.t(), String.t()}]
+  def check_literals(findings, config, key) do
+    case Map.get(config, key) do
+      nil ->
+        findings
+
+      pairs when is_map(pairs) ->
+        if Enum.all?(pairs, &literal_pair?/1) do
+          control_finding(findings, pairs, key)
+        else
+          [{key, literal_message()} | findings]
+        end
+
+      _other ->
+        [{key, literal_message()} | findings]
+    end
+  end
+
+  # The bare `<assign>`s a literal-only map compiles to, in their datamodel
+  # paths' sorted order, or `[]` for none. Every literal pair is also a
+  # well-formed capture pair, so once the shape is admitted the emission is
+  # `assigns/1`'s own: the same sort, the same spelling, and no guard
+  # (`guarded/2`). A malformed map answers with a finding under `key`
+  # rather than dropping a pair, for `assigns/1`'s reason.
+  @spec literal_assigns(term(), String.t()) ::
+          {:ok, [Emission.t()]} | {:error, [{String.t(), String.t()}]}
+  def literal_assigns(nil, _key), do: {:ok, []}
+
+  def literal_assigns(pairs, key) when is_map(pairs) do
+    if Enum.all?(pairs, &literal_pair?/1) do
+      assigns(pairs)
+    else
+      {:error, [{key, literal_message()}]}
+    end
+  end
+
+  def literal_assigns(_other, key), do: {:error, [{key, literal_message()}]}
+
+  defp literal_pair?({destination, [@const_tag, value]}),
+    do: path?(destination) and spellable?(value)
+
+  defp literal_pair?(_other), do: false
+
+  defp literal_message do
+    "must map each datamodel path written, like loan.wait_ended, " <>
+      ~s(to the literal ["const", value] it is set to, whose value is any ) <>
+      "JSON a block document may carry: a string, an integer, true, " <>
+      "false, null, an array or an object. A path to read is not " <>
+      "accepted here, because the event this key is written on carries " <>
+      "no payload"
+  end
 
   # ADR-0002's Note of 2026-09-12, `N2`: from `0.28.0` on, a pair whose
   # source is a PATH and whose path the firing event's payload does not

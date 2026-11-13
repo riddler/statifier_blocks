@@ -14923,3 +14923,133 @@ composite compiles to the bytes it compiles to at `b31b839`, with no golden
 edited.
 
 Filed with `sb-fqba`.
+
+## Note (2026-11-13): `core.await` takes an optional literal-only `timeout_capture`
+
+A dated Note rather than an amendment. It records a ruling on a type this
+record already ships and decides nothing beyond it: decision 10's table, G14's
+row and every section above this line stand as written, the vocabulary does
+not grow, and no section above is edited. Ruled by the operator, 2026-11-13:
+"timeout_capture: a new key on core.await beside capture". Filed with
+`sb-1ez8`.
+
+**Why.** A chart that waits for an event with a deadline wants to record which
+way the wait ended without assigning a default before the wait. `capture`
+cannot carry it: its pairs ride the awaited transition alone, and putting its
+literal pairs on the deadline's transition as well would change what every
+stored `core.await` carrying both a `timeout` and a literal `capture` pair
+compiles to.
+
+**What `core.await` carries now.** A second optional map beside `capture`,
+under the config key `timeout_capture`:
+
+- the pairs: the key is the datamodel path written, as in `capture`, and the
+  value is a `["const", value]` literal and nothing else. The path form
+  `capture` admits is refused here, because the timer's event is the await's
+  own delayed send and carries no payload of the host's to read a path from;
+- the emission: each pair is a bare `<assign>` on the deadline's transition
+  (the one the await's own timer selects, to the `timed_out` outcome), the
+  element a literal `capture` pair compiles to, in the datamodel paths'
+  sorted order. The assigns are never wrapped in the presence-testing `<if>`:
+  a literal has no source to be absent (`N2` of the 2026-09-12 Note);
+- the refusal: a malformed map - not a map, a pair whose path is blank or
+  carries whitespace, a pair whose value is not a `["const", value]` literal
+  this package can spell, or a literal carrying a raw C0 control character
+  (the refusal of the 2026-09-13 Note) - is one `validate_config/1` finding
+  on the `timeout_capture` key, reported after the `event`, `timeout` and
+  `capture` findings. G14's "it refuses nothing else", already read with the
+  `capture` finding beside its two, now reads with this one beside those
+  three.
+
+The literal spelling, the sort and the control-character refusal are
+`StatifierBlocks.Core.Capture`'s own, not copies: that internal module gains
+`check_literals/3` and `literal_assigns/2`, and `literal_assigns/2` hands an
+admitted map to `assigns/1`. The module stays `@moduledoc false` and
+publishes nothing.
+
+**How the 2026-10-19 Note's sentence now reads.** That Note says of `capture`:
+"The deadline's transition carries none: its event is the await's own timer".
+It stays true of `capture`, which still writes on the awaited transition
+alone. The deadline's transition now carries the `timeout_capture` assigns
+when the map holds pairs, and no others. `core.await`'s moduledoc said the
+same thing in its own words ("The deadline's transition carries none" in
+`lib/statifier_blocks/core/await.ex`, read at `b31b839`) and is corrected in
+the same change to say which map each transition carries.
+
+**When the values are visible.** In the microstep the timer's event selects,
+the waiting state exits, the transition's executable content runs - the
+assigns, in document order - and then the `timed_out` final is entered and
+its `<onentry>` raises `done.outcome.<state id>.timed_out`; `done.state.<state
+id>` is queued after it. Both events are processed in later microsteps, so
+every reader of either, and every block after the await, sees the values
+written. That is the order SCXML 1.0's `microstep` procedure gives (exit
+states, execute transition content, enter states) and the order the
+2026-09-12 Note relies on for `core.on_event`'s assigns, "before the
+`<raise>` that carries the outcome".
+
+**Two points taken at the design's recommended answer, 2026-11-13.**
+
+- A `timeout_capture` map on an await with no deadline is admitted and writes
+  nothing. With no `timeout` there is no deadline transition to write on - "a
+  deadline is all of this, or none of it", the Note beneath G14a - and both
+  outcomes are declared for every config, so clearing the deadline costs an
+  author nothing; a finding here would be one the editor gives no row to
+  clear.
+- The editor draws no row for the key. `ConfigForm.decode/3` reduces over the
+  block's effective config as its base, so a key the form does not draw
+  survives a form post. A new test pins `decode/3`'s half of that for this
+  key; that the editor hands it the effective config is the `config-change`
+  handler in `StatifierBlocks.Editor`, unchanged by this Note.
+
+**What is not changed.** `config_schema/1` gains no field and
+`current_version/0` stays 1, for the reason the 2026-10-19 Note gives for
+`capture`. No reader-facing sentence changes: the palette entry, `explain/0`,
+`summary/1` and `sentence/1` read as before. `core.on_event` has no timeout
+and gains no key. `priv/schemas/block-document.schema.json` is not changed.
+The trace-visible positions this record refuses a sensitive path at do not
+list `core.await`'s `capture`, and `timeout_capture` takes the same posture.
+
+**What compiles differently.** An await whose `timeout_capture` is absent or
+empty compiles to the bytes it compiled to before the key existed: the
+deadline's transition is the self-closing one `defp deadline/4` emitted
+(`lib/statifier_blocks/core/await.ex`, read at `b31b839`), and the four
+no-capture goldens and the capture corpus case are unchanged. One stored
+shape does compile differently: an await that already carried a well-formed
+`timeout_capture` key, which `core.await` did not read at `b31b839`
+(`validate_config/1` and `emit/2` in the same file), now compiles to its
+assigns, and a malformed one, which compiled before, is now refused.
+
+**The environment walk and the declared-path advisory.** Both read the new
+key as they read `capture`: off any block's config, not only `core.await`'s.
+`StatifierBlocks.Environment.write_signatures/3` reports a `timeout_capture`
+map's keys as `:unknown` writes after the `capture` pairs, each map in its
+keys' sorted order, anchored on its own key; the declared-path advisory reads
+the same keys and anchors its finding on `timeout_capture`. The readers
+extended are `defp capture_writes/1` in `lib/statifier_blocks/environment.ex`
+and `defp capture_findings/4` in `lib/statifier_blocks/datamodel.ex` (both
+read at `b31b839`). So the 2026-09-06 environment table's `core.await` row,
+which reads "none" in its writes column, no longer describes the walk: an
+await writes `:unknown` at each `timeout_capture` key, and - by the readers
+the 2026-10-19 Note names - at each `capture` key. The row is left as
+written and is read with this paragraph. The walk and the advisory report a
+`timeout_capture` map's keys whether or not a `timeout` is stored, as they
+report a `capture` map's without asking which transition it rides; with no
+deadline the chart writes nothing there.
+
+The same reading reaches `ADR-0011`. Its decision 2 lists the forms a write
+signature takes, the third being `core.on_event`'s `capture`, one write per
+pair at the pair's key, and its decision 10 says a capture's target paths are
+write signatures. Both are read with a `timeout_capture` map's keys beside
+`capture`'s: one `:unknown` write per pair, at the pair's key, anchored on
+`timeout_capture`. No line of `ADR-0011` is edited.
+
+The pins are in `test/statifier_blocks/core/await_test.exs` (the map's
+refusals and their order, the emission on the deadline's transition alone,
+the bytes of an await without the key, a run that times out, a run that does
+not, and a `core.branch` after the await that reads the value),
+`test/statifier_blocks/environment_test.exs`,
+`test/statifier_blocks/datamodel_test.exs` and
+`test/statifier_blocks/editor/capture_row_test.exs` (the key survives a form
+post). The corpus case is `test/fixtures/await_capture/timeout_capture.json`
+and its golden. This Note carries no `Status:` line, which is this file's
+convention for a Note.

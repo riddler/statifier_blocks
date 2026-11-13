@@ -10,7 +10,9 @@ defmodule StatifierBlocks.Core.Await do
   `core.wait`'s `duration` and `core.send`'s `delay` are written in. The
   two outcomes, `received` and `timed_out`, are the two ways an await can
   end. An optional `capture` map, which declares no field, copies values
-  out of the awaited event's payload into the datamodel.
+  out of the awaited event's payload into the datamodel, and an optional
+  `timeout_capture` map, which declares no field either, writes literals
+  when the deadline passes.
 
   ## The optional `capture` map
 
@@ -27,8 +29,9 @@ defmodule StatifierBlocks.Core.Await do
   because `_event.data` is in scope for that transition and for nothing
   after it: a `core.assign` placed after the await runs in a later
   microstep with a different `_event`, and the payload is gone. The
-  deadline's transition carries none - its event is this block's own
-  timer and carries no payload of the host's.
+  deadline's transition carries none of `capture`'s assigns - its event
+  is this block's own timer and carries no payload of the host's - and
+  carries `timeout_capture`'s instead (below).
 
   An await whose `capture` is absent or empty compiles to exactly the
   bytes it compiled to before the key existed, so the key is additive
@@ -36,6 +39,28 @@ defmodule StatifierBlocks.Core.Await do
   declaration is not shared: it adds a compile-time refusal of a read
   past a declared payload, and nothing about what a capture writes
   depends on it. See ADR-0002's Note of 2026-10-19.
+
+  ## The optional `timeout_capture` map
+
+  A chart that waits with a deadline often wants to record which way the
+  wait ended without assigning a default before it. `timeout_capture` is
+  a map from a datamodel path written to a `["const", value]` literal, and
+  nothing else: the path form `capture` admits is refused here, because
+  the timer's event carries no payload to read a path from. Each pair is
+  a bare `<assign>` on the deadline's transition, in the datamodel
+  paths' sorted order, spelled exactly as a literal `capture` pair is
+  spelled, so the values are in the datamodel before the `timed_out` final
+  raises its outcome and before anything after the await runs.
+
+  The two maps are separate on purpose: `capture` still writes on the
+  awaited transition alone, and `timeout_capture` on the deadline's
+  alone. With no `timeout` stored there is no deadline transition, so the
+  map is admitted and writes nothing - the same reason both outcomes stay
+  declared for every config. An await whose `timeout_capture` is absent or
+  empty compiles to exactly the bytes it compiled to before the key
+  existed, so `current_version/0` stays 1 and `config_schema/1` gains no
+  field. The editor does not draw the map and keeps it across a form
+  post.
 
   ## An await is not a wait
 
@@ -103,6 +128,9 @@ defmodule StatifierBlocks.Core.Await do
   # than `core.wait`'s because this field is optional too.
   @timeout_message "must be a duration like 30s or 1h30m - or empty for no deadline"
 
+  # The config key the deadline's literal writes are stored under.
+  @timeout_capture_key "timeout_capture"
+
   @received "received"
   @timed_out "timed_out"
 
@@ -154,6 +182,7 @@ defmodule StatifierBlocks.Core.Await do
     |> check_event(config)
     |> check_timeout(config)
     |> Capture.check(config)
+    |> Capture.check_literals(config, @timeout_capture_key)
     |> Config.verdict()
   end
 
@@ -337,6 +366,13 @@ defmodule StatifierBlocks.Core.Await do
   Nothing else in the shape moves, and an await with no `capture` writes
   the self-closing transition sketched above.
 
+  A `timeout_capture` pair becomes a bare `<assign>` on the deadline's
+  transition, the same element a literal `capture` pair compiles to:
+
+      <transition event="statifier_blocks.await.blk_AWT" target="s_AWT__o_timed_out">
+        <assign expr="&quot;timed_out&quot;" location="loan.wait_ended"/>
+      </transition>
+
   ## What is annotated and what is not
 
   The awaited `event` attribute is stamped as coming from the `event`
@@ -354,13 +390,15 @@ defmodule StatifierBlocks.Core.Await do
          {:ok, timed_out} <- Context.outcome_id(context, @timed_out),
          {:ok, event} <- event(Map.get(config, "event")),
          {:ok, delay} <- delay(config),
-         {:ok, assigns} <- Capture.assigns(Map.get(config, "capture")) do
+         {:ok, assigns} <- Capture.assigns(Map.get(config, "capture")),
+         {:ok, timeout_assigns} <-
+           Capture.literal_assigns(Map.get(config, @timeout_capture_key), @timeout_capture_key) do
       arrival =
         [event: event, target: received]
         |> Emit.transition(assigns)
         |> Emission.attribute_from_config("event", "event")
 
-      deadline = deadline(delay, block_id, send_id, timed_out)
+      deadline = deadline(delay, block_id, send_id, timed_out, timeout_assigns)
 
       armed = Emit.state(waiting, nil, deadline.onentry ++ [arrival] ++ deadline.transitions)
 
@@ -372,13 +410,15 @@ defmodule StatifierBlocks.Core.Await do
   # The `<onentry>` send, the transition it wakes, and the outcome final
   # that transition targets - or none of the three. Returning them
   # together keeps "a deadline is all of this, or none of it" one
-  # decision rather than three tests of the same value.
-  @spec deadline(String.t() | nil, Block.id(), String.t(), String.t()) ::
+  # decision rather than three tests of the same value. The transition
+  # carries the `timeout_capture` assigns, and with no deadline they are
+  # dropped with it.
+  @spec deadline(String.t() | nil, Block.id(), String.t(), String.t(), [Emission.t()]) ::
           %{onentry: [Emission.t()], transitions: [Emission.t()], finals: [Emission.t()]}
-  defp deadline(nil, _block_id, _send_id, _timed_out),
+  defp deadline(nil, _block_id, _send_id, _timed_out, _assigns),
     do: %{onentry: [], transitions: [], finals: []}
 
-  defp deadline(delay, block_id, send_id, timed_out) do
+  defp deadline(delay, block_id, send_id, timed_out, assigns) do
     event = "statifier_blocks.await." <> block_id
 
     send_element =
@@ -386,7 +426,7 @@ defmodule StatifierBlocks.Core.Await do
 
     %{
       onentry: [Emission.element("onentry", [], [send_element])],
-      transitions: [Emit.transition(event: event, target: timed_out)],
+      transitions: [Emit.transition([event: event, target: timed_out], assigns)],
       finals: [Emit.final(timed_out)]
     }
   end
