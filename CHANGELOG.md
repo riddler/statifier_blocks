@@ -11,6 +11,23 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.45.0] 2026-11-17
+
+0.45.0 adds two optional surfaces. Under Added: `core.await` takes an
+optional `timeout_capture` map that writes datamodel paths on the deadline
+transition, and a module composite may define `subtree/2` to be handed the
+composite block's own id. A `subtree/1` composite and an await with no
+`timeout_capture` compile to the bytes they compiled to on 0.44.1; an await
+that already stored a well-formed `timeout_capture` key now compiles to its
+assigns. `StatifierBlocks.Compiler.compiler_version/0` answers the new package
+version, and a compiled record carries it. The package gains no Hex dependency.
+
+### Added
+
+- `core.await` takes an optional `timeout_capture` map from a datamodel path to a `["const", value]` literal, written as bare `<assign>`s on the deadline's transition, so a chart can record that a wait timed out; `capture` still writes on the awaited transition only.
+- An await that already stored a well-formed `timeout_capture` key now compiles to its assigns, and one whose `timeout_capture` is malformed is refused at compile.
+- A module composite may define `subtree/2` instead of `subtree/1`: it is handed the params and an expansion context carrying the composite block's own id under `:block_id`, so a member's config can name the composite it was expanded from. `subtree/1` is unchanged, and a module defining both, or neither, does not compile.
+
 ## [0.44.1] 2026-10-20
 
 Docs release: 0.44.1 changes documentation only. The README is cut to a
@@ -3987,6 +4004,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.45.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.45.0
 [0.44.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.44.1
 [0.44.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.44.0
 [0.43.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.43.1
