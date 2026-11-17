@@ -1,7 +1,7 @@
-# Upgrading a host from 0.31 to 0.44
+# Upgrading a host from 0.31 to 0.45
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.44.0, one minor at a time. A host here is the code that embeds the package:
+0.45.0, one minor at a time. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
@@ -10,9 +10,9 @@ about it, and says **NONE** where the answer is nothing.
 Take the minors in order, and move the pin with each one, as the README
 recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`,
 `"~> 0.34.0"`, `"~> 0.35.0"`, `"~> 0.36.0"`, `"~> 0.37.0"`, `"~> 0.38.0"`,
-`"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"`, `"~> 0.42.0"`, `"~> 0.43.0"`
-and `"~> 0.44.0"`. A patch release rides its minor's pin, so each section
-below covers the patches of the minor it moves to.
+`"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"`, `"~> 0.42.0"`, `"~> 0.43.0"`,
+`"~> 0.44.0"` and `"~> 0.45.0"`. A patch release rides its minor's pin, so each
+section below covers the patches of the minor it moves to.
 
 One value moves at every release, a patch included, and the sections below
 do not repeat it: the compiler version. `StatifierBlocks.Compiler.compiler_version/0`
@@ -499,3 +499,25 @@ you pass on its read-only form as well as on the editable one, so a rule
 of yours on that class now reaches the read-only form too; and the
 `StatifierBlocksMap` hook leaves the drafts drawer out and draws the path
 when the drafts shelf alone fails to lay out.
+
+## 0.44 to 0.45
+
+**NONE** for a host that builds no `core.await` with a `timeout_capture`
+key and defines no module composite with `subtree/2`: nothing needs
+migrating, no stored document has to change, a document that uses
+neither compiles to the bytes it compiled to on 0.44, and the package
+gains no dependency.
+
+- **If you build or store documents whose `core.await` blocks carry a
+  `timeout_capture` key**, it now compiles: `core.await` takes an optional
+  `timeout_capture` map from a datamodel path to a `["const", value]`
+  literal, each pair a bare `<assign>` on the deadline's transition, so a
+  chart can record that a wait timed out. A well-formed map that used to
+  be ignored now writes its assigns, and a malformed one is refused at
+  compile. `capture` is unchanged and still writes on the awaited
+  transition only.
+- **If you define module composites**, you may define `subtree/2` instead
+  of `subtree/1`: it is handed the params and an expansion context whose
+  `:block_id` is the composite block's own id, so a member's config can
+  name the composite it was expanded from. `subtree/1` is unchanged. A
+  module that defines both, or neither, does not compile.

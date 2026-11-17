@@ -14822,7 +14822,7 @@ the behaviour's terms. The data kind therefore keeps today's path.
 Every caller already hands `expand!/2` or `expand/2` the block as the
 document stores it: the compiler's Resolve (`defp expand/2`,
 `compiler.ex:1097`), the environment walk (the two `Composite.expand!`
-calls, `environment.ex:474` and `:799`) and the editor's Expand
+calls, `environment.ex:479` and `:804`) and the editor's Expand
 (`Composite.expand(block, module)`, `editor.ex:2430`). So Expand still writes
 what Resolve builds, and the byte-identity this file states for it
 (`:8310`-`:8317`) holds for a `subtree/2` composite. The two probe
