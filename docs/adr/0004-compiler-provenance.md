@@ -4883,3 +4883,403 @@ They are met here, not edited.
 None. Each claim holds at `49c6b5b` as written. The Context's line numbers
 were read at `173705c`, before the Amendment's own code moved them; the
 Amendment says to re-locate by anchor, and the table above does.
+
+## Amendment (2026-11-19): `core.subchart` names its child by a literal or a datamodel path, and a run-time child's outcomes must be among the block's
+
+**Status: proposed (2026-11-19, bead `sb-borq`).** A decision record merges
+at proposed and is flipped to accepted by a separate request through the
+same `docs/adr/` gate once the code that implements it has shipped in a
+published version. Additive: no text above this line is edited, no line
+above it is removed, and the head `Status:` line at `:3` is not extended.
+It amends two sections of this record by addition, the Amendment of
+2026-08-29 "a document compiled for use as a child, and `core.subchart`
+routing" (C1 to C3) and the Amendment of 2026-08-29 "`core.subchart`'s `src`
+is a document id, and a document may not run itself" (its four
+sections), and it
+adds one reason to the refusal set `ADR-0008` decision 5 closes. It adds
+clauses `J1` to `J7`.
+
+The design, verbatim as the option chosen, was ruled by the operator,
+2026-11-19: "Subset: each run-time child's root outcomes must be among the
+block's declared outcomes; a misfit is refused at child creation; chart and
+chart_from exclusive; core.map stays out". Back across a sub-path boundary
+is outside this Amendment.
+
+Code cites below that name code already on `main` were read at `3ef9f55`
+and carry their anchors; the code this Amendment describes is cited by
+anchor alone, and none of it is in the request that adds this section.
+Re-locate by anchor, not by number.
+
+### Context
+
+At `3ef9f55` a `core.subchart` names its child one way: `chart`, a document
+id the author types, required by `config_schema/1`
+(`lib/statifier_blocks/core/subchart.ex:243`, `def config_schema/1`) and
+written verbatim as the `<invoke>`'s `src` by `emit/2` (`:419`,
+`def emit/2`), which is what the `src` Amendment's first section
+records. So a document cannot choose its
+child from data: a branch-library onboarding that sets up whichever
+integrations a patron services desk picked has to spell one block per
+integration and a branch in front of them, and a fourth integration is an
+edit to the parent.
+
+Three things at the tip rest on the id being a literal:
+
+- **Self-reference.** The `src` Amendment's refusal criterion is the `src` attribute on an `invoke`
+  element, compared for equality with the document id
+  (`lib/statifier_blocks/compiler/self_reference.ex:80-81`, `@element` and
+  `@attribute`), and the same module's moduledoc already says "`srcexpr` is
+  deliberately not checked".
+- **The publish-time pair check.** The compile records one
+  `t:StatifierBlocks.Compiled.child_reference/0` per block that names a
+  document, and the `core.subchart` clause matches a binary `chart` only
+  (`lib/statifier_blocks/compiler.ex:3301`, `defp reference/3`); any other
+  block or config records nothing (`:3332`, the fallback clause).
+  `StatifierBlocks.Graph`'s `check/2` (`lib/statifier_blocks/graph.ex:128`)
+  and `consumers_broken/2` (`:167`) judge only recorded references, by
+  `ADR-0008`'s Amendment of 2026-09-22.
+- **The handlers.** Both handlers resolve the child through one shared
+  step, `StatifierBlocks.Runtime.Subchart.Resolution`'s `resolve/3`
+  (`lib/statifier_blocks/runtime/subchart/resolution.ex:58`, `@spec
+  resolve/3`), which refuses a non-binary `src` as `unknown_document`
+  without calling the host's `resolve_chart/2` (`:63`), and otherwise
+  answers the resolver's `{:ok, %Document{}}` by a `:child_use` compile,
+  its `{:ok, %Compiled{}}` as it stands, `{:cycle, path}` as
+  `cycle_refused` and `:error` as `unknown_document`. The in-memory handler
+  plans `{:start_child, ...}` or one refusal from that answer
+  (`lib/statifier_blocks/runtime/subchart.ex:196`, `def start/3`), and the
+  durable one answers the same instruction or `{:error, reason: ...,
+  detail: ...}` (`lib/statifier_blocks/runtime/durable_subchart.ex:191`,
+  `def dispatch/4`).
+
+The engine evaluates `<invoke srcexpr>` at the moment the invocation
+starts: in statifier 2.5.0, the version this package's lock resolves,
+`Statifier.Interpreter`'s `invoke_one/6` resolves `src` or `srcexpr`
+against the datamodel and hands the result to the handler on
+`t:Statifier.Effect.Invoke.t/0`'s `src` field, and the engine's validator
+refuses an `<invoke>` that carries both attributes. Whether the
+`~> 2.2` floor `mix.exs` declares does the same is confirmed by the request
+that builds `J1`, before it emits one.
+
+The outcome routing today runs one way only. C2 gives the block one
+conditioned `done.invoke` transition per outcome it declares and an
+unconditioned one last, which lands on the first declared outcome
+(`lib/statifier_blocks/core/subchart.ex:524`, `defp default_target/1`).
+The pair check refuses at publish a parent that routes on an outcome the
+child does not declare; the other direction, a child outcome the parent
+has no arm for, is not refused anywhere and falls to that unconditioned
+arm (the `StatifierBlocks.Graph` moduledoc, "The three checks").
+
+### J1. `chart_from`: a datamodel path, emitted as `srcexpr`, exclusive with `chart`
+
+`core.subchart` gains one optional config key, `chart_from`: a datamodel
+path whose value, when the block's invocation starts, is the document id of
+the child to run. A block names its child by exactly one of the two keys:
+
+- `chart`, a literal document id, exactly as the `src` Amendment records
+  it. A block that
+  carries `chart` and no `chart_from` emits, for every config it admits at
+  `3ef9f55`, the bytes it emits at `3ef9f55`.
+- `chart_from`, a datamodel path in the grammar `assign_to` already takes
+  (`ADR-0011` decision 13), written verbatim as the `<invoke>`'s `srcexpr`
+  in place of `src`. The attribute is stamped as coming from `chart_from`,
+  as `src` is from `chart`, so a finding about it anchors on the field the
+  author typed.
+
+Both keys present and non-empty is one `validate_config/1` finding on
+`chart_from`; neither present is the finding `chart` raises at `3ef9f55`,
+unchanged. An empty string reads as absent, as it does for `outcomes`,
+`assign_to` and `params`. `config_schema/1` lists `chart_from` after `chart`, as a
+`{:path, %{}}` field, and `chart` stops being `required?: true`, since the
+rule that one of the two is present is `validate_config/1`'s.
+`current_version/0` stays `1`: no stored config changes meaning, so there
+is nothing for `migrate_config/2` to do.
+
+The rest of the block is the same for both keys: `outcomes`, `assign_to`,
+`params`, the `on_<outcome>` slots, C2's routing and C3's explicit
+`<invoke id>`. A `chart_from` block emits one more `<param>`, the carrier
+`J2` decides.
+
+### J2. The block's declared outcomes are the set every run-time child's root outcomes must fall within
+
+For a block that names its child by `chart_from`, the outcomes the block
+declares, `outcome_names/1`
+(`lib/statifier_blocks/core/subchart.ex:575`, `def outcome_names/1`: the
+author's `outcomes`, `done` when they listed none, with `error` appended
+unless they listed it), are the set every child the path names at run time
+must fit: each outcome the child's root declares is one of them. A child
+may declare fewer. A parent may route an outcome a given child never
+raises, which is what lets one `core.subchart` run three setup documents
+that finish three different ways.
+
+The child's root outcomes are the `declared_outcomes` of its
+`StatifierBlocks.Compiled` `interface`
+(`lib/statifier_blocks/compiled.ex:123`, `@type interface`): the artifact
+the handler's own `:child_use` compile produces for an `{:ok, %Document{}}`
+answer, or the one the resolver handed back for an `{:ok, %Compiled{}}`
+answer. An artifact whose `interface` declares no outcomes fits any block,
+because there is nothing in it to judge.
+
+The handler learns the block's set from the emission. A `chart_from`
+block's `<invoke>` carries, after the author's `params` rows, one reserved
+`<param>`:
+
+```xml
+<param expr="'done skipped error'" name="statifier_blocks:outcomes"/>
+```
+
+its `expr` a single-quoted string literal of `outcome_names/1`, in order,
+separated by single spaces. An outcome name is an identifier
+(`outcome_rows/1`), so it holds no space and no quote, and an author's
+param name is an identifier (`StatifierBlocks.Core.Invoke`'s
+`param_rows/1`), so it cannot be this one, which holds a colon. The handler
+removes the reserved param from the `t:Statifier.Effect.Invoke.t/0` it
+hands on in `{:start_child, ...}`, so it never reaches the child's
+datamodel. A block naming its child by `chart` emits no such param, which
+is how the literal form keeps its bytes and how the handler tells the two
+forms apart.
+
+**Why a carrier on the emission.** The handler's inputs are the invoke
+payload and a context: in-memory, `t:Statifier.Invoke.Handler.ctx/0`
+carries the session id, the invoke types and the handler map, and the
+durable dispatch
+context carries the execution id, a content hash and the payload. Neither
+carries the parent document or its block config, so the declared set has to
+travel on the payload, and a `<param>` is the payload's one open channel.
+
+**Why `chart_from` only.** A literal child is named at authoring time, and
+the publish-time pair check already judges it against the parent (`J5`).
+Carrying the set on a literal block's `<invoke>` would move the bytes of
+every published document that uses `core.subchart`. The ruling concerns the
+child chosen at run time; a literal child keeps today's routing, an
+undeclared outcome falling to the unconditioned arm as before.
+
+### J3. A misfit is refused at child creation, in both handlers, with one stable reason
+
+A run-time child whose root declares an outcome outside the block's set is
+refused with the reason **`"child_outcome_undeclared"`**: a child outcome
+the block did not declare. The refusal is made in
+`StatifierBlocks.Runtime.Subchart.Resolution`, the step both handlers
+share, after the child has resolved and compiled and before either handler
+answers. So in-memory no `{:start_child, ...}` is planned and the handler
+plans the one `{:raise, :platform, "error.communication.invoke." <> id,
+...}` it plans for every refusal; durably, `dispatch/4` answers `{:error,
+reason: "child_outcome_undeclared", detail: detail}` and no child execution
+is created. The order is the existing one with this check last:
+`unknown_document`, `cycle_refused` and `child_compile_findings` are judged
+first, and a child that fails any of them never reaches this check.
+
+`detail` is JSON-shaped, in the register of the other reasons:
+
+| Key | Value |
+|---|---|
+| `"chart"` | the document id the path evaluated to |
+| `"outcomes"` | the child's root outcomes outside the block's set, in the child's declaration order |
+| `"declared"` | the block's set, in `outcome_names/1` order |
+
+The event is caught where every refusal is: by the block's
+`error.communication.invoke` transition when `on_error` is occupied, as C2
+and the in-memory handler's moduledoc ("The closed refusal set") say.
+
+**The refusal set.** `ADR-0008` decision 5 closes the set at four, "never
+a fifth", and argues against each candidate it names. This is a fifth,
+shared by both handlers like the first three, not durable-only, and it is
+none of the candidates that section rejects: it is not a child that starts
+and then fails, because the child is never created. The ruling above is
+the authority for it; `ADR-0008` is not edited, and this section is where
+its decision 5 now reads one reason longer.
+
+### J4. The self-reference refusal is for the literal form only
+
+The `src` Amendment's self-reference refusal stands as written and
+reaches exactly what it reaches at
+`3ef9f55`: an `<invoke>` whose `src` equals the document's own id. A
+`chart_from` block emits no `src`, so no compile finding is raised for it,
+and the self-reference moduledoc's sentence on `srcexpr` is the reason: the
+id is not known until the path is read. A path that names the document it
+sits in at run time is a cycle of length one, and the same Amendment
+already gives every cycle to the host's resolver, which answers `{:cycle, path}` and the
+handler refuses `cycle_refused`. A host whose resolver does not detect
+cycles runs the same document inside itself for as long as its data names
+it; that is that Amendment's scope line, now reached by data as well as by a document
+graph.
+
+### J5. Which publish-time checks still verify, and which move to child creation
+
+For a block that names its child by `chart`, nothing moves: the
+self-reference refusal, the recorded reference, and `StatifierBlocks.Graph`'s
+three rules in both directions verify at publish exactly as at `3ef9f55`.
+
+For a block that names its child by `chart_from`:
+
+| Check | Where it is judged |
+|---|---|
+| The config: one of `chart` and `chart_from`, the path's grammar, the `outcomes` rows | the compile, `validate_config/1`, unchanged in kind |
+| The emission: C2's routing for every declared outcome, C3's `<invoke id>`, the invoke type's two-registry lint | the compile, unchanged |
+| The child is a document the host resolves | child creation: `unknown_document` |
+| The child is not reached through a cycle, itself included | child creation: `cycle_refused`, from the host's resolver (`J4`) |
+| The child compiles for child use | child creation: `child_compile_findings` |
+| Every outcome the child's root declares is among the block's | child creation: `child_outcome_undeclared` (`J3`) |
+| Every outcome the parent routes on is declared by the child | nowhere: under `J2` a parent may route an outcome a given child never raises |
+
+The compile records no `t:StatifierBlocks.Compiled.child_reference/0` for a
+`chart_from` block, since the reference's `document_id` is a document id
+and a path is not one; so the fallback clause of `defp reference/3` keeps
+answering `[]` for it, `check/2` has nothing to resolve, and
+`consumers_broken/2`, handed such a parent, finds no reference in it to
+judge. A
+host that republishes a child the path may name learns of a misfit from
+the refusal at child creation, not at publish.
+
+A path that names no bound location, or that the engine fails to evaluate,
+is not a refusal: the engine raises `error.execution` for that invocation
+and no handler is called (statifier 2.5.0, `invoke_one/6`). A path whose
+value is not a string reaches the handler and is refused
+`unknown_document` without the resolver being called, by the non-binary
+clause of `resolve/3`, unchanged.
+
+### J6. The host's `resolve_chart/2` is the only gate on which ids resolve
+
+This package judges nothing about the value a `chart_from` path holds
+beyond that it is a string. Any string the datamodel holds at that moment,
+including one an external event's data wrote, reaches
+`c:StatifierBlocks.Runtime.Subchart.resolve_chart/2`, and the host's answer
+is the whole of the decision: a host that offers a fixed set of child
+documents answers `:error` for every other id, and the handler refuses
+`unknown_document`. The resolver contract is unchanged: the same callback,
+the same four answers, the same `ArgumentError` for a fifth answer.
+
+### J7. `core.map` is unchanged
+
+`core.map` names its child by a literal `chart` only. It gains no
+`chart_from` key, and its emission, its reference in `interface` and its
+handler's resolution are unchanged. A data-driven child for a fan-out is
+outside this Amendment.
+
+### The contract as typespecs
+
+```elixir
+# StatifierBlocks.Core.Subchart - the config validate_config/1 admits.
+# Exactly one of "chart" and "chart_from" is a non-empty string.
+@type config :: %{
+        optional("chart") => String.t(),       # a document id, emitted as src
+        optional("chart_from") => String.t(),  # a datamodel path, emitted as srcexpr
+        optional("outcomes") => String.t(),    # one outcome name per line
+        optional("assign_to") => String.t(),
+        optional("params") => String.t()       # name=path rows
+      }
+
+# StatifierBlocks.Runtime.Subchart.Resolution - the types are unchanged;
+# the closed set of reason() values gains "child_outcome_undeclared".
+@type reason :: String.t()
+@type t :: {:ok, String.t()} | {:refuse, reason(), map()}
+
+# The detail map of a "child_outcome_undeclared" refusal.
+@type outcome_detail :: %{
+        String.t() => String.t() | [String.t()]
+      }
+# keys: "chart" => String.t(), "outcomes" => [String.t()], "declared" => [String.t()]
+
+# StatifierBlocks.Runtime.Subchart - the resolver contract, unchanged.
+@callback resolve_chart(document_id :: String.t(), ctx :: map()) ::
+            {:ok, StatifierBlocks.Document.t()}
+            | {:ok, StatifierBlocks.Compiled.t()}
+            | {:cycle, [String.t()]}
+            | :error
+```
+
+### Worked example: the branch-library onboarding
+
+A branch library's onboarding runs one setup per integration the branch
+picked. Three setup documents are each published for child use:
+
+| Document id | Root outcomes |
+|---|---|
+| `doc_catalogue_sync` | `done`, `skipped` |
+| `doc_reading_list_import` | `done` |
+| `doc_card_reader_setup` | `done`, `skipped`, `needs_site_visit` |
+
+An earlier step writes the next setup's document id to
+`onboarding.setup_document`. The onboarding document's `core.subchart`
+block, `blk_SETUP`, carries:
+
+```json
+{
+  "chart_from": "onboarding.setup_document",
+  "outcomes": "done\nskipped"
+}
+```
+
+so its declared set, `outcome_names/1`, is `done`, `skipped`, `error`. It
+compiles, by C1 to C3 and `J1` and `J2`, to:
+
+```xml
+<state id="s_blk_SETUP" initial="...">
+  <state id="...">
+    <invoke id="blk_SETUP" srcexpr="onboarding.setup_document" type="statifier_blocks:subchart">
+      <param expr="'done skipped error'" name="statifier_blocks:outcomes"/>
+    </invoke>
+    <transition event="done.invoke" cond="..." target="..."/>
+    <!-- one conditioned transition per declared outcome, then the
+         unconditioned one, as C2 prints them -->
+  </state>
+  ...
+</state>
+```
+
+At run time, with the host's resolver answering only the three ids above:
+
+- `onboarding.setup_document` holds `"doc_catalogue_sync"`: the child
+  declares `done` and `skipped`, both in the set, and starts. It finishes
+  `skipped` and the block takes `on_skipped`.
+- It holds `"doc_reading_list_import"`: the child declares `done` only. It
+  fits, starts, and the block's `skipped` arm is simply never taken for it.
+- It holds `"doc_card_reader_setup"`: the child declares
+  `needs_site_visit`, which the block does not. No child is created, in
+  either handler, and the block receives
+  `error.communication.invoke.blk_SETUP` with data
+
+  ```json
+  {
+    "reason": "child_outcome_undeclared",
+    "detail": {
+      "chart": "doc_card_reader_setup",
+      "outcomes": ["needs_site_visit"],
+      "declared": ["done", "skipped", "error"]
+    }
+  }
+  ```
+
+  which its `on_error` slot catches when occupied. The author's fix is a
+  `needs_site_visit` line in `outcomes`, and the block gains an
+  `on_needs_site_visit` slot for it.
+- It holds `"doc_branch_closure"`, a document the host does not offer: the
+  resolver answers `:error` and the handler refuses `unknown_document`
+  (`J6`).
+
+### What this Amendment does not decide
+
+- Back across a sub-path boundary.
+- A data-driven child for `core.map` (`J7`).
+- How the editor offers the choice between `chart` and `chart_from`, how
+  the block's sentence reads it, and the how-to page: the request that
+  builds them records them.
+- Whether `io/1` reports the `chart_from` path as a read for the typed
+  environment (`ADR-0011`); the request that builds `J1` records its choice.
+- Anything about a block whose invocation the engine aborts with
+  `error.execution` (`J5`'s last paragraph): the block waits, as any
+  `core.subchart` whose invocation never started does.
+
+### Consequences
+
+- A host that changes nothing sees no changed answer: a document with no
+  `chart_from` key compiles to the bytes it compiles to at `3ef9f55`, and
+  every reference, `:graph` finding and handler answer for it is unchanged.
+- A `chart_from` block is new: its emission, its fifth refusal reason and
+  its absence from `interface` apply to it alone.
+- `ADR-0008` decision 5's closed set reads with `child_outcome_undeclared`
+  beside its four (`J3`), and the in-memory handler's moduledoc ("The
+  closed refusal set") and the durable one's table are rewritten by the
+  request that builds `J3`.
+
+Filed with `sb-borq`.
