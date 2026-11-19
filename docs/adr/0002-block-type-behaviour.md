@@ -15099,3 +15099,50 @@ in this repository, and this Note writes nothing in that one.
 the trace-visible positions refused and the no-datamodel qualifier; every
 compiled byte. No code changes. This Note carries no `Status:` line, which is
 this file's convention for a Note.
+
+## Note (2026-11-19): decision 10's `core.subchart` row reads with `chart_from`, decided by `ADR-0004`'s Amendment of 2026-11-19
+
+A dated Note rather than an amendment. It records how decision 10's
+`core.subchart` row, G5, reads once the code `ADR-0004`'s Amendment of
+2026-11-19 decides has shipped, and decides nothing itself: that Amendment
+is where `chart_from`, the outcome fit and the refusal are decided (its
+`J1` to `J7`), and it is at proposed. G5, G5a and every section above this
+line stand as written, and no section above is edited.
+
+**The row, as it reads with that Amendment's code.**
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.subchart` | one `zero_or_one` slot per declared outcome, named `on_<outcome>`, in declaration order with `on_error` last | `chart`: `:string`, optional; `chart_from`: `{:path, %{}}`, optional; exactly one of the two, judged by `validate_config/1`; `outcomes`: `:string`, optional; `assign_to`: `{:path, %{}}`, optional; `params`: `:string`, optional | for `chart`, the outcomes the referenced chart declares, as the author listed them; for `chart_from`, the set every child the path names at run time must fall within; in both, with `error` appended unless they listed it | a step that runs another chart, named by a literal document id or read from a datamodel path when it starts, through one host-registered invoke type, and finishes at the outcome the child reported; a `chart_from` child whose root declares an outcome outside the declared set is refused `child_outcome_undeclared` before it is created |
+
+**What changed against G5's printing, and why each is not decided here.**
+
+- `chart` stops being required and `chart_from` sits beside it: `ADR-0004`'s
+  `J1`. G5 prints `chart` as `required?: true`
+  (`lib/statifier_blocks/core/subchart.ex:243`, `def config_schema/1`, read
+  at `3ef9f55`); the rule that one of the two is present moves to
+  `validate_config/1`.
+- `assign_to` reads `{:path, %{}}`, not `:string`. That is not this
+  Amendment's change: it is already so at `3ef9f55` (`config_schema/1`,
+  the `assign_to` entry), by `ADR-0011` decision 13 and the Notes above
+  that record it, and the row prints it here so the row is read once.
+- The `outcomes(config)` column gains the `chart_from` reading:
+  `ADR-0004`'s `J2`. The callback is unchanged
+  (`outcome_names/1`, `:575`, read at `3ef9f55`); only what the list is
+  for differs between the two keys.
+- `current_version/0` stays `1`, `io/1` and the palette entry are not
+  changed by `J1`, and G5a's emission sentence reads for `chart_from` with
+  `srcexpr` in place of `src` and one reserved `<param>` after the
+  author's rows: `ADR-0004`'s `J1` and `J2`.
+
+**The finding.** A `chart_from` child whose root declares an outcome
+outside the block's set is refused when the child would be created, with
+the reason `child_outcome_undeclared`, in both handlers (`ADR-0004`'s
+`J3`). It is a refusal at run time, not a compile finding, so no compile
+stage reports it; the row's Notes column carries it as part of what the
+step does.
+
+**What is unchanged.** The vocabulary does not grow. `core.map`'s row is
+unchanged, literal `chart` only (`ADR-0004`'s `J7`). No code changes in
+the request that adds this Note. This Note carries no `Status:` line, which
+is this file's convention for a Note.
