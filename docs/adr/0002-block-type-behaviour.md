@@ -15053,3 +15053,49 @@ not, and a `core.branch` after the await that reads the value),
 post). The corpus case is `test/fixtures/await_capture/timeout_capture.json`
 and its golden. This Note carries no `Status:` line, which is this file's
 convention for a Note.
+
+## Note (2026-11-19): a sealed string a host's sealer produced is an opaque handle, not a secret value under the secrets rule
+
+A dated Note rather than an amendment. It records how a rule this record
+already states reads for one kind of value, and decides nothing beyond it:
+the rule, the `sensitive?` key and every refusal stated in "Amendment
+(2026-08-29): decision 7, an optional `sensitive?` key, and the secrets rule
+behind it" stand as written, and no section above is edited.
+
+**The rule.** That Amendment's Context states that "credentials, API keys and
+other secrets never enter a chart datamodel", and that "The datamodel carries
+the identifier; it never carries the value."
+
+**What a sealed string is here.** A string a host's sealer produced from a
+secret value, under a key the host's sealer holds. The key is in no document,
+no compiled chart and no datamodel; only the host's sealer can open the
+string.
+
+**Why it is not a secret value under the rule.** This package compiles a
+document to SCXML and never sees a value, as that Amendment's Context says.
+The engine that runs the compiled chart carries a sealed string as it carries
+any other string value: it can copy it, store it and compare it, and it cannot
+open it, because the key that opens it is not anywhere the engine reads. The
+string reaches the five surfaces that Context lists - traces, telemetry, job
+payloads, authoring fixtures, LiveView diffs - as any datamodel value does,
+and what it shows there is a string no reader of those surfaces can open. So a
+sealed string stands where the rule's identifier stands, a handle the host
+alone turns back into the value, and a datamodel holding one is not a
+datamodel holding a secret. The value it was sealed from is under the rule: a
+host that hands that value to the engine before it is sealed carries a secret
+into the datamodel. The reading holds only for a string that cannot be opened
+without the sealer's key; an encoding anyone can reverse is the value spelled
+another way, and is under the rule.
+
+**The sibling record.** `rd-ADR-0002` (riddler-ex's
+`docs/adr/0002-element-document.md`), in its Amendment dated 2026-11-16, which
+adds a question kind whose response a host seals before it is stored and
+which is accepted (2026-11-19), read at that repository's origin/main
+`10fe9cd`, states the same reading from its side, quoting the rule above: "The
+sealed string is a handle the engine cannot open". That record writes nothing
+in this repository, and this Note writes nothing in that one.
+
+**What is unchanged.** The rule; the `sensitive?` key and what it may annotate;
+the trace-visible positions refused and the no-datamodel qualifier; every
+compiled byte. No code changes. This Note carries no `Status:` line, which is
+this file's convention for a Note.
