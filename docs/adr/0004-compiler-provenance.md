@@ -5131,14 +5131,17 @@ judge. A
 host that republishes a child the path may name learns of a misfit from
 the refusal at child creation, not at publish.
 
-A path whose root is not present in the datamodel at all is not a
-refusal: the engine evaluates the path with unbound roots refused, raises
-`error.execution` for that invocation, and calls no handler (statifier
-2.5.0, `invoke_one/6`). Every other path reaches the handler. A root the
-datamodel declares but holds no value for, and a bound root whose member
-the path names is missing, evaluate to `:undefined`, not to an error; that
-value, like any other value that is not a string, reaches the handler as
-`src` and is refused `unknown_document` without the resolver being
+A path the engine fails to evaluate is not a refusal: the engine raises
+`error.execution` for that invocation and calls no handler (statifier
+2.5.0, `invoke_one/6`). The engine evaluates with unbound roots refused,
+so a path whose root is not present in the datamodel at all fails this
+way, and so does any other evaluation error the path's expression meets:
+`chart_from` admits `assign_to`'s grammar, which is wider than a dotted
+name. A path that evaluates reaches the handler, whatever value it
+yields. A root the datamodel declares but holds no value for, and a bound
+root whose member the path names is missing, evaluate to `:undefined`,
+not to an error; that value, like any other value that is not a string,
+reaches the handler as `src` and is refused `unknown_document` without the resolver being
 called, by the non-binary clause of `resolve/3`, unchanged, its `detail`
 carrying the value inspected.
 
@@ -5271,8 +5274,9 @@ At run time, with the host's resolver answering only the three ids above:
 - Whether `io/1` reports the `chart_from` path as a read for the typed
   environment (`ADR-0011`); the request that builds `J1` records its choice.
 - Anything about a block whose invocation the engine aborts with
-  `error.execution` because the path's root is not in the datamodel
-  (`J5`'s last paragraph): the block waits, as any `core.subchart` whose
+  `error.execution` because the path fails to evaluate, its root absent
+  from the datamodel or any other evaluation error (`J5`'s last
+  paragraph): the block waits, as any `core.subchart` whose
   invocation never started does. A declared root with no value, or a
   missing member, is not this case: it is refused `unknown_document`.
 
