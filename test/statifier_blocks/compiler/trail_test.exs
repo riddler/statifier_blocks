@@ -47,12 +47,12 @@ defmodule StatifierBlocks.Compiler.TrailTest do
     def emit(_block, context), do: {:ok, Collect.state(context)}
 
     @doc false
-    def state(context) do
+    def state(context, event \\ "step.submitted") do
       done = Context.done_id(context)
       {:ok, waiting} = Context.role_id(context, "waiting")
 
       submit =
-        Emit.transition([event: "step.submitted", target: done], [
+        Emit.transition([event: event, target: done], [
           Emission.element("assign", [{"expr", "_event.data"}, {"location", "responses"}])
         ])
 
@@ -75,6 +75,45 @@ defmodule StatifierBlocks.Compiler.TrailTest do
 
     @impl true
     def emit(_block, context), do: {:ok, Collect.state(context)}
+  end
+
+  defmodule Counted do
+    @moduledoc """
+    `Collect`, completed by the event its config names, and counting every
+    entry into its state in the `visits` root, so a test can tell a step
+    that was re-entered from one that was left alone.
+    """
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def config_schema(config) do
+      Collect.config_schema(config) ++
+        [
+          %{
+            key: "event",
+            type: :string,
+            label: "The event that completes it",
+            required?: false,
+            default: "step.submitted"
+          }
+        ]
+    end
+
+    @impl true
+    def returnable?(config), do: Collect.returnable?(config)
+
+    @impl true
+    def emit(%Block{config: config}, context) do
+      %Emission{children: children} =
+        state = Collect.state(context, Map.get(config, "event", "step.submitted"))
+
+      visit =
+        Emission.element("onentry", [], [
+          Emission.element("assign", [{"expr", "visits + 1"}, {"location", "visits"}])
+        ])
+
+      {:ok, %{state | children: children ++ [visit]}}
+    end
   end
 
   @sentinel "SENTINEL-library-card-7f3a"
@@ -283,6 +322,273 @@ defmodule StatifierBlocks.Compiler.TrailTest do
     end
   end
 
+  describe "the Back transitions (L3, L4)" do
+    # sabotage: dropped `internal: true` from `scope_back/2` -> the scope
+    # state's Back lost `type="internal"` and this went red (verified)
+    test "the scope state carries one Back per step, after its own transitions" do
+      scxml = compile!(registration()).scxml
+
+      assert scxml =~
+               ~s(<transition event="done.state.s_blk_PICKUP" target="s_blk_ROOT__o_done" type="internal"/>) <>
+                 ~s(<transition cond="s_blk_ROOT__trail[0] === 's_blk_NAME'" event="statifier_blocks.back" ) <>
+                 ~s(target="s_blk_NAME" type="internal">) <>
+                 ~s(<assign expr="s_blk_ROOT__trail[1]" location="s_blk_ROOT__trail"/></transition>) <>
+                 ~s(<transition cond="s_blk_ROOT__trail[0] === 's_blk_CARD'") <>
+                 ~s( event="statifier_blocks.back" target="s_blk_CARD" type="internal">)
+    end
+
+    # sabotage: kept the step's own state in `others` in
+    # `steps_additions/2` -> a self-targeting Back appeared on s_blk_CARD
+    # and this went red (verified)
+    test "a step's state carries Back to each other step, then the catch-all, after the push" do
+      scxml = compile!(registration()).scxml
+
+      back_to = fn step ->
+        ~s(<transition cond="s_blk_ROOT__trail[1][0] === '#{step}'" event="statifier_blocks.back" ) <>
+          ~s(target="#{step}"><assign expr="s_blk_ROOT__trail[1][1]" location="s_blk_ROOT__trail"/>) <>
+          ~s(</transition>)
+      end
+
+      assert scxml =~
+               ~s(</if></onentry>) <>
+                 back_to.("s_blk_NAME") <>
+                 back_to.("s_blk_PICKUP") <>
+                 ~s(<transition event="statifier_blocks.back"/><transition event="step.again")
+
+      refute scxml =~ "s_blk_ROOT__trail[1][0] === 's_blk_RULES'"
+    end
+
+    # sabotage: read the top, `T[0]`, in place of `T[1][0]` in
+    # `step_back/3` -> Back at s_blk_CARD took the catch-all and this went
+    # red (verified)
+    test "Back at the second step re-enters the first and pops" do
+      state = start(registration()) |> deliver("step.submitted")
+      assert leaves(state) == ["s_blk_CARD__waiting"]
+
+      state = deliver(state, "statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_NAME__waiting"]
+      assert trail(state) == ["s_blk_NAME", []]
+    end
+
+    # sabotage: removed the catch-all from `step_back/3` -> the event
+    # reached the scope state, re-entered s_blk_NAME and the visit count
+    # moved (verified)
+    test "Back at the first step does nothing" do
+      state = start(registration(type: "library.counted"), counted())
+      assert visits(state) == 1
+
+      state = deliver(state, "statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_NAME__waiting"]
+      assert trail(state) == ["s_blk_NAME", []]
+      assert visits(state) == 1
+    end
+
+    # sabotage: emitted no scope-state Back (`put/4` of `:scope_back`
+    # dropped) -> Back from the step that is not returnable took no
+    # transition and this went red (verified)
+    test "Back from a step that is not returnable re-enters the trail's top step" do
+      state = start(registration())
+      state = state |> deliver("step.submitted") |> deliver("step.submitted")
+      assert leaves(state) == ["s_blk_RULES__waiting"]
+
+      state = deliver(state, "statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_CARD__waiting"]
+      assert trail(state) == ["s_blk_CARD", ["s_blk_NAME", []]]
+    end
+  end
+
+  describe "no transition on an empty trail (L5)" do
+    # sabotage: dropped the `:finals` clear in `scope_additions/2` -> Back
+    # re-entered s_blk_PICKUP in the finished document and this went red
+    # (verified)
+    test "Back sent to a finished document takes no transition" do
+      state = start(registration())
+      state = Enum.reduce(1..4, state, fn _step, state -> deliver(state, "step.submitted") end)
+
+      assert leaves(state) == ["s_blk_ROOT__o_done"]
+      assert trail(state) == []
+
+      state = deliver(state, "statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_ROOT__o_done"]
+      assert trail(state) == []
+    end
+
+    # sabotage: made every block returnable in `collect/3` (`if true`) ->
+    # the declared-false registration carried Back and this went red
+    # (verified)
+    test "a document with no returnable step has no Back transition" do
+      refute compile!(registration(revisable: false)).scxml =~ "statifier_blocks.back"
+    end
+
+    # sabotage: dropped the one-step clause in `scope_additions/2` -> the
+    # scope-state Back appeared on the root and this went red (verified)
+    test "a root block that is the one returnable step offers no Back" do
+      root = Block.new("library.counted", id: "blk_ROOT")
+      scxml = compile!(root, counted()).scxml
+
+      refute scxml =~ "s_blk_ROOT__trail[0] === "
+      assert scxml =~ ~s(<transition event="statifier_blocks.back"/>)
+
+      state = start(root, counted()) |> deliver("statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_ROOT__waiting"]
+      assert visits(state) == 1
+    end
+  end
+
+  describe "the boundaries that clear the trail (L6)" do
+    # sabotage: made the `core.foreach` arm of `child_scope/3` match no
+    # slot -> the body's steps joined the document's trail and this went
+    # red (verified)
+    test "inside a loop body Back stays within the body and the iteration" do
+      state = start(looping(), patrons("['ada', 'grace']"))
+      state = deliver(state, "step.submitted")
+
+      assert leaves(state) == ["s_blk_B1__waiting"]
+      assert trail(state) == []
+      assert body_trail(state) == ["s_blk_B1", []]
+
+      # the body's first step: the step before the loop is not behind it
+      state = deliver(state, "statifier_blocks.back")
+      assert leaves(state) == ["s_blk_B1__waiting"]
+
+      state = state |> deliver("step.submitted") |> deliver("statifier_blocks.back")
+      assert leaves(state) == ["s_blk_B1__waiting"]
+      assert body_trail(state) == ["s_blk_B1", []]
+
+      # the second pass starts with nothing from the first behind it
+      state = state |> deliver("step.submitted") |> deliver("step.submitted")
+      assert leaves(state) == ["s_blk_B1__waiting"]
+      assert body_trail(state) == ["s_blk_B1", []]
+
+      state = state |> deliver("step.submitted") |> deliver("step.submitted")
+      assert leaves(state) == ["s_blk_AFTER__waiting"]
+    end
+
+    # sabotage: dropped the boundary clears in `boundary_additions/2` ->
+    # the step after the loop could go back to the step before it and
+    # this went red (verified)
+    test "a loop is a boundary for the scope it sits in" do
+      state = start(looping(), patrons("[]"))
+      state = deliver(state, "step.submitted")
+
+      assert leaves(state) == ["s_blk_AFTER__waiting"]
+      assert trail(state) == ["s_blk_AFTER", []]
+
+      state = deliver(state, "statifier_blocks.back")
+      assert leaves(state) == ["s_blk_AFTER__waiting"]
+    end
+
+    # sabotage: made the `core.parallel` arm of `child_scope/3` match no
+    # slot -> both lanes shared the document's trail and this went red
+    # (verified)
+    test "inside a parallel lane Back stays within the lane" do
+      state = start(lanes(), counted())
+      refute Map.has_key?(state.datamodel, "s_blk_P__trail")
+      assert state.datamodel["s_blk_P__lane_sender__trail"] == ["s_blk_SEND", []]
+      assert visits(state) == 2
+
+      state = deliver(state, "statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_RECV__waiting", "s_blk_SEND__waiting"]
+      assert visits(state) == 2
+    end
+
+    # sabotage: dropped the `:finals` clear in `scope_additions/2` -> the
+    # finished lane's Back re-entered s_blk_SEND and this went red
+    # (verified)
+    test "a finished lane offers no Back while another lane runs" do
+      state = start(lanes(), counted())
+      state = deliver(state, "send.submitted")
+
+      assert leaves(state) == ["s_blk_P__done_lane_sender", "s_blk_RECV__waiting"]
+      assert state.datamodel["s_blk_P__lane_sender__trail"] == []
+
+      state = deliver(state, "statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_P__done_lane_sender", "s_blk_RECV__waiting"]
+      assert visits(state) == 2
+    end
+
+    # sabotage: dropped the `:entry` clear of a body or lane in
+    # `scope_additions/2` -> both clears were missing and this went red
+    # (verified)
+    test "a loop iteration and a parallel lane each clear their own trail on entry" do
+      loop = compile!(looping(), patrons("[]")).scxml
+      lanes = compile!(lanes(), counted()).scxml
+
+      assert loop =~
+               ~s(<state id="s_blk_F__body" initial="s_blk_B1"><onentry>) <>
+                 ~s(<assign expr="[]" location="s_blk_F__body__trail"/></onentry>)
+
+      assert lanes =~
+               ~s(<state id="s_blk_P__lane_sender" initial="s_blk_SEND"><onentry>) <>
+                 ~s(<assign expr="[]" location="s_blk_P__lane_sender__trail"/></onentry>)
+    end
+
+    # sabotage: left `core.subchart` out of `@boundaries` -> its clears
+    # were missing and this went red (verified)
+    test "a sub-path clears its scope's trail on entry and on exit" do
+      scxml = compile!(sub_paths(), patrons("[]")).scxml
+      clear = ~s(<assign expr="[]" location="s_blk_ROOT__trail"/>)
+
+      assert scxml =~
+               ~s(<state id="s_blk_SUB" initial="s_blk_SUB__running">) <>
+                 ~s(<onentry>#{clear}</onentry><onexit>#{clear}</onexit>)
+
+      assert scxml =~ ~r{<state id="s_blk_MAP" [^>]*><onentry>#{Regex.escape(clear)}}
+      assert scxml =~ ~r{<state id="s_blk_MAP" .*?<onexit>#{Regex.escape(clear)}}s
+    end
+
+    # sabotage: attached every boundary of the document to each scope in
+    # `finish/2` -> the loop, whose scope has no step, carried a clear and
+    # this went red (verified)
+    test "a boundary in a scope with no returnable step adds nothing" do
+      scxml = compile!(looping(edges: false), patrons("[]")).scxml
+
+      refute scxml =~ "s_blk_ROOT__trail"
+
+      assert scxml =~
+               ~s(<state id="s_blk_F" initial="s_blk_F__head"><onentry><assign expr="patrons")
+
+      refute scxml =~ "<onexit>"
+      assert scxml =~ ~s(<data expr="[]" id="s_blk_F__body__trail"/>)
+    end
+  end
+
+  describe "provenance of Back and the clears (L9)" do
+    # sabotage: owned the scope-state Back by the scope's block in
+    # `scope_back/2` -> red (verified)
+    test "Back belongs to its step, a clear to its boundary or its scope's block" do
+      compiled = compile!(looping(), patrons("[]"))
+
+      owner = fn needle ->
+        {at, _length} = :binary.match(compiled.scxml, needle)
+        {:ok, owner} = Provenance.owner_at(compiled.provenance, at)
+        {owner.block_id, owner.role, owner.config_key}
+      end
+
+      assert owner.(~s(<transition cond="s_blk_F__body__trail[0] === 's_blk_B2')) ==
+               {"blk_B2", ":trail", nil}
+
+      assert owner.(~s(<transition cond="s_blk_F__body__trail[1][0] === 's_blk_B1')) ==
+               {"blk_B2", ":trail", nil}
+
+      assert owner.(~s(<transition event="statifier_blocks.back"/>)) ==
+               {"blk_BEFORE", ":trail", nil}
+
+      assert owner.(~s(<assign expr="[]" location="s_blk_ROOT__trail"/>)) ==
+               {"blk_F", ":trail", nil}
+
+      assert owner.(~s(<assign expr="[]" location="s_blk_F__body__trail"/>)) ==
+               {"blk_F", ":trail", nil}
+    end
+  end
+
   # -- Fixtures ------------------------------------------------------------------
 
   # The registration: name, card and pickup are returnable; the rules step
@@ -308,6 +614,75 @@ defmodule StatifierBlocks.Compiler.TrailTest do
     )
   end
 
+  # A step before a loop over the patrons, two returnable steps in its
+  # body, and a step after it; `edges: false` leaves the loop alone.
+  defp looping(opts \\ []) do
+    step = &Block.new("library.collect", id: &1)
+
+    loop =
+      Block.new("core.foreach",
+        id: "blk_F",
+        config: %{"items" => "patrons", "item_as" => "patron"},
+        slots: %{"body" => [step.("blk_B1"), step.("blk_B2")]}
+      )
+
+    body =
+      if Keyword.get(opts, :edges, true),
+        do: [step.("blk_BEFORE"), loop, step.("blk_AFTER")],
+        else: [loop]
+
+    Block.new("core.sequence", id: "blk_ROOT", slots: %{"body" => body})
+  end
+
+  # Two lanes, each one counted returnable step completed by its own event.
+  defp lanes do
+    step = fn id, event ->
+      Block.new("library.counted", id: id, config: %{"event" => event})
+    end
+
+    Block.new("core.parallel",
+      id: "blk_P",
+      config: %{"lanes" => ["sender", "recipient"]},
+      slots: %{
+        "lane_sender" => [step.("blk_SEND", "send.submitted")],
+        "lane_recipient" => [step.("blk_RECV", "recv.submitted")]
+      }
+    )
+  end
+
+  # A returnable step, then a library card issued by a sub-path, then one
+  # issued per patron by a map.
+  defp sub_paths do
+    Block.new("core.sequence",
+      id: "blk_ROOT",
+      slots: %{
+        "body" => [
+          Block.new("library.collect", id: "blk_NAME"),
+          Block.new("core.subchart",
+            id: "blk_SUB",
+            config: %{"chart" => "library_card", "outcomes" => "done"}
+          ),
+          Block.new("core.map",
+            id: "blk_MAP",
+            config: %{
+              "items" => "patrons",
+              "chart" => "library_card",
+              "item_as" => "patron",
+              "index_as" => "position",
+              "collect" => "cards",
+              "on" => "all"
+            }
+          )
+        ]
+      }
+    )
+  end
+
+  defp counted, do: [declare: [{"responses", nil}, {"visits", "0"}]]
+
+  defp patrons(expr),
+    do: [declare: [{"patrons", expr}, {"cards", nil}, {"responses", nil}]]
+
   defp resolved(%Block{type: type} = block) do
     module = Map.fetch!(palette().types, type)
     %{block: block, module: module, slots: []}
@@ -317,7 +692,8 @@ defmodule StatifierBlocks.Compiler.TrailTest do
     Palette.new(
       Map.merge(Palette.core_types(), %{
         "library.collect" => Collect,
-        "library.issue" => IssueCard
+        "library.issue" => IssueCard,
+        "library.counted" => Counted
       })
     )
   end
@@ -337,8 +713,8 @@ defmodule StatifierBlocks.Compiler.TrailTest do
     compiled
   end
 
-  defp start(root) do
-    {:ok, machine} = Statifier.compile(compile!(root).scxml)
+  defp start(root, opts \\ []) do
+    {:ok, machine} = Statifier.compile(compile!(root, opts).scxml)
     {state, _effects} = Statifier.initialize(machine)
     state
   end
@@ -351,6 +727,12 @@ defmodule StatifierBlocks.Compiler.TrailTest do
   end
 
   defp trail(state), do: state.datamodel["s_blk_ROOT__trail"]
+
+  defp body_trail(state), do: state.datamodel["s_blk_F__body__trail"]
+
+  defp visits(state), do: state.datamodel["visits"]
+
+  defp leaves(state), do: state |> Statifier.active_leaf_states() |> Enum.sort()
 
   defp flatten([]), do: []
   defp flatten([top, below]), do: [top | flatten(below)]
