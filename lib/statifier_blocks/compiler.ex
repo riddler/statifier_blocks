@@ -2198,11 +2198,12 @@ defmodule StatifierBlocks.Compiler do
 
   # -- Stage 5: emit ---------------------------------------------------------
 
-  # ADR-0004's Amendment of 2026-11-20, `L1` and `L2`: the trail roots and
-  # the pushes go in after every block has emitted, from the resolved tree,
-  # and before the hoist, so a trail root lands in the one `<datamodel>` with
-  # every other root. A document with no returnable step comes back from
-  # `Trail.lay/2` untouched (`L8`); see `StatifierBlocks.Compiler.Trail`.
+  # ADR-0004's Amendment of 2026-11-20, `L1` to `L6`: the trail roots, the
+  # pushes, the Back transitions and the clears go in after every block has
+  # emitted, from the resolved tree, and before the hoist, so a trail root
+  # lands in the one `<datamodel>` with every other root. A document with no
+  # returnable step comes back from `Trail.lay/2` untouched (`L8`); see
+  # `StatifierBlocks.Compiler.Trail`.
   @spec emit_stage(Resolved.t(), Document.t(), [option()]) ::
           {:ok, {Emission.t(), [Finding.t()]}} | {:error, [Finding.t()]}
   defp emit_stage(node, %Document{id: document_id} = document, opts) do
