@@ -487,3 +487,170 @@ None reverses what the record decides.
   display stays undecided.
 
 Filed with `sb-tysd`.
+
+## Amendment (2026-11-20): decision 4, the reserved back event `statifier_blocks.back` stands outside the `accepts` declaration - `4a`
+
+**Status: proposed (2026-11-20, bead `sb-ydms`).** A decision record merges
+at proposed and is flipped to accepted by a separate request through the
+same `docs/adr/` gate once the Back code it reads beside (`ADR-0004`'s
+Amendment of 2026-11-20) has shipped in a published version. Additive: no
+text above this line is edited, no line above it is removed, and the head
+`Status:` line at `:3` is not extended. It adds one clause, `4a`, to
+decision 4, and changes no other decision of this record.
+
+The rule, verbatim as the option chosen, was ruled by the operator,
+2026-11-20: "the reserved back event is outside accepts; any host may
+deliver it, and with no trail it takes no transition." The same ruling asked
+for a dated record saying so before the reader that answers whether Back is
+offered is built; this is that record.
+
+Code cites below were read at `main` `b71247e` and carry their anchors;
+re-locate by anchor, not by number. Engine cites were read on statifier-ex's
+`main` at `76742af` (the commit that releases its 2.16.0).
+
+### Context
+
+**`ADR-0004` spells a back event a host sends from outside.** Its Amendment
+of 2026-11-20, "Back - a trail of returnable steps in the chart's own data,
+the push on entry, the reserved back event, and the boundaries that clear
+the trail", decides in `L3` that the back event is spelled
+`statifier_blocks.back`, "under the prefix `ADR-0002` decision 10 reserves",
+and that "a host asks an execution to go back by delivering that event to
+it, as an external event". The prefix is `ADR-0002` decision 10's bullet
+"The `statifier_blocks.` event-name prefix is reserved", which forbids a
+host to name its own events under it. The compiler spells the event once,
+`@back` in `StatifierBlocks.Compiler.Trail`
+(`lib/statifier_blocks/compiler/trail.ex:138`), and emits it on `L4`'s two
+families of transitions (`defp scope_back/2` at `:486` and `defp
+step_back/3` at `:495`).
+
+**Decision 4 reads that same event as internal.** Where a document declares
+a non-empty `accepts` list and has a returnable step, the chart listens for
+`statifier_blocks.back` on its scope state, which can be active, so the
+engine's vocabulary (`Statifier.Chart.events/1`) holds the descriptor, and
+`Statifier.Chart.check_accepts/2` lists it under `undeclared` unless a
+declared name matches it. Decision 4's bullet "Reachable but undeclared is
+internal" reads every such descriptor as "not bindable from outside", one
+"no external sender may name". `ADR-0004`'s Amendment left the conflict
+open, in its "What this Amendment does not decide": "How a document that
+declares `accepts` (`ADR-0014`) and has a returnable step treats
+`statifier_blocks.back`".
+
+**What the engine answers.** `check_accepts/2` "reports and refuses
+nothing: which list a host refuses a publish on, if either, is the host's
+decision" (the `Statifier.Chart` module documentation in
+`lib/statifier/chart.ex`, its section "The event vocabulary"). It names no
+event as special. Decision 4 is this record's reading of its answer, so the
+reading is this record's to amend, and nothing the engine computes changes.
+The function is the engine's from statifier 2.7.0 on; this package's
+requirement is `~> 2.2` (`mix.exs`, `defp statifier_dep/0`) and its own
+`mix.lock` resolves 2.5.0, which carries neither function, as the flip Note
+of 2026-09-22 records. This package runs no accepts check, so its lock does
+not change what a host's publish step answers.
+
+### 4a. The reserved back event is outside the declaration
+
+- **Any host may deliver it.** `statifier_blocks.back` is outside what a
+  document's `accepts` governs: a document need not declare it to receive
+  it. A host may deliver it, as an external event, to an
+  execution of any document, whatever its `accepts` list names: a list that
+  does not name it, a list that does, and no declaration at all.
+- **Decision 4's internal reading does not apply to it.** Where
+  `check_accepts/2` lists `statifier_blocks.back` under `undeclared`, it is
+  not internal: a host does not read it as an event no external sender may
+  name, and does not refuse a publish for it. Decision 4's bullet "Reachable
+  but undeclared is internal" stands as written for every other descriptor.
+- **With an empty trail it takes no transition.** Delivering it where no
+  Back is offered changes nothing: on an empty trail no condition of `L4`
+  holds and the engine discards the event, and a chart with no trail root
+  has no transition on `statifier_blocks.back` at all (`ADR-0004`'s
+  Amendment of 2026-11-20, `L5`). So a host needs no check of a document's
+  declaration, and no knowledge of its returnable steps, before it delivers
+  the event.
+- **The publish check neither requires it nor refuses it for being
+  undeclared.** A declaration that leaves it out is never a publish error
+  on its account. A declaration that names it is a declared name like any
+  other under decision 4's first bullet: where the chart has a transition
+  on it, a descriptor matches it and nothing is refused; where it has none,
+  it is unreachable and decision 4 refuses the publish, as it refuses any
+  declared name the chart cannot take. This clause does not change that
+  answer. Decision 2's four refusals do not refuse the name either; they
+  read no prefix.
+
+What the engine answers today, and how decision 4 with `4a` reads it, per
+case:
+
+| The document | `check_accepts/2` on `statifier_blocks.back` | Read under decision 4 and `4a` |
+|---|---|---|
+| has a returnable step; `accepts` non-empty and does not name it | in `undeclared` | not internal and not an error; a host may deliver it |
+| has a returnable step; `accepts` names it | in neither list | not an error; naming it changes no delivery |
+| has no returnable step; `accepts` non-empty and does not name it | in neither list: the chart has no descriptor for it | not an error; delivered, it takes no transition |
+| has no returnable step; `accepts` names it | in `unreachable`, unless another reachable descriptor such as `*` matches it | refused at publish by decision 4's first bullet, unchanged |
+| `accepts` absent or empty | both lists empty (the engine's `nil` form, decision 5) | in the computed set wherever a trail root exists; a host may deliver it either way |
+
+**What a host does.** It delivers `statifier_blocks.back` to an execution
+whose Back it means to offer, without adding the name to the document's
+`accepts`, and it reads `statifier_blocks.back` in `undeclared` as neither
+internal nor an error. Nothing in this package changes: it runs no accepts
+check (decision 4, "Who judges it"), the compile's carry of `accepts` is
+unchanged (decision 3), and the chart's bytes are `ADR-0004`'s Amendment's
+alone.
+
+### Worked example: a patron registration that declares `accepts` and offers Back
+
+Take the registration of this record's worked example, which declares
+`["email.verified", "registration.abandoned"]`, and give it, as its first
+two steps, the returnable `library.collect` steps `blk_NAME` and `blk_CARD`
+of `ADR-0004`'s Amendment's worked example, under a `core.sequence` root
+`blk_ROOT`. The chart then carries the trail root `s_blk_ROOT__trail` and
+`L4`'s transitions on `statifier_blocks.back`.
+
+- **The publish check.** Both declared names are matched by a reachable
+  descriptor, so nothing is unreachable. `undeclared` holds the deadline's
+  event, the completion descriptors and `statifier_blocks.back`. The first
+  two are internal by decision 4; the third is outside the declaration by
+  `4a`. The publish proceeds.
+- **A visitor at `blk_CARD` asks to go back.** The host delivers
+  `statifier_blocks.back` to the execution although `accepts` does not name
+  it, and the execution re-enters `blk_NAME` (`L4`).
+- **A visitor at `blk_NAME` asks to go back.** The host delivers it the same
+  way; nothing is behind the step, so nothing happens (`L5`).
+- **The author adds `statifier_blocks.back` to `accepts`.** A descriptor
+  matches it, the publish proceeds, and every delivery above happens as
+  before. If the author later makes both steps non-returnable and leaves the
+  name declared, the chart has no transition on it, the check reports it
+  `unreachable`, and decision 4 refuses the publish until the author removes
+  the name.
+
+### What this Amendment does not decide
+
+- **The engine's functions.** What `events/1` and `check_accepts/2` compute
+  stays the engine's; neither treats the reserved prefix specially, and this
+  clause asks nothing of them.
+- **A router's check.** `sr-ADR-0008` ("The receiver contract at publish")
+  judges a binding's event and an execution-target send's literal event
+  against the receiving document's declaration, and its `defp judge/3` in
+  `lib/statifier_router/contracts.ex` (read on statifier_router's `main` at
+  `150d62b`) answers `:undeclared` for an event equal to none of the
+  declared names. This Amendment does not change what that check answers.
+  This record's "What this record does not decide" leaves how a router uses
+  the declaration to the router's own record, and whether a route may name
+  the package's reserved back event is that record's to decide.
+- **`ADR-0002` decision 10's reservation.** A host still must not name an
+  event of its own under the `statifier_blocks.` prefix; delivering the
+  package's own back event is not naming one of its own.
+- **Back across a sub-path boundary**, and how a host learns, for one
+  execution, whether Back is offered: outside this record, as `ADR-0004`'s
+  Amendment leaves them.
+
+### Consequences
+
+- A host that changes nothing sees no changed compile and no changed
+  answer: no code in this package changes, and no compiled byte or hash
+  moves.
+- A host whose publish step reads `undeclared` sets `statifier_blocks.back`
+  aside before treating an entry there as internal.
+- An author never has to declare the back event to offer Back, and one who
+  declares it takes decision 4's answer for a declared name.
+
+Filed with `sb-ydms`.
