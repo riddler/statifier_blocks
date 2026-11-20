@@ -15149,7 +15149,7 @@ is this file's convention for a Note.
 
 ## Amendment (2026-11-20): a block type may declare its instances returnable steps, and `core.checkpoint` is a core block an author places - `C12`
 
-**Status: proposed (2026-11-20, bead `sb-cbr3`).** A decision record merges
+**Status: accepted (2026-11-20, bead `sb-cbr3`).** A decision record merges
 at proposed and is flipped to accepted by a separate request through the
 same `docs/adr/` gate once the code that implements it has shipped in a
 published version of this package. Additive: every decision, Amendment and
@@ -15504,3 +15504,56 @@ are the `ADR-0004` Amendment's.
 What builds this: `sb-53vv` (the callback, its resolver, the registration
 check and the palette fact) and `sb-1otr` (`core.checkpoint`). Filed with
 `sb-cbr3`.
+
+## Note (2026-11-20): the `C12` Amendment of 2026-11-20 is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Status line of the Amendment "a block type may declare its instances
+returnable steps, and `core.checkpoint` is a core block an author places -
+`C12`" (`:15152`), by one word, `proposed` to `accepted`. Everything else is
+this Note, at the foot of the file.
+
+The code the Amendment records shipped in statifier_blocks 0.46.0, published
+on Hex on 2026-11-20 from the `v0.46.0` tag at `5858bd3` by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/44781747998, whose
+`CHANGELOG.md` section (`:14`) carries it under Added (`:35`). Every claim
+the Amendment makes was checked against `main` at `5858bd3`. The Amendment
+merged in `da4a51f`; after it, `lib/statifier_blocks/block_type.ex`,
+`lib/statifier_blocks/palette.ex`, `lib/statifier_blocks/view_model.ex` and
+`lib/statifier_blocks/editor/palette_browser.ex` were changed by `edf77bb`,
+and `lib/statifier_blocks/palette.ex` and `lib/statifier_blocks/core.ex` by
+`a016c7b`, which added `lib/statifier_blocks/core/checkpoint.ex`. Every
+`lib/` cite below was read at `5858bd3` and is written anchor first, line
+second.
+
+### Each clause, and where it reads today
+
+| Clause | Read at `5858bd3` |
+|---|---|
+| The Context's cites, read at `9df5522` | `@optional_callbacks` (`block_type.ex:871`), `defmacro __using__/1` (`:113`), `def failure_outcomes/2` (`:966`), `def call/4` (`palette.ex:607`), `def declares?/3` (`:649`), `def new/2` (`:179`), `defp refute_duplicate_orders!/2` (`:451`), `defp register/2`'s last clause (`:518`), `def preflight/1` (`:773`), `def new_block/2` (`:691`), `def core_types/0` (`:220`), `def composite?/1` (`composite.ex:703`), `defmodule PaletteGroup` (`view_model.ex:440`), `defp palette_groups/1` (`:2473`) and the `<li>` carrying `data-type` (`editor/palette_browser.ex:290`) are at the lines printed |
+| `C12`, the callback | `@callback returnable?(Block.config()) :: boolean()` (`block_type.ex:898`), listed in `@optional_callbacks` (`:900`) and not injected by `use`; the resolver `returnable?/2` (`:1029`) answers `Palette.call(ref, :returnable?, [config], false) == true`, so absence, `false` and any other answer are `false`, and a raise is not rescued. `call/4` asks a stateful entry with its state first |
+| `C12b`, the two refusals | `new/2` (`palette.ex:196`) runs `defp refute_bad_returnables!/1` (`:529`) after the duplicate-order check, over every entry that declares the callback; `defp refute_bad_returnable!/1` (`:537`) raises `ArgumentError` naming the entry for a composite and for an answer that is not a boolean, and `defp fresh_returnable_answer/1` (`:564`) reports a raise, throw or exit while building the fresh config or making the call. `preflight/1` is unchanged |
+| `C12c`, the palette fact | `defp put_returnable/2` (`view_model.ex:2477`) adds `returnable: true` when the type declares the callback, typed `optional(:returnable) => true` (`:471`); the browser's `<li>` carries `data-returnable` (`editor/palette_browser.ex:294`) and the marker "Returnable step" (`:317`). No `palette_entry/0` key is added |
+| `C12d`, `core.checkpoint` | registered as `"core.checkpoint"` in `core_types/0` (`palette.ex:238`); `StatifierBlocks.Core.Checkpoint` defines `palette_entry/0` ("Checkpoint", group "Structure", order 18), `explain/0`, `sentence/1` and `emit/2`, and no `outcomes/1`, `returnable?/1` or config of its own; `current_version/0` is the injected `1` |
+| `C12e`, no switch | no option turns Back on; `test/statifier_blocks/compiler/compile_ratchet_test.exs` pins the bytes of documents with no returnable step at the `v0.45.0` release |
+| Consequences | `Palette.manifest/1` of `core/0` carries `{"core.checkpoint", 1}` (`test/statifier_blocks/palette/manifest_test.exs`); the moduledoc's counts of the optional callbacks are pinned by the tests under "the moduledoc's counts read true" |
+| The tests | `test/statifier_blocks/block_type/returnable_test.exs`, `test/statifier_blocks/core/checkpoint_test.exs` and `test/statifier_blocks/editor/palette_body_test.exs` |
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The Amendment's Status paragraph says it "merges at proposed and is
+  flipped to accepted by a separate request through the same `docs/adr/`
+  gate once the code that implements it has shipped in a published version
+  of this package". This is that request, and 0.46.0 is that version.
+- This file's head `Status:` line is not extended.
+
+### Sentences that no longer hold as written
+
+None. The preamble's "a later Amendment on `ADR-0004`, not written yet" and
+"No code is in the request that adds this section" describe the day it was
+written: `ADR-0004`'s Amendment of 2026-11-20 on Back is now on `main` and is
+flipped to accepted in the same request, and `edf77bb` and `a016c7b` built
+this section.

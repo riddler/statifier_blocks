@@ -4886,7 +4886,7 @@ Amendment says to re-locate by anchor, and the table above does.
 
 ## Amendment (2026-11-19): `core.subchart` names its child by a literal or a datamodel path, and a run-time child's outcomes must be among the block's
 
-**Status: proposed (2026-11-19, bead `sb-borq`).** A decision record merges
+**Status: accepted (2026-11-20, statifier_blocks 0.46.0); proposed (2026-11-19, bead `sb-borq`).** A decision record merges
 at proposed and is flipped to accepted by a separate request through the
 same `docs/adr/` gate once the code that implements it has shipped in a
 published version. Additive: no text above this line is edited, no line
@@ -5296,7 +5296,7 @@ Filed with `sb-borq`.
 
 ## Amendment (2026-11-20): Back - a trail of returnable steps in the chart's own data, the push on entry, the reserved back event, and the boundaries that clear the trail
 
-**Status: proposed (2026-11-20, bead `sb-q6pf`).** A decision record merges
+**Status: accepted (2026-11-20, statifier_blocks 0.46.0); proposed (2026-11-20, bead `sb-q6pf`).** A decision record merges
 at proposed and is flipped to accepted by a separate request through the
 same `docs/adr/` gate once the code that implements it has shipped in a
 published version. Additive: no text above this line is edited, no line
@@ -5691,3 +5691,137 @@ config changes meaning. No published version of this package carries
 no `Status:` line, which is this file's convention for a Note.
 
 Filed with `sb-1ajf`.
+
+## Note (2026-11-20): `L4`'s first family is not emitted when the root block is its scope's one returnable step
+
+A dated Note rather than an amendment. It names one sentence of the
+Amendment of 2026-11-20 on Back and the change already on `main` that the
+sentence does not describe, and decides nothing. `L1` to `L9` and every
+section above this line stand as written, and no text above is edited.
+
+**The sentence.** `L4` item 1 gives the scope state "one per returnable
+step `S` of the scope" of the first family. When the document's root block
+is itself a returnable step and the only one in the document scope, its
+state is both the scope state and that step's state, and the compile emits
+none of the first family there: `defp scope_additions/2` in
+`StatifierBlocks.Compiler.Trail` (`lib/statifier_blocks/compiler/trail.ex:310`,
+its `[{_step, ^scope_id}]` clause at `:321`, read at `5858bd3`) skips them,
+from `51cb2bc`. The second family, the push, the trail root and the clears
+are emitted as `L1` to `L6` say.
+
+**What an execution does is unchanged.** Every position in such a document
+is inside the step, so `L4`'s own reading applies: Back goes to the step
+below it, and there is none. The second family's last transition, with no
+target and no condition, is on the same state ahead of where the first
+family would go, so it would be selected first in any case; it takes the
+event and changes nothing, as `L5` says. The test "a root block that is the
+one returnable step offers no Back" in
+`test/statifier_blocks/compiler/trail_test.exs` pins both the missing first
+family and that Back there leaves the execution where it was. Where the root
+block is returnable and other steps share its scope, the first family is
+emitted for every step, the root's included, as `L4` item 1 reads.
+
+## Note (2026-11-20): the Amendments of 2026-11-19 on `chart_from` and of 2026-11-20 on Back are flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only lines this request changes above it
+are the two Amendments' own status lines (`:4889` and `:5299`), where the
+status word `accepted` with its date and the version leads and the original
+`proposed (...` text stays as written. Everything else is this Note and the
+one above it, at the foot of the file, so no line another record cites
+moves. The head `Status:` line at `:3` is not extended.
+
+The code both Amendments record shipped in statifier_blocks 0.46.0,
+published on Hex from the `v0.46.0` tag at `5858bd3`
+(`5858bd334b52c53265af41782b6edf0047f55852`) by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/44781747998 (the job
+"Verify, gate and publish", every step green, the step "Publish to Hex"
+included), whose `CHANGELOG.md` section (`:14`) carries them under Added
+(`:35`) and Changed (`:48`). Both are flipped to accepted on 2026-11-20 after
+0.46.0 shipped.
+
+Every claim both Amendments make was re-verified against `main` at
+`5858bd3`. The `chart_from` Amendment merged in `9df5522`; after it,
+`lib/statifier_blocks/core/subchart.ex` was changed by `f1549d1`, `b4327d0`
+and `5911dc7`, the two subchart handlers and
+`lib/statifier_blocks/runtime/subchart/resolution.ex` by `f1549d1` and
+`5911dc7`, and `lib/statifier_blocks/compiler.ex` by `f1549d1`, by the two
+trail commits below and by the release's version bump. The Back Amendment
+merged in `879e0a3`; after it, `lib/statifier_blocks/compiler/trail.ex` was
+added by `a43a68b` and changed by `51cb2bc` and `a016c7b`,
+`lib/statifier_blocks/core/checkpoint.ex` was added by `a016c7b`, the compile
+ratchet by `b71247e`, and `lib/statifier_blocks/runtime/back.ex` by
+`7a18fb3`. None of them changes what either Amendment decides, except the
+two sentences named under "Sentences that no longer hold as written". Every
+cite below was read at `5858bd3` and is written anchor first, line second.
+
+### The Amendment of 2026-11-19, `chart_from`
+
+| Claim | Read at `5858bd3` |
+|---|---|
+| The Context's cites, read at `3ef9f55` | `def config_schema/1` (`core/subchart.ex:243`), `def emit/2` (`:419`), `defp default_target/1` (`:524`), `def outcome_names/1` (`:575`), `defp reference/3` (`compiler.ex:3301`) and its fallback (`:3332`), `check/2` (`graph.ex:128`), `consumers_broken/2` (`:167`), `@spec resolve/3` (`runtime/subchart/resolution.ex:58`) and its non-binary clause (`:63`), `def start/3` (`runtime/subchart.ex:196`), `def dispatch/4` (`runtime/durable_subchart.ex:191`) and `@type interface` (`compiled.ex:123`) are at the lines printed. The self-reference cite, `self_reference.ex:80-81`, is one line early: `@element` and `@attribute` are at `:81-82` at `3ef9f55` and at `5858bd3`, and the moduledoc's "`srcexpr` is deliberately not checked" (`:26`) stands |
+| J1, the one-of rule | `defp child_source/1` (`core/subchart.ex:808`): an empty or absent `chart_from` falls to `chart`'s own rule and finding, "names the document to run, like bdoc_01JWIZ", as at `3ef9f55`; both present is one finding on `chart_from`; a `chart_from` that is not a datamodel path is a finding on `chart_from`. `config_schema/1` (`:327`) lists `chart_from` after `chart`, neither `required?: true`; `current_version/0` answers `1` |
+| J1, the emission | `defp invoke/4` (`:783`) writes the path as `srcexpr`, stamped from `chart_from`; the literal clause above it is unchanged, and `test/statifier_blocks/core/subchart_bytes_test.exs` pins a literal block's bytes and chart identity against `test/fixtures/subchart_bytes/literal_chart.json` |
+| J2, the carrier | `defp outcomes_carrier/1` (`:798`) appends `<param expr="'...'" name="statifier_blocks:outcomes"/>` after the author's rows, from `outcome_names/1` (`:683`) joined by single spaces; `Resolution.child_invoke/2` (`resolution.ex:120`) removes it before `{:start_child, ...}` |
+| J3, the refusal | `defp fit/2` (`resolution.ex:147`) refuses `"child_outcome_undeclared"` with `"chart"`, `"outcomes"` and `"declared"`, after `unknown_document`, `cycle_refused` and `child_compile_findings`; the in-memory handler's "The closed refusal set" (`runtime/subchart.ex:89`) and the durable one's table (`runtime/durable_subchart.ex:99`) name it; `dispatch/4` (`:202`) answers `{:error, reason: ..., detail: ...}` |
+| J4, self-reference for the literal form only | `StatifierBlocks.Compiler.SelfReference` has no change since `3ef9f55`; the test "a path that names the document's own id raises no self-reference finding" in `test/statifier_blocks/core/subchart_chart_from_test.exs` pins it |
+| J5, no reference for a `chart_from` block | the `core.subchart` clause of `defp reference/3` (`compiler.ex:3313`) now requires a non-empty `chart`, so a `chart_from` block falls to the fallback (`:3344`); `StatifierBlocks.Graph` has no change since `3ef9f55`. A non-string value is refused `unknown_document` by `resolve/3`'s first clause (`resolution.ex:90`), its value inspected. The engine's `invoke_one/6`, in the statifier 2.5.0 the lock resolves, resolves `src` or `srcexpr` and aborts that invocation on an evaluation error |
+| J6, the resolver is the only gate | `resolve/3`'s second clause (`resolution.ex:94`) hands any string to `resolve_chart/2` and keeps the four answers and the `ArgumentError` for a fifth |
+| J7, `core.map` unchanged | `lib/statifier_blocks/core/map.ex` has no change since `3ef9f55`, and the `FanOut` clause of `defp reference/3` (`compiler.ex:3326`) still reads `chart` |
+| The tests | `test/statifier_blocks/core/subchart_chart_from_test.exs`, `test/statifier_blocks/runtime/subchart_chart_from_test.exs` and `test/statifier_blocks/runtime/subchart_outcome_fit_test.exs` |
+
+### The Amendment of 2026-11-20, Back
+
+| Claim | Read at `5858bd3` |
+|---|---|
+| The Context's cites, read at `da4a51f` | `def declare/2` (`compiler/declared_roots.ex:195`), `def hoist/1` (`:288`), `@abandon` (`core/emit.ex:85`), `def scope/2` (`compiler/interrupts.ex:86`), `@body_role` (`core/foreach.ex:149`), `defp region/2` (`core/parallel.ex:388`), `def role?/1` (`compiler/state_id.ex:106`) and `def emit/2` (`core/placeholder.ex:114`) are at the lines printed |
+| The pass | `emit_stage/3` in `StatifierBlocks.Compiler` runs `Trail.lay/2` (`compiler.ex:2213`) after every block has emitted and before the hoist; `lay/2` (`compiler/trail.ex:200`) answers its emission untouched when no step is returnable |
+| L1, the trail root | `root_id/1` (`trail.ex:177`) appends `__trail` to the scope state's id; `defp root/2` (`:467`) declares it through `DeclaredRoots.declare/2` with `expr="[]"`; the scopes are the document, a `core.foreach` body and a `core.parallel` lane, by `defp child_scope/3`; only a scope holding a step is surveyed |
+| L2, the push | `defp push/3` (`:473`) builds the guarded `<onentry>`; `defp place/2` (`:380`) puts it after the state's `<data>`, which the hoist lifts, so it is first |
+| L3, the event | `@back "statifier_blocks.back"` (`:138`) |
+| L4, the two families | `defp scope_back/2` (`:486`) and `defp step_back/3` (`:495`), placed by `defp place/2`, the first after the state's last transition, the second after the push with the catch-all last. One case is the Note of this date above |
+| L5, an empty trail | the tests under "no transition on an empty trail (L5)" in `test/statifier_blocks/compiler/trail_test.exs` |
+| L6, the clears | `@boundaries` (`:142`) and `@entry_boundaries` (`:146`); `defp boundary_additions/2` (`:341`), the entry clear a body or lane gets in `defp scope_additions/2` (`:310`), and `defp clear_finals/2` (`:418`) on each `<final>` child of a scope state; `core.checkpoint`'s `emit/2` (`core/checkpoint.ex:86`) is the placeholder's emission |
+| L7, state ids only | every expression `trail.ex` writes reads only the trail and literal state ids; the test "a sentinel response never enters the trail" pins it |
+| L8, no step, no changed byte | `test/statifier_blocks/compiler/compile_ratchet_test.exs` pins the existing fixtures' bytes and chart identity at the `v0.45.0` release, before the trail's first code (`test/support/compile_ratchet.ex`) |
+| L9, provenance | every element is recorded under `@role ":trail"` (`:134`), which `StateId.role?/1` rejects, owned as `L9` lists; the test "Back belongs to its step, a clear to its boundary or its scope's block" pins it |
+| Consequences, the one opt-in move | `CHANGELOG.md` 0.46.0, Changed (`:48`), states it as `L8` does |
+
+### Sentences that name a status
+
+They are met here, not edited.
+
+- Each Amendment's status line says "proposed (..."; it is flipped by the
+  status word ahead of it, with the date and the version.
+- Each says a decision record "merges at proposed and is flipped to
+  accepted by a separate request through the same `docs/adr/` gate once the
+  code that implements it has shipped in a published version". This is that
+  request, and 0.46.0 is that version.
+- Each says the head `Status:` line at `:3` is not extended, and this Note
+  does not extend it either.
+
+### Sentences that no longer hold as written
+
+- `J1`'s "`config_schema/1` lists `chart_from` after `chart`, as a
+  `{:path, %{}}` field" is superseded by the Note of 2026-11-20 on `J1`
+  (`:5650`): the field is `{:path, %{expects: "string"}}` at `5858bd3`. The
+  same Note answers the `chart_from` Amendment's open item on `io/1`.
+- `L4` item 1's "one per returnable step `S` of the scope" reads with the
+  Note of this date above, for the case where the root block is its
+  scope's one returnable step.
+
+### Sentences that hold, read beside a later record
+
+- `J1`'s and the Consequences' byte sentences for a `chart` block, and
+  `J7`'s for `core.map`, are about what those blocks emit. A document that
+  also holds a returnable step gains the Back Amendment's clears on those
+  blocks' states (`L6`); that is the host's one opt-in move (`L8`, and
+  `ADR-0002`'s `C12e`), and a document with no returnable step keeps its
+  bytes.
+- The Back Amendment's "What this Amendment does not decide" leaves open how
+  a document that declares `accepts` treats `statifier_blocks.back`.
+  `ADR-0014`'s Amendment of 2026-11-20, `4a`, now decides it, and is flipped
+  in the same request. How a host learns whether Back is offered stays
+  outside this record; 0.46.0 also ships
+  `StatifierBlocks.Runtime.Back.offered?/3` (`runtime/back.ex:99`) for it.
+- The role spelling `L9` leaves to the building request is `":trail"`.
