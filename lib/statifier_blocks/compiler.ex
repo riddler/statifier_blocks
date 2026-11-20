@@ -345,7 +345,8 @@ defmodule StatifierBlocks.Compiler do
     SelfReference,
     SensitivePaths,
     Serializer,
-    StateId
+    StateId,
+    Trail
   }
 
   @scxml_ns "http://www.w3.org/2005/07/scxml"
@@ -2197,13 +2198,19 @@ defmodule StatifierBlocks.Compiler do
 
   # -- Stage 5: emit ---------------------------------------------------------
 
+  # ADR-0004's Amendment of 2026-11-20, `L1` and `L2`: the trail roots and
+  # the pushes go in after every block has emitted, from the resolved tree,
+  # and before the hoist, so a trail root lands in the one `<datamodel>` with
+  # every other root. A document with no returnable step comes back from
+  # `Trail.lay/2` untouched (`L8`); see `StatifierBlocks.Compiler.Trail`.
   @spec emit_stage(Resolved.t(), Document.t(), [option()]) ::
           {:ok, {Emission.t(), [Finding.t()]}} | {:error, [Finding.t()]}
   defp emit_stage(node, %Document{id: document_id} = document, opts) do
     with {:ok, host} <- host_roots(node, opts),
          {kept_document, warnings} <- document_roots(node, document, host),
          {:ok, emission} <- emit(node, document_id),
-         {:ok, {stripped, roots}} <- hoist(node, prepend(emission, host ++ kept_document)) do
+         trailed = Trail.lay(emission, node),
+         {:ok, {stripped, roots}} <- hoist(node, prepend(trailed, host ++ kept_document)) do
       {:ok, {scxml_element(node, document_id, stripped, roots, opts), warnings}}
     end
   end
