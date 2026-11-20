@@ -5293,3 +5293,338 @@ At run time, with the host's resolver answering only the three ids above:
   request that builds `J3`.
 
 Filed with `sb-borq`.
+
+## Amendment (2026-11-20): Back - a trail of returnable steps in the chart's own data, the push on entry, the reserved back event, and the boundaries that clear the trail
+
+**Status: proposed (2026-11-20, bead `sb-q6pf`).** A decision record merges
+at proposed and is flipped to accepted by a separate request through the
+same `docs/adr/` gate once the code that implements it has shipped in a
+published version. Additive: no text above this line is edited, no line
+above it is removed, and the head `Status:` line at `:3` is not extended.
+It decides what the compiler generates for the returnable steps
+`ADR-0002`'s Amendment of 2026-11-20 ("a block type may declare its
+instances returnable steps, and `core.checkpoint` is a core block an author
+places - `C12`") declares, which that Amendment's preamble names as this
+record's to decide. It adds clauses `L1` to `L9`.
+
+The design, verbatim as the options chosen, was ruled by the operator,
+2026-11-19:
+
+- "In the chart's own data: the compiler declares a trail root (only when a
+  returnable step exists), pushes on entry, pops on Back; persistence
+  unchanged".
+- "A core block (working name core.checkpoint) the author places; passing it
+  clears the trail; sub-path boundaries, loop iterations and parallel lanes
+  also count".
+- "No switch: Back exists exactly where a returnable step exists; upgrading
+  moves no hash; a host opts in by declaring its type returnable, and those
+  documents move once".
+
+The trail root's name and the back event's spelling were left to this
+record. Back across a sub-path boundary is outside it: a returnable step
+inside a sub-path, a loop body or a parallel lane offers Back only within
+it.
+
+Code cites below that name code already on `main` were read at `da4a51f`
+and carry their anchors; the code this Amendment describes is cited by
+anchor alone, and none of it is in the request that adds this section.
+Re-locate by anchor, not by number.
+
+### Context
+
+At `da4a51f` nothing in `lib/` names a returnable step or a checkpoint: a
+case-insensitive search for both words over `lib/` matches nothing. The
+declaration is on `main` as a record only: `C12` gives the behaviour an
+optional `returnable?/1` and the resolver
+`StatifierBlocks.BlockType.returnable?/2`, true only for a declared callback
+answering exactly `true`, and `C12d` adds `core.checkpoint`, whose emission
+it leaves to this record.
+
+Four things already on `main` shape the answer:
+
+- **Compiler-declared roots.** F2 gives the compiler its own `<data>` roots
+  in the generated namespace, and the `:declare` Note of 2026-08-29 says
+  where they land. A block's emission carries a
+  `StatifierBlocks.Compiler.DeclaredRoots` declaration among its own state's
+  children (`lib/statifier_blocks/compiler/declared_roots.ex:195`, `def
+  declare/2`), and `hoist/1` (`:288`) lifts every one into the one top-level
+  `<datamodel>` in document order. A chart that declares nothing gets no
+  `<datamodel>` element.
+- **No list length.** F5 records that predicator indexes a list, reads an
+  index out of bounds as `undefined`, and has no list-length function. A
+  stack whose top is found by its length cannot be read.
+- **The reserved event prefix.** `ADR-0002` decision 10 reserves the
+  `statifier_blocks.` event-name prefix and forbids a host to name its own
+  events under it; the interrupt pair is spelled there
+  (`lib/statifier_blocks/core/emit.ex:85`, `@abandon`).
+- **A compiler pass over the assembled emission.**
+  `StatifierBlocks.Compiler.Interrupts` rewrites what block types emitted,
+  from where it sits in the parent's emission
+  (`lib/statifier_blocks/compiler/interrupts.ex:86`, `def scope/2`), and
+  leaves every chart without a rail byte-identical. The trail is the same
+  kind of addition: a host type answers `returnable?/1` and emits what it
+  emitted before.
+
+The loop and the lane fix where a trail can live. `core.foreach`'s body is
+one compound state entered on every pass (F4; its role,
+`lib/statifier_blocks/core/foreach.ex:149`, `@body_role`), and each
+`core.parallel` lane is a region state of its own (`defp region/2`,
+`lib/statifier_blocks/core/parallel.ex:388`, minting the role `"lane_" <>
+lane`). Two lanes run at once, so a trail they shared would interleave
+their entries.
+
+### L1. The trail root: one per trail scope, named `<scope state id>__trail`, declared only where a returnable step is
+
+A **returnable step** is a block for which
+`StatifierBlocks.BlockType.returnable?/2` answers `true` (`C12`). A **trail
+scope** is one of:
+
+| Trail scope | Its scope state |
+|---|---|
+| the document | the state the root block compiles to, `s_<root block id>` |
+| a `core.foreach` body | the body state, `s_<foreach block id>__body` |
+| a `core.parallel` lane | the lane's region, `s_<parallel block id>__lane_<lane>` |
+
+A returnable step belongs to the nearest trail scope that encloses it. A
+child document a `core.subchart` or `core.map` block runs, a **sub-path**,
+is a separate chart with a datamodel of its own; its returnable steps
+belong to its own document scope.
+
+The **trail root** of a scope is a `<data>` root whose id is the scope
+state's id followed by `__trail`, for example `s_blk_ROOT__trail`, declared
+with `expr="[]"`. It is declared for a scope **only when at least one
+returnable step belongs to that scope**, through
+`DeclaredRoots.declare/2` in the scope state's emission, so `hoist/1`
+places it in the one `<datamodel>` in document order with every other root.
+A scope with no returnable step declares nothing.
+
+A lane's and a body's trail root id carries the `__` separator twice, so it
+is no state id `StateId.state_id/2` can mint: a role may not contain `__`
+(`lib/statifier_blocks/compiler/state_id.ex:106`, `def role?/1`). The
+document's is the id `state_id/2` would mint for the root block under the
+role `trail`, which no core type mints; a host root type that minted it
+meets the engine's duplicate-id check at the Chart stage, decision 9's
+delegated check, and is never silently overwritten.
+
+### L2. The push on entering a returnable step
+
+The compiler gives each returnable step's state one `<onentry>` of its own,
+placed first among that state's children, which pushes the step's state id
+onto its scope's trail unless it is already on top:
+
+```xml
+<onentry>
+  <if cond="T[0] !== 'S'">
+    <assign location="T" expr="['S', T]"/>
+  </if>
+</onentry>
+```
+
+where `T` is the scope's trail root id and `S` the step's state id. The
+trail is a pair list: `[]` is empty, and a push makes a two-item list of
+the new state id and the trail as it was, so the top is `T[0]` and the
+trail below it is `T[1]`, read without a length (F5). The test against the
+top keeps a re-entry that is not a new visit - a history re-entry, the
+re-entry `L4` makes, a self-transition - from pushing the same step twice.
+
+The block type's `emit/2` is unchanged: the compiler adds this element to
+what the type emitted, as it adds every byte of the trail.
+
+### L3. The reserved back event: `statifier_blocks.back`
+
+The back event is spelled **`statifier_blocks.back`**, under the prefix
+`ADR-0002` decision 10 reserves, beside the interrupt pair. A host asks an
+execution to go back by delivering that event to it, as an external event;
+nothing the trail's emission reads looks at the event's data. A host must
+not name an event of its own `statifier_blocks.back`, by the same
+reservation.
+
+### L4. The Back transitions: re-enter the trail's top step and pop
+
+Back takes the execution to the returnable step it entered most recently
+**behind its current position**. Anywhere in a scope other than inside a
+returnable step, that is the trail's top step. Inside a returnable step,
+its own entry is the top, so it is the step below it. Two families of
+transitions on `statifier_blocks.back` say so:
+
+1. **On the scope state**, one per returnable step `S` of the scope, in
+   document order, after the state's existing transitions:
+
+   ```xml
+   <transition event="statifier_blocks.back" cond="T[0] === 'S'" target="S" type="internal">
+     <assign location="T" expr="T[1]"/>
+   </transition>
+   ```
+
+   It re-enters the top step and pops it.
+2. **On each returnable step's state**, one per other returnable step `S`
+   of the same scope, in document order, then one with no target and no
+   condition, last:
+
+   ```xml
+   <transition event="statifier_blocks.back" cond="T[1][0] === 'S'" target="S">
+     <assign location="T" expr="T[1][1]"/>
+   </transition>
+   <transition event="statifier_blocks.back"/>
+   ```
+
+   It pops the step's own entry, re-enters the top step below it and pops
+   that too. The step's own transitions are selected before its scope
+   state's, as SCXML selects a descendant's enabled transition first, so
+   the last one keeps the event from reaching the scope state when nothing
+   is behind the step.
+
+Re-entering `S` runs `L2`'s push, so after Back the trail reads as it read
+when `S` was first entered. A Back transition exits and re-enters the
+states between its source and its target as any SCXML transition does: a
+state on that path that starts work on entry starts it again.
+
+### L5. No transition on an empty trail
+
+On an empty trail, `[]`, `T[0]` reads `undefined` and no condition in `L4`
+holds, so no transition is taken: the engine discards the event, nothing is
+exited or entered, and nothing is assigned. Inside a returnable step with
+nothing behind it, the last transition of `L4`'s second family is selected
+and does nothing: it has no target, so no state is exited or entered, and
+it carries no assignment, so the trail is unchanged. A chart with no trail
+root has no transition on `statifier_blocks.back` at all.
+
+### L6. The boundaries that clear the trail
+
+A clear is `<assign location="T" expr="[]"/>`. The compiler emits one only
+into a scope whose trail root `L1` declares:
+
+| Boundary | Where the clear sits | Which trail it clears |
+|---|---|---|
+| `core.checkpoint` | its state's `<onentry>` | its scope's |
+| a sub-path: `core.subchart` or `core.map` | its state's `<onentry>` and `<onexit>` | its scope's |
+| a loop: `core.foreach` | its state's `<onentry>` and `<onexit>` | its scope's |
+| a loop iteration | the body state's `<onentry>`, on every pass | the body's |
+| a parallel: `core.parallel` | its state's `<onentry>` and `<onexit>` | its scope's |
+| a parallel lane | the lane region's `<onentry>` | the lane's |
+
+So no Back crosses a boundary: a step on one side has no entry on the other
+side's trail. A sub-path's child keeps its trail in its own datamodel,
+which starts empty. `core.checkpoint` compiles to `D5`'s shape, a state
+whose `<final>` is reached on entry, plus its clear when its scope has a
+trail; a checkpoint in a scope with no returnable step emits that shape
+alone (`lib/statifier_blocks/core/placeholder.ex:114`, `def emit/2`, is the
+same emission).
+
+### L7. The trail holds state ids and never responses
+
+Every value the trail's emission writes is one of three: a string literal
+the compiler writes, the state id of a returnable step of the same chart;
+`[]`; or a part of the trail itself. No expression in it reads any other
+datamodel location, so nothing a person submits at a step, nothing a host
+writes into the datamodel and no event's data can reach a trail root. This
+is a rule on the emission, not on the hosts: the request that builds `L2`
+pins it with a sentinel test that runs a chart whose step writes a known
+value and asserts that value is nowhere in the trail.
+
+### L8. A document with no returnable step compiles byte-identically
+
+A document none of whose blocks answers `returnable?/2` with `true`
+declares no trail root (`L1`), pushes nothing (`L2`), carries no Back
+transition (`L4`) and no clear (`L6`), so it compiles to the bytes it
+compiles to without this Amendment and its compiled hash does not move.
+This holds for a document with a `core.checkpoint` in it as well, except
+for the checkpoint's own state, which is the new block's emission and was
+never compiled before. The request that builds the trail adds a ratchet
+test that pins the compiled hashes of the package's existing fixtures at
+the commit before the trail's first code merges and fails on any change.
+A host that declares its type returnable moves, once, the bytes of each
+document using an instance that answers `true` (`C12e`).
+
+### L9. Provenance, determinism and findings
+
+- **Provenance (decision 5) stays total.** A trail root's `<data>` belongs
+  to the block that owns its scope state: the root block, the
+  `core.foreach` block or the `core.parallel` block. A push belongs to its
+  returnable step. A transition of `L4`'s first family belongs to the step
+  it targets, and one of the second family to the step whose state carries
+  it. A clear belongs to the boundary block whose state carries it. None
+  carries a config key; the role they are recorded under is a spelling
+  `StateId.role?/1` rejects, as the `:declare` Note's is, named by the
+  request that builds them.
+- **Determinism (decision 6).** Every family is emitted in document order of
+  the returnable steps, so the same document compiles to the same bytes.
+- **Findings (decision 10).** This Amendment adds none.
+
+### Worked example: patron registration
+
+`C12`'s registration document, in order in the root's body: `blk_NAME` and
+`blk_CARD` are returnable `library.collect` steps, `blk_ISSUE` issues the
+card, `blk_CHECK` is a `core.checkpoint`, `blk_PICKUP` is returnable and
+`blk_RULES` is a `library.collect` whose config says it is not. The root
+block, `blk_ROOT`, is a `core.sequence`, so the one trail root is
+`s_blk_ROOT__trail` and three steps belong to it. Elided to the trail's
+own bytes:
+
+```xml
+<datamodel><data expr="[]" id="s_blk_ROOT__trail"/></datamodel>
+<state id="s_blk_ROOT" initial="s_blk_NAME">
+  <!-- the sequence's done.state transitions -->
+  <transition cond="s_blk_ROOT__trail[0] === 's_blk_NAME'" event="statifier_blocks.back" target="s_blk_NAME" type="internal">
+    <assign expr="s_blk_ROOT__trail[1]" location="s_blk_ROOT__trail"/>
+  </transition>
+  <!-- the same for s_blk_CARD, then s_blk_PICKUP -->
+  <state id="s_blk_CARD" initial="...">
+    <onentry>
+      <if cond="s_blk_ROOT__trail[0] !== 's_blk_CARD'">
+        <assign expr="['s_blk_CARD', s_blk_ROOT__trail]" location="s_blk_ROOT__trail"/>
+      </if>
+    </onentry>
+    <transition cond="s_blk_ROOT__trail[1][0] === 's_blk_NAME'" event="statifier_blocks.back" target="s_blk_NAME">
+      <assign expr="s_blk_ROOT__trail[1][1]" location="s_blk_ROOT__trail"/>
+    </transition>
+    <!-- the same for s_blk_PICKUP -->
+    <transition event="statifier_blocks.back"/>
+    <!-- what library.collect emits -->
+  </state>
+  <state id="s_blk_CHECK" initial="s_blk_CHECK__o_done">
+    <onentry><assign expr="[]" location="s_blk_ROOT__trail"/></onentry>
+    <final id="s_blk_CHECK__o_done"><!-- D5's raise --></final>
+  </state>
+  <!-- s_blk_NAME and s_blk_PICKUP as s_blk_CARD; s_blk_ISSUE and
+       s_blk_RULES as their types emit them -->
+</state>
+```
+
+A patron's way through it:
+
+| The execution is at | Trail before | Back | Trail after |
+|---|---|---|---|
+| `blk_NAME` | `[NAME]` | nothing behind it: nothing happens | `[NAME]` |
+| `blk_CARD` | `[CARD, NAME]` | re-enters `blk_NAME` | `[NAME]` |
+| `blk_PICKUP`, after `blk_CHECK` | `[PICKUP]` | nothing behind it: nothing happens | `[PICKUP]` |
+| `blk_RULES` | `[PICKUP]` | re-enters `blk_PICKUP` | `[PICKUP]` |
+
+The trail column writes `[CARD, NAME]` for
+`['s_blk_CARD', ['s_blk_NAME', []]]`. Once `blk_ISSUE` has issued the card
+and `blk_CHECK` has cleared the trail, nothing before the checkpoint can be
+returned to.
+
+### What this Amendment does not decide
+
+- Back across a sub-path boundary.
+- A composite as a returnable step, refused at registration by `C12b`.
+- How a document that declares `accepts` (`ADR-0014`) and has a returnable
+  step treats `statifier_blocks.back`: `ADR-0014` decision 4 reads a
+  reachable descriptor no declared name matches as internal, and this
+  Amendment does not say how a host delivering Back squares with that.
+- How a host learns, for one execution, whether Back is offered, and how a
+  host's client asks for it: later requests, outside this record.
+- The role spelling `L9` leaves to the request that builds the trail.
+
+### Consequences
+
+- A host that changes nothing sees no changed compile and no changed answer
+  (`L8`); upgrading moves no compiled hash.
+- A host that declares a type returnable moves, once, the compiled bytes of
+  the documents that use it, and an execution of such a document may be
+  sent `statifier_blocks.back`.
+- Persistence is unchanged, as ruled: the trail is a datamodel root like
+  any other, and nothing in this package stores it.
+
+Filed with `sb-q6pf`.
