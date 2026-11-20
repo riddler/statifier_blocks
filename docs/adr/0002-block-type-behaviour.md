@@ -15146,3 +15146,361 @@ step does.
 unchanged, literal `chart` only (`ADR-0004`'s `J7`). No code changes in
 the request that adds this Note. This Note carries no `Status:` line, which
 is this file's convention for a Note.
+
+## Amendment (2026-11-20): a block type may declare its instances returnable steps, and `core.checkpoint` is a core block an author places - `C12`
+
+**Status: proposed (2026-11-20, bead `sb-cbr3`).** A decision record merges
+at proposed and is flipped to accepted by a separate request through the
+same `docs/adr/` gate once the code that implements it has shipped in a
+published version of this package. Additive: every decision, Amendment and
+Note above this line stands as written, no text above this line is edited,
+and the head `Status:` line is not extended. It adds one optional callback
+to the behaviour decision 5 declares, one registration check beside the one
+`Palette.new/2` already makes, one fact to the palette browser's entries,
+and one row to decision 10's core vocabulary. It adds clauses `C12` to
+`C12e`, the next free numbers in this file's `C` series. No code is in the
+request that adds this section.
+
+The design, verbatim as the options chosen, was ruled by the operator,
+2026-11-19:
+
+- "An optional callback on the host's block type (config in, boolean out),
+  recorded as a statifier_blocks ADR-0002 Amendment".
+- "A core block (working name core.checkpoint) the author places; passing it
+  clears the trail; sub-path boundaries, loop iterations and parallel lanes
+  also count".
+- "No switch: Back exists exactly where a returnable step exists; upgrading
+  moves no hash; a host opts in by declaring its type returnable, and those
+  documents move once".
+
+This section decides the declaration on the behaviour, how it is checked
+when a palette is built, how the palette shows it, and that the checkpoint
+block exists with the shape `C12d` gives it. What the compiler generates for
+Back - the trail and where it lives, the push on entering a returnable
+step, the reserved back event and its spelling, the transition it takes,
+which boundaries clear the trail and how, and what `core.checkpoint` emits -
+is decided by a later Amendment on `ADR-0004`, not written yet, and nothing
+below decides any of it.
+
+Code cites below name code on `main` and were read at `9df5522`; each is
+written anchor first, line second, and a later reader re-locates by the
+anchor. Code this section describes and nothing has built yet is named by
+the function or key it will be, with no line.
+
+### Context
+
+At `9df5522` the behaviour has no way to say anything about returning to a
+block. Its optional callbacks are the ones `@optional_callbacks` lists
+(`lib/statifier_blocks/block_type.ex:871`, the `@optional_callbacks`
+attribute), and none of them is about it; no module under `lib/` and no
+record under `docs/adr/` names a returnable step or a checkpoint (a
+case-insensitive search for both words over `lib/`, `docs/` and the README
+at that commit matches nothing).
+
+Two existing seams shape the answer:
+
+- **Optional callbacks are read through `Palette.call/4` and
+  `Palette.declares?/3`** (`lib/statifier_blocks/palette.ex:607`, `def
+  call/4`; `:649`, `def declares?/3`). A resolver on `BlockType` turns an
+  absent or malformed answer into a stated default, so a host type written
+  before a callback existed compiles as it did: `failure_outcomes/2` is the
+  model (`lib/statifier_blocks/block_type.ex:966`, `def
+  failure_outcomes/2`), answering `[]` for anything that is not a list of
+  strings.
+- **A palette is checked once, when it is built.** `Palette.new/2` refuses,
+  with `ArgumentError`, a palette in which two entries of one browser group
+  declare the same `order` (`lib/statifier_blocks/palette.ex:179`, `def
+  new/2`; `:451`, `defp refute_duplicate_orders!/2`), and `from_modules/2`
+  builds through it. That refusal is the package's one mount-time check of
+  what a palette's entries declare; `from_modules/2` also refuses a
+  registration that is not a name-and-entry pair (`:518`, `defp
+  register/2`), which is about the list's shape, not an entry's answers.
+  `Palette.preflight/1` is the host's own later check of its types'
+  defaults and returns findings rather than refusing (`:773`, `def
+  preflight/1`).
+
+### `C12`. The declaration: an optional `returnable?/1`, config in, boolean out
+
+`StatifierBlocks.BlockType` declares one more optional callback:
+
+    @callback returnable?(Block.config()) :: boolean()
+
+It answers whether a block of this type with this config is a **returnable
+step**: a block whose state an execution, after it has left that state, may
+be sent back to by the reserved back event the later `ADR-0004` Amendment
+named above will spell. It takes `config` for decision 5's reason, the one
+`outcomes/1` gives: a type may say that some of its instances are
+returnable and others are not, by what the author configured.
+
+- **Absent means not returnable.** A type that does not define it has no
+  returnable instance, which is where every type registered before this
+  section stays. The callback joins `@optional_callbacks`.
+- **Not injected by `use StatifierBlocks.BlockType`.** Injecting `false`
+  would make `Palette.declares?/3` answer `true` for every `use`-ing type,
+  so `C12c`'s palette fact, which reads declaredness, would mark every such
+  type; the injected `sentence/1` already shows that cost (the comment on it
+  inside `defmacro __using__/1`, `lib/statifier_blocks/block_type.ex:113`).
+  `explain/0` is deliberately not injected either (its `@doc`, "Optional,
+  and deliberately **not** injected"), and this one joins it.
+- **Pure, and total over accepted config.** Decision 4 binds it as it binds
+  every callback, and it carries `outcomes/1`'s stability rule: the same
+  answer for the same config, and an answer without raising for any config
+  `validate_config/1` accepts.
+- **Read through one resolver.** `StatifierBlocks.BlockType.returnable?/2`
+  takes the palette entry and the block's config and answers `true` only
+  when the callback is declared and answers exactly `true`. Absence, an
+  unloadable module, `false` and any non-boolean answer are all `false`,
+  for `failure_outcomes/2`'s reason: a host type that answers nonsense for
+  one block's config compiles to the bytes it compiled to before rather
+  than crashing the compile. A raise is not rescued by the resolver; it
+  reaches its caller as a raise from `failure_outcomes/1` does.
+- **A stateful entry** (`{module, state}`) defines `returnable?/2` as
+  `(state, config)`, which is `returnable?/1` in the behaviour's terms, and
+  is asked through `Palette.call/4` and `Palette.declares?/3` like any other
+  callback.
+
+### `C12b`. Validated at registration: two refusals in `Palette.new/2`
+
+When a palette is built, `Palette.new/2` (and so `from_modules/2` and
+`core/0`, which build through it) checks each `types` entry whose module is
+loadable and declares `returnable?/1`, after the duplicate-`order` check, and
+raises `ArgumentError` naming the entry's type name in either case below. It
+is the same kind of refusal as the order collision: a mount-time programmer
+error that a host should see before any document is opened, not a finding
+on one.
+
+1. **A composite declares no `returnable?/1`.** An entry for which
+   `StatifierBlocks.Composite.composite?/1` answers `true`
+   (`lib/statifier_blocks/composite.ex:703`, `def composite?/1`) and which
+   declares the callback is refused. A composite's block compiles through
+   its expansion, and whether an expansion as a whole is a step that can be
+   returned to is not decided by this section. A data composite's module,
+   `StatifierBlocks.Composite.Data`, does not define the callback, so the
+   refusal can only meet a module composite.
+2. **The answer for a fresh block is a boolean.** The callback is asked
+   once, with the config `Palette.new_block/2` starts a block of that type
+   from (its `config_schema(%{})` defaults; `lib/statifier_blocks/palette.ex:691`,
+   `def new_block/2`). An answer that is not `true` or `false`, or a raise,
+   throw or exit while building that config or making the call, refuses the
+   palette, and the message says which of those it was.
+
+The check asks one config, not every config, and claims no more: a type
+whose answer for some other config is not a boolean is read as not
+returnable by the resolver in `C12` for that block. A palette built as a
+struct literal rather than through `new/2` skips this check, as it skips
+the order check today. `Palette.preflight/1` is unchanged.
+
+### `C12c`. Shown in the palette: one fact on a type's browser entry
+
+The palette shows a type whose entry **declares** `returnable?/1`, read
+through `Palette.declares?/3`, not the answer for any one config: the
+palette offers types before any block of them is configured, so what it can
+truthfully say is that a block of this type may be a returnable step.
+
+- The view model's browser entry for a type (`StatifierBlocks.ViewModel`'s
+  `PaletteGroup`, `lib/statifier_blocks/view_model.ex:440`, `defmodule
+  PaletteGroup`, built by `defp palette_groups/1`, `:2473`) carries
+  `returnable: true` when the type declares the callback, and no
+  `:returnable` key otherwise. A recipe entry never carries it.
+- The palette browser draws that entry with a `data-returnable="true"`
+  attribute on its list item (the `<li>` that already carries `data-type`,
+  `lib/statifier_blocks/editor/palette_browser.ex:290`) and a short visible
+  marker, "Returnable step", inside the entry's text beside its label and
+  description. How the marker is styled is the browser's own, under
+  `ADR-0005` decision 10.
+- It is **not** a `palette_entry/0` key. The declaration lives in one place,
+  the callback, and a palette key saying the same thing would be a second
+  source that could disagree with it. `ADR-0005` decision 10's table of
+  keys is unchanged.
+
+The palette search, the card and the inspector are unchanged by this
+section.
+
+### `C12d`. `core.checkpoint` is a core block an author places
+
+The core vocabulary gains one type, `core.checkpoint`, registered in
+`Palette.core_types/0` (`lib/statifier_blocks/palette.ex:220`, `def
+core_types/0`). An author places it where a person may no longer return to
+any step before it, and passing it clears Back's trail; what that compiles
+to is the `ADR-0004` Amendment's. Its row on decision 10:
+
+| Block type | `slots(config)` | Config schema | `outcomes(config)` | Notes |
+|---|---|---|---|---|
+| `core.checkpoint` | none | none | the default, `done` | a point of no return the author places: passing it clears Back's trail, so no returnable step before it can be returned to from a step after it; it is not itself a returnable step |
+
+In full:
+
+- `slots/1`, `config_schema/1` and `validate_config/1` are the `use`
+  defaults: no slots, no fields, nothing refused. It has no config of its
+  own; a block of it carries what every block carries (its id, its type,
+  its `type_version`, an optional `title` and note) and nothing else.
+- `outcomes/1` is not defined, so it has the one outcome `done`;
+  `failure_outcomes/1` and `donedata_type/1` are not defined.
+- It does **not** define `returnable?/1`. A checkpoint is where returning
+  stops, not a place to return to.
+- `io/1` is the `use` default, `%{}`: it reads and writes nothing an author
+  declares, so every slot that admits an unconstrained block admits it.
+- `current_version/0` is `1`.
+- Its `palette_entry/0` puts it in the `"Structure"` group at the next free
+  `order` in that group when it is built (18 at `9df5522`, by the numbering
+  the `Palette` moduledoc's "Ordering a group" states), labelled
+  "Checkpoint". Its description, `explain/0` paragraph and `sentence/1` are
+  the building request's to write, under this row's Notes column.
+
+It is kind-neutral like every core type: it says nothing about what the
+steps around it are or who takes them, and it is placed and judged the same
+way in any document.
+
+### `C12e`. No switch, and what a host opts into
+
+There is no palette option, document key or compile option that turns Back
+on. Back exists exactly where a returnable step exists, which is the third
+ruling above read through `C12`: a document none of whose blocks answers
+`returnable?/2` with `true` has no returnable step. Placing a
+`core.checkpoint` does not create one.
+
+Upgrading to the release that builds this section moves no document's
+compiled bytes by itself. A host opts in by defining `returnable?/1` on its
+own type, and that moves, once, the compiled bytes of each document using an
+instance that answers `true`; a document with no such instance compiles as
+it did. An author placing a `core.checkpoint` edits a document as any other
+insertion does. Which bytes move and how is the `ADR-0004` Amendment's,
+and the request that proves a document with no returnable step compiles
+byte-identically is that Amendment's too.
+
+### The contract as typespecs
+
+```elixir
+# StatifierBlocks.BlockType - the new optional callback.
+@callback returnable?(Block.config()) :: boolean()
+
+@optional_callbacks io: 1,
+                    migrate_config: 2,
+                    fixtures: 0,
+                    palette_entry: 0,
+                    outcomes: 1,
+                    failure_outcomes: 1,
+                    summary: 1,
+                    donedata_type: 1,
+                    sentence: 1,
+                    explain: 0,
+                    returnable?: 1
+
+# StatifierBlocks.BlockType - the resolver every consumer reads it through.
+# true only for a declared callback answering exactly true.
+@spec returnable?(StatifierBlocks.Palette.type_ref(), Block.config()) :: boolean()
+
+# StatifierBlocks.ViewModel.PaletteGroup - one optional key on an entry.
+@type entry :: %{
+        required(:kind) => kind(),
+        required(:name) => String.t(),
+        required(:module) => module(),
+        required(:entry) => BlockType.palette_entry(),
+        optional(:type_name) => Block.type_name(),
+        optional(:returnable) => true
+      }
+
+# StatifierBlocks.Palette.new/2 - the spec is unchanged; it raises
+# ArgumentError for the two refusals of C12b as it does for an order
+# collision.
+@spec new(%{optional(Block.type_name()) => type_ref()}, keyword()) :: t()
+```
+
+### Worked example: patron registration
+
+A library registers new patrons. Its host type `library.collect` gathers
+one set of details from the patron; the patron may return to most of them,
+but not to the agreement they sign at the end:
+
+```elixir
+defmodule Library.Blocks.Collect do
+  use StatifierBlocks.BlockType
+
+  @impl true
+  def config_schema(_config) do
+    [
+      %{key: "prompt", type: :string, label: "What to collect",
+        required?: true, default: ""},
+      %{key: "revisable", type: :boolean, label: "The patron may come back to this",
+        required?: false, default: true}
+    ]
+  end
+
+  @impl true
+  def returnable?(config), do: Map.get(config, "revisable", true) == true
+
+  # emit/2, the state the execution rests in until the patron's details
+  # arrive, is elided.
+end
+```
+
+Its other host type, `library.issue_card`, issues the card and declares no
+`returnable?/1`. The host builds its palette:
+
+```elixir
+Palette.from_modules(
+  [
+    {"library.collect", Library.Blocks.Collect},
+    {"library.issue_card", Library.Blocks.IssueCard}
+  ],
+  core: true
+)
+```
+
+`new/2` asks `Library.Blocks.Collect.returnable?/1` once, with
+`%{"prompt" => "", "revisable" => true}`, and gets `true`: admitted. A
+version of the module answering `Map.get(config, "revisable")`, which is
+`nil` for a config with no such key, would still be admitted here, because
+the fresh block's config carries the key; one answering `config["prompt"]`
+would be refused, naming `"library.collect"`, because `""` is not a
+boolean. In the browser, `library.collect` is drawn with the "Returnable
+step" marker; `library.issue_card` and `core.checkpoint` are not.
+
+The registration document, in order in the root's body:
+
+| Block | Type | Config | Returnable step |
+|---|---|---|---|
+| `blk_NAME` | `library.collect` | `prompt` "Your name and address" | yes |
+| `blk_CARD` | `library.collect` | `prompt` "Which card would you like?" | yes |
+| `blk_ISSUE` | `library.issue_card` | - | no: the type declares nothing |
+| `blk_CHECK` | `core.checkpoint` | - | no: a checkpoint never is |
+| `blk_PICKUP` | `library.collect` | `prompt` "Choose a pickup branch" | yes |
+| `blk_RULES` | `library.collect` | `prompt` "Agree to the borrowing rules", `revisable` `false` | no: this instance's config says so |
+
+At `blk_CARD` the patron may return to `blk_NAME`. Once the card is issued
+and `blk_CHECK` has been passed, no step before it can be returned to: from
+`blk_PICKUP` there is nothing earlier to go back to, which is what an issued
+card needs. `blk_RULES` is never returned to, though its type declares the
+callback. How the trail records this and which event takes the patron back
+are the `ADR-0004` Amendment's.
+
+### What this Amendment does not decide
+
+- Everything the compiler generates for Back, listed in this section's
+  preamble: the `ADR-0004` Amendment's.
+- A composite as a returnable step: refused at registration by `C12b` until
+  a record decides it.
+- Whether a block's card or the inspector shows that one instance is a
+  returnable step; the palette fact in `C12c` is about the type.
+- How a host learns, for one execution, that Back is offered, and how a
+  host's client asks for it: later requests, outside this record.
+- Back across a sub-path boundary.
+
+### Consequences
+
+- A host that changes nothing sees no changed compile and no changed
+  answer from any callback or resolver that exists today: no type it
+  registers declares `returnable?/1`, and the core palette's one new type
+  does not either. The new type itself is the next bullet.
+- The core palette gains one entry, so `Palette.manifest/1` of `core/0`
+  gains one row, `{"core.checkpoint", 1}`, and the core `"Structure"`
+  group one entry; a host that pins the core manifest sees that row.
+- `Palette.new/2` gains two refusals that only a type declaring the new
+  callback can meet.
+- The package's own prose that counts the behaviour's optional callbacks or
+  the core vocabulary is brought up to date by the requests that build
+  this section.
+
+What builds this: `sb-53vv` (the callback, its resolver, the registration
+check and the palette fact) and `sb-1otr` (`core.checkpoint`). Filed with
+`sb-cbr3`.
