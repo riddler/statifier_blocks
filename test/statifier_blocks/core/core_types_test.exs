@@ -23,7 +23,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
     # entry-count assert and on the fetch below.
     test "hand a host every core type, by the name a document stores" do
       assert %Palette{} = palette = Palette.core()
-      assert map_size(Palette.core_types()) == 17
+      assert map_size(Palette.core_types()) == 18
       assert palette.types == Palette.core_types()
 
       assert {:ok, Core.Sequence} = Palette.fetch(palette, "core.sequence")
@@ -43,6 +43,7 @@ defmodule StatifierBlocks.Core.CoreTypesTest do
       assert {:ok, Core.Map} = Palette.fetch(palette, "core.map")
       assert {:ok, Core.Drafts} = Palette.fetch(palette, "core.drafts")
       assert {:ok, Core.Placeholder} = Palette.fetch(palette, "core.placeholder")
+      assert {:ok, Core.Checkpoint} = Palette.fetch(palette, "core.checkpoint")
     end
 
     # Sabotage: made `core_types/0` return a `%Palette{}` - red, because a

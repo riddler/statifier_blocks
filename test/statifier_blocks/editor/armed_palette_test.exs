@@ -109,11 +109,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # the rows came from counts it.
       #
       # Sabotage: `count_line/3` computing `shown_types` from `groups` rather
-      # than from `visible` - the numerator reads 19 over a shorter list.
+      # than from `visible` - the numerator reads 20 over a shorter list.
       test "counts the types that will land, reads included", %{conn: conn} do
         {:ok, view, html} = mount_probe(conn)
 
-        assert count_text(html) == "19 block types", "the scan saw the whole palette"
+        assert count_text(html) == "20 block types", "the scan saw the whole palette"
 
         armed = arm(view, "blk_GRP", "body", 0)
         rows = type_rows(armed)
@@ -122,8 +122,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                "the slot refuses a configured block of this type, so it is not offered"
 
         assert "core.wait" in rows, "and everything the slot does take is still offered"
-        assert length(rows) < 19
-        assert count_text(armed) == "#{length(rows)} of 19 block types fit here"
+        assert length(rows) < 20
+        assert count_text(armed) == "#{length(rows)} of 20 block types fit here"
       end
     end
 

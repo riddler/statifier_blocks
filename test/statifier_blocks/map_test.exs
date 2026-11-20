@@ -224,6 +224,34 @@ defmodule StatifierBlocks.MapTest do
     end
   end
 
+  describe "a checkpoint" do
+    # A checkpoint is drawn as every leaf step is: a box in its slot's flow,
+    # joined to the steps either side, titled by its label with its
+    # sentence under it.
+    #
+    # Sabotage: made `Checkpoint.sentence/1` answer its label, "Checkpoint"
+    # - the line was left off as a repeat of the title and this went red.
+    # Reverted from a copy.
+    test "is a leaf box in the flow, titled Checkpoint, its sentence under it" do
+      graph = BlockMap.graph(checkpoint_view_model())
+
+      assert %{
+               "kind" => "block",
+               "gap" => true,
+               "title" => "Checkpoint",
+               "lines" => ["No going back past this point"]
+             } = checkpoint = find(graph, "check")
+
+      refute Map.has_key?(checkpoint, "children")
+
+      root = find(graph, "root")
+      pairs = for %{"sources" => [from], "targets" => [to]} <- root["edges"], do: {from, to}
+
+      assert {"issue", "check"} in pairs
+      assert {"check", "pickup"} in pairs
+    end
+  end
+
   describe "captions" do
     # A group's rules column and a branch carry a caption, and nothing else
     # on the map carries one: not the Invoke's failure rail either. A
@@ -1600,6 +1628,24 @@ defmodule StatifierBlocks.MapTest do
         "body" => [
           Block.new("core.send", id: "notice", config: %{"event" => "loan.overdue"}),
           Block.new("core.drafts", id: "shelf", slots: %{"body" => parked})
+        ]
+      }
+    )
+    |> Document.new()
+    |> build()
+  end
+
+  # A card issued, then a checkpoint, then a pickup branch chosen.
+  defp checkpoint_view_model do
+    send = &Block.new("core.send", id: &1, config: %{"event" => &2})
+
+    Block.new("core.sequence",
+      id: "root",
+      slots: %{
+        "body" => [
+          send.("issue", "card.issued"),
+          Block.new("core.checkpoint", id: "check"),
+          send.("pickup", "pickup.chosen")
         ]
       }
     )

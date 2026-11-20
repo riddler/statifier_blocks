@@ -37,7 +37,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     this is markup rather than styling.
 
     **Not a general icon library, and not anybody's icon set.** The paths are
-    written here, for these eleven names, at a single 24-unit grid and a
+    written here, for these twelve names, at a single 24-unit grid and a
     single stroke weight. A host that wants a real icon library passes one.
 
     ## The three cases `glyph/1` has
@@ -97,6 +97,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       "clock" => [
         "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z",
         "M12 7v5.2l3.4 2"
+      ],
+      "flag" => [
+        "M5.5 21V3.5",
+        "M5.5 4h12l-2.5 4.5 2.5 4.5h-12"
       ],
       "inbox" => [
         "M3.5 13.5h5l1 2h5l1-2h5",

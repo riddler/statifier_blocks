@@ -1,8 +1,7 @@
 defmodule StatifierBlocks.Compiler.Trail do
   @moduledoc """
   The trail of returnable steps, kept in the chart's own datamodel, and
-  Back over it (ADR-0004's Amendment of 2026-11-20, `L1` to `L8`, except
-  `L6`'s `core.checkpoint` row).
+  Back over it (ADR-0004's Amendment of 2026-11-20, `L1` to `L8`).
 
   A **returnable step** is a block for which
   `StatifierBlocks.BlockType.returnable?/2` answers `true` (ADR-0002's
@@ -74,6 +73,7 @@ defmodule StatifierBlocks.Compiler.Trail do
 
       | Boundary | Where the clear sits | Which trail |
       |---|---|---|
+      | `core.checkpoint` | its state's `<onentry>` | the scope the block belongs to |
       | `core.subchart`, `core.map`, `core.foreach`, `core.parallel` | its state's `<onentry>` and `<onexit>` | the scope the block belongs to |
       | a loop iteration | the body state's `<onentry>` | the body's |
       | a parallel lane | the lane region's `<onentry>` | the lane's |
@@ -85,8 +85,8 @@ defmodule StatifierBlocks.Compiler.Trail do
       clear, first among its children after its `<data>`; a state with no
       `<onexit>` gets one holding only the clear, right after that
       `<onentry>`. A `<final>` at the top level of the chart ends the
-      execution and gets no clear. The `core.checkpoint` row of `L6` is
-      not built here.
+      execution and gets no clear. A `core.checkpoint` in a scope with
+      no returnable step compiles to the step that does nothing alone.
 
   So no Back crosses a boundary, and a finished document or lane holds an
   empty trail: no condition above holds on `[]`, the engine discards the
@@ -129,7 +129,7 @@ defmodule StatifierBlocks.Compiler.Trail do
 
   alias StatifierBlocks.{Block, BlockType, Emission, Palette, Provenance}
   alias StatifierBlocks.Compiler.{DeclaredRoots, StateId}
-  alias StatifierBlocks.Core.{Emit, Foreach, Parallel, Subchart}
+  alias StatifierBlocks.Core.{Checkpoint, Emit, Foreach, Parallel, Subchart}
 
   @role ":trail"
   @suffix "__trail"
@@ -140,6 +140,10 @@ defmodule StatifierBlocks.Compiler.Trail do
   # The blocks whose state's entry and exit clear the trail of the scope
   # they belong to (`L6`): the sub-paths, the loop and the parallel.
   @boundaries [Subchart, StatifierBlocks.Core.Map, Foreach, Parallel]
+
+  # The blocks whose state's entry alone clears the trail of the scope
+  # they belong to (`L6`): the point of no return an author places.
+  @entry_boundaries [Checkpoint]
 
   @typedoc """
   A resolved node, as `StatifierBlocks.Compiler` threads it: a block, the
@@ -214,7 +218,8 @@ defmodule StatifierBlocks.Compiler.Trail do
 
   # `order` is the scope state ids in first-step order, reversed; `found`
   # maps each to its owner and its steps, reversed; `bounds` maps any scope
-  # state id to the boundary blocks in it, reversed.
+  # state id to the boundary blocks in it, each with the sides of its state
+  # that clear, reversed.
   defp collect(%{block: block, module: ref, slots: slots}, {scope_id, _owner} = scope, acc) do
     module = module_of(ref)
     pair = {block.id, StateId.state_id(block.id)}
@@ -222,7 +227,12 @@ defmodule StatifierBlocks.Compiler.Trail do
     acc =
       if BlockType.returnable?(ref, block.config), do: add_step(acc, scope, pair), else: acc
 
-    acc = if module in @boundaries, do: add_boundary(acc, scope_id, pair), else: acc
+    acc =
+      cond do
+        module in @boundaries -> add_boundary(acc, scope_id, {pair, [:entry, :exit]})
+        module in @entry_boundaries -> add_boundary(acc, scope_id, {pair, [:entry]})
+        true -> acc
+      end
 
     Enum.reduce(slots, acc, fn {slot, children}, acc ->
       child_scope = child_scope(module, block.id, slot) || scope
@@ -241,8 +251,8 @@ defmodule StatifierBlocks.Compiler.Trail do
     end
   end
 
-  defp add_boundary({order, found, bounds}, scope_id, pair),
-    do: {order, found, Map.update(bounds, scope_id, [pair], &[pair | &1])}
+  defp add_boundary({order, found, bounds}, scope_id, bound),
+    do: {order, found, Map.update(bounds, scope_id, [bound], &[bound | &1])}
 
   defp finish({order, found, bounds}, document_state_id) do
     order
@@ -331,10 +341,8 @@ defmodule StatifierBlocks.Compiler.Trail do
   defp boundary_additions(acc, %{state_id: scope_id, boundaries: boundaries}) do
     trail = root_id(scope_id)
 
-    Enum.reduce(boundaries, acc, fn {block_id, state_id}, acc ->
-      acc
-      |> append(state_id, :entry, clear(trail, block_id))
-      |> append(state_id, :exit, clear(trail, block_id))
+    Enum.reduce(boundaries, acc, fn {{block_id, state_id}, sides}, acc ->
+      Enum.reduce(sides, acc, &append(&2, state_id, &1, clear(trail, block_id)))
     end)
   end
 

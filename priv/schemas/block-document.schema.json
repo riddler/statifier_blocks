@@ -283,6 +283,17 @@
           }
         }
       },
+      "core.checkpoint": {
+        "description": "A core.checkpoint block: a point of no return; passing it clears the trail of steps that can be returned to. Applied together with #/definitions/block; the root does not apply it.",
+        "properties": {
+          "type": {
+            "const": "core.checkpoint"
+          },
+          "config": {
+            "type": "object"
+          }
+        }
+      },
       "core.drafts": {
         "description": "A core.drafts block: the shelf of fragments an author has built but not placed; nothing in it compiles. Applied together with #/definitions/block; the root does not apply it.",
         "properties": {

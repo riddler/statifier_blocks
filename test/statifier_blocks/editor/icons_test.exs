@@ -131,7 +131,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                "sb-jja: the shipped set covers the names `Palette.core/0` emits. " <>
                  "Missing: #{inspect(MapSet.to_list(missing))}"
 
-        assert MapSet.size(emitted) == 11, "the scan actually saw the core palette"
+        assert MapSet.size(emitted) == 12, "the scan actually saw the core palette"
       end
 
       # Sabotage: adding a name to `@glyphs` that no core type emits - the set
