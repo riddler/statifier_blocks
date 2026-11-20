@@ -1,3 +1,0 @@
-### Added
-
-- `core.checkpoint`, a core block an author places as a point of no return: passing it clears Back's trail in its scope, so no returnable step before it can be returned to from a step after it. It has no slots, no config and the one outcome `done`, is not itself a returnable step, sits last in the palette's "Structure" group, and compiles to a step that does nothing, with the clear only where its scope has a returnable step. The core palette's manifest gains `{"core.checkpoint", 1}`, the shipped block document schema a `core.checkpoint` definition, and the default icon set a `flag` glyph; a document that does not use the block compiles to the same bytes as before.

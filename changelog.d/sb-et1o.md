@@ -1,3 +1,0 @@
-### Added
-
-- The editor's config form for `core.subchart` offers `chart_from` beside `chart`, so an author can name the child document by its id or by a datamodel path read when the child starts; a form that fills in both is refused with one finding on `chart_from`. `config_schema/1` lists `chart_from` after `chart` as a path field and no longer marks `chart` required, a new block carries both keys empty, the block's sentence reads "Run the chart named at <path> and wait" for a `chart_from` block, and the shipped JSON Schema's `core.subchart` definition admits a config that names its child by either key. A new how-to page shows a branch library choosing a setup document at run time with the host's `resolve_chart/2` as the allow-list.
