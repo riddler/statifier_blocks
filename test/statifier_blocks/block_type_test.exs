@@ -30,7 +30,7 @@ defmodule StatifierBlocks.BlockTypeTest do
   describe "behaviour_info/1" do
     # sabotage: drop `@callback current_version() :: pos_integer()` from
     # block_type.ex -> the callbacks list drops {:current_version, 0} -> red
-    test "callbacks/1 is exactly the fifteen declared callbacks" do
+    test "callbacks/1 is exactly the sixteen declared callbacks" do
       callbacks = BlockType.behaviour_info(:callbacks)
 
       assert MapSet.new(callbacks) ==
@@ -49,15 +49,16 @@ defmodule StatifierBlocks.BlockTypeTest do
                  summary: 1,
                  donedata_type: 1,
                  sentence: 1,
-                 explain: 0
+                 explain: 0,
+                 returnable?: 1
                )
 
-      assert length(callbacks) == 15
+      assert length(callbacks) == 16
     end
 
     # sabotage: add `migrate_config: 2` to the `@optional_callbacks` list
     # without `fixtures: 0` -> the set no longer matches -> red
-    test "optional_callbacks/1 is exactly the ten optional callbacks" do
+    test "optional_callbacks/1 is exactly the eleven optional callbacks" do
       optional = BlockType.behaviour_info(:optional_callbacks)
 
       assert MapSet.new(optional) ==
@@ -71,10 +72,11 @@ defmodule StatifierBlocks.BlockTypeTest do
                  summary: 1,
                  donedata_type: 1,
                  sentence: 1,
-                 explain: 0
+                 explain: 0,
+                 returnable?: 1
                )
 
-      assert length(optional) == 10
+      assert length(optional) == 11
     end
   end
 

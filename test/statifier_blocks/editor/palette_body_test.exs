@@ -33,6 +33,26 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def members(_block_id, _document), do: []
   end
 
+  defmodule StatifierBlocks.Editor.PaletteBodyTest.Collect do
+    @moduledoc """
+    A host type for a library's patron registration that declares
+    `returnable?/1`, so the browser has a type to mark (ADR-0002's
+    2026-11-20 amendment, `C12c`).
+    """
+
+    use StatifierBlocks.BlockType
+
+    @impl true
+    def palette_entry,
+      do: %{label: "Collect", group: "Library", description: "Gathers details from a patron."}
+
+    @impl true
+    def returnable?(_config), do: true
+
+    @impl true
+    def emit(_block, _context), do: {:error, :not_compiled}
+  end
+
   defmodule StatifierBlocks.Editor.PaletteBodyTest do
     @moduledoc """
     The palette's body: the count line, the group headers, and the shape of a
@@ -243,6 +263,39 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       test "counts the filtered rows, not the registry's" do
         assert palette_html(query: "wait") =~
                  ~s(<span class="sb-palette__group-count">4</span>)
+      end
+    end
+
+    describe "a returnable type's row" do
+      defp returnable_html do
+        Palette.core_types()
+        |> Map.put("library.collect", StatifierBlocks.Editor.PaletteBodyTest.Collect)
+        |> Palette.new(recipes: Palette.core().recipes)
+        |> groups_for()
+        |> then(&palette_html(groups: &1))
+      end
+
+      # Sabotage: dropped `data-returnable={...}` from the `<li>` in
+      # `PaletteBrowser` - the attribute assertion goes red.
+      #
+      # Sabotage: dropped the `sb-palette__returnable` span - the marker
+      # assertion goes red.
+      test "carries data-returnable and the Returnable step marker" do
+        row = entry(returnable_html(), "library.collect")
+
+        assert row =~ ~s(data-returnable="true")
+        assert row =~ ~r{<span class="sb-palette__returnable">\s*Returnable step\s*</span>}
+      end
+
+      # Sabotage: `data-returnable={to_string(entry[:returnable] == true)}` -
+      # every other row gains `data-returnable="false"` and this goes red.
+      test "is the only row that does" do
+        html = returnable_html()
+        row = entry(html, "core.wait")
+
+        refute row =~ "data-returnable"
+        refute row =~ "Returnable step"
+        assert length(Regex.scan(~r/data-returnable=/, html)) == 1
       end
     end
 

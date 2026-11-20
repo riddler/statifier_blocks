@@ -450,6 +450,14 @@ defmodule StatifierBlocks.ViewModel do
     is not. A type entry also carries `:type_name`, unchanged, because a
     type's name IS its `type_name`; a recipe carries no such key, having no
     `type_name` at all.
+
+    A type entry whose type **declares**
+    `c:StatifierBlocks.BlockType.returnable?/1` also carries
+    `returnable: true` (ADR-0002's 2026-11-20 amendment, `C12c`): a block of
+    that type may be a returnable step. It is read from the declaration, not
+    from an answer for any one config, because the palette offers a type
+    before any block of it is configured. Every other entry, a recipe
+    included, carries no `:returnable` key.
     """
 
     @type kind :: :type | :recipe
@@ -459,7 +467,8 @@ defmodule StatifierBlocks.ViewModel do
             required(:name) => String.t(),
             required(:module) => module(),
             required(:entry) => BlockType.palette_entry(),
-            optional(:type_name) => Block.type_name()
+            optional(:type_name) => Block.type_name(),
+            optional(:returnable) => true
           }
 
     @type t :: %__MODULE__{name: String.t(), entries: [entry()]}
@@ -2461,6 +2470,16 @@ defmodule StatifierBlocks.ViewModel do
   @spec default_entry(Block.type_name()) :: map()
   defp default_entry(type_name), do: Map.put(@default_entry, :label, type_name)
 
+  # `C12c`: the fact is declaredness, so a type answering `false` for every
+  # config is still marked - the palette cannot know which config an author
+  # will give it.
+  @spec put_returnable(PaletteGroup.entry(), Palette.type_ref()) :: PaletteGroup.entry()
+  defp put_returnable(entry, ref) do
+    if Palette.declares?(ref, :returnable?, 1),
+      do: Map.put(entry, :returnable, true),
+      else: entry
+  end
+
   # `palette.types` AND `palette.recipes`, each carrying its own defaulted
   # `palette_entry/0`, grouped by `entry.group` and sorted group name ->
   # `order` -> `label` (ADR-0005 decision 10's grouping rule).
@@ -2480,6 +2499,7 @@ defmodule StatifierBlocks.ViewModel do
           module: module,
           entry: palette_entry_with_defaults(module, type_name)
         }
+        |> put_returnable(module)
       end) ++
         Enum.map(recipes, fn {name, module} ->
           %{

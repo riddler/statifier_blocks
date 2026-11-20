@@ -3010,6 +3010,17 @@
   line-height: var(--sb-leading);
 }
 
+/* The one fact a type's entry may carry beyond its label and description: a
+ * block of it may be a returnable step (ADR-0002's 2026-11-20 amendment, C12c).
+ * Muted like the description, set apart by weight rather than by colour. */
+.sb-palette__returnable {
+  display: block;
+  color: var(--sb-fg-muted);
+  font-size: var(--sb-text-xs);
+  font-weight: var(--sb-weight-medium);
+  line-height: var(--sb-leading);
+}
+
 /* ------------------------------------------------------------------ shell
  *
  * The 2026-08-29 shell amendment: three panes plus a full-width drawer row
