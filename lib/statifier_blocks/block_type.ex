@@ -1,9 +1,10 @@
 defmodule StatifierBlocks.BlockType do
   @moduledoc """
   The authoring-time extension seam. A host implements this behaviour once
-  per palette entry; the `core.*` structural vocabulary this package will
-  ship itself lands in a later record (ADR-0002 decision 10) and is not
-  present yet.
+  per palette entry, and the `core.*` structural vocabulary this package
+  ships itself (ADR-0002 decision 10, `StatifierBlocks.Core`, reached through
+  `StatifierBlocks.Palette.core/0`) implements it the same way, with no
+  privileged path.
 
   ## Purity (decision 4)
 
@@ -28,10 +29,10 @@ defmodule StatifierBlocks.BlockType do
   ## Required and optional callbacks
 
   Five callbacks are required; a module missing one of them is not a valid
-  `StatifierBlocks.BlockType` and fails to compile as one. Ten are
+  `StatifierBlocks.BlockType` and fails to compile as one. Eleven are
   optional (`@optional_callbacks io: 1, migrate_config: 2, fixtures: 0,
   palette_entry: 0, outcomes: 1, failure_outcomes: 1, summary: 1,
-  donedata_type: 1, sentence: 1, explain: 0`); a
+  donedata_type: 1, sentence: 1, explain: 0, returnable?: 1`); a
   module that implements only the five required ones compiles cleanly, and
   each optional absence degrades to a stated default rather than an error:
 
@@ -52,6 +53,7 @@ defmodule StatifierBlocks.BlockType do
   | `donedata_type/1` | no | the document's `<donedata>` carries only the params the compiler mints |
   | `sentence/1` | no | a block's one line of prose is the type's label |
   | `explain/0` | no | the type's explanation is its palette entry's `description`, or none |
+  | `returnable?/1` | no | no block of the type is a returnable step |
 
   ## Who owns what
 
@@ -69,6 +71,7 @@ defmodule StatifierBlocks.BlockType do
   | `donedata_type/1` | ADR-0013 (the typed child summary); where the params go is ADR-0004's C1 |
   | `sentence/1` | this record's 2026-09-07 amendment; where the line is drawn is ADR-0005's |
   | `explain/0` | ADR-0017 decision 1; where the paragraph is drawn is that record's decision 4 |
+  | `returnable?/1` | this record's 2026-11-20 amendment (`C12`); what the compiler generates for a returnable step is ADR-0004's |
 
   ## Declaring the defaults instead of spelling them (ADR-0007)
 
@@ -96,8 +99,8 @@ defmodule StatifierBlocks.BlockType do
   The defaults change nothing this record decides. They are ordinary
   function definitions, each a pure function of its arguments, so decision
   4 holds for a `use`-ing type exactly as it does for a hand-written one,
-  and a type that writes all nine callbacks out by hand is the same type it
-  was before ADR-0007 existed.
+  and a type that writes all seven injected callbacks out by hand is the
+  same type it was before ADR-0007 existed.
   """
 
   alias StatifierBlocks.Block
@@ -868,6 +871,32 @@ defmodule StatifierBlocks.BlockType do
   """
   @callback explain() :: String.t()
 
+  @doc """
+  Whether a block of this type with this `config` is a **returnable step**
+  (ADR-0002's 2026-11-20 amendment, `C12`): a block whose state an
+  execution, after it has left that state, may be sent back to. What the
+  compiler generates for one is ADR-0004's.
+
+  It takes `config` for `outcomes/1`'s reason: a type may say that some of
+  its instances are returnable and others are not, by what the author
+  configured.
+
+  Optional, and deliberately **not** injected by `use
+  StatifierBlocks.BlockType`, as `explain/0` is not: the palette marks a
+  type that **declares** it, so an injected `false` would mark every
+  `use`-ing type. A type that does not declare it has no returnable
+  instance.
+
+  It is **pure** and carries `outcomes/1`'s stability rule: the same answer
+  for the same config, and an answer without raising for any config
+  `validate_config/1` accepts. `returnable?/2` on this module is the
+  resolver every consumer reads it through, and it answers `true` only for
+  exactly `true`. `StatifierBlocks.Palette.new/2` asks it once, for a fresh
+  block's config, and refuses the palette when that answer is not a
+  boolean, and refuses a composite that declares it.
+  """
+  @callback returnable?(Block.config()) :: boolean()
+
   @optional_callbacks io: 1,
                       migrate_config: 2,
                       fixtures: 0,
@@ -877,7 +906,8 @@ defmodule StatifierBlocks.BlockType do
                       summary: 1,
                       donedata_type: 1,
                       sentence: 1,
-                      explain: 0
+                      explain: 0,
+                      returnable?: 1
 
   # ADR-0002 amendment A1's default: a type that declares no outcomes has
   # exactly one, named `done`. Named once, here, so the compiler and the
@@ -973,6 +1003,32 @@ defmodule StatifierBlocks.BlockType do
   end
 
   defp sanitize_failure_outcomes(_malformed), do: []
+
+  @doc """
+  Whether a block of the palette entry `ref` with this `config` is a
+  returnable step (ADR-0002's 2026-11-20 amendment, `C12`).
+
+  `true` only when the entry declares `returnable?/1` and it answers exactly
+  `true`. An absent callback, an entry whose module is not loadable,
+  `false` and any answer that is not a boolean are all `false`, for
+  `failure_outcomes/2`'s reason: a host type that answers nonsense for one
+  block's config compiles to the bytes it compiled to before rather than
+  crashing the compile. Reached through `StatifierBlocks.Palette.call/4`,
+  so a stateful entry is asked `returnable?(state, config)`.
+
+  A raise is not rescued here: it reaches the caller as a raise from
+  `failure_outcomes/1` does.
+
+      iex> StatifierBlocks.BlockType.returnable?(StatifierBlocks.Core.Sequence, %{})
+      false
+
+      iex> StatifierBlocks.BlockType.returnable?(NoSuchModule, %{})
+      false
+  """
+  @spec returnable?(Palette.type_ref(), Block.config()) :: boolean()
+  def returnable?(ref, config) do
+    Palette.call(ref, :returnable?, [config], false) == true
+  end
 
   @doc """
   The palette entry's `donedata_type(config)`, or `[]` when

@@ -291,6 +291,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                 :for={entry <- group.entries}
                 data-type={entry[:type_name]}
                 data-recipe={if entry.kind == :recipe, do: entry.name}
+                data-returnable={if entry[:returnable], do: "true"}
               >
                 <button
                   type="button"
@@ -311,6 +312,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                     <span class="sb-palette__name">{entry.entry.label}</span>
                     <span :if={entry.entry.description != ""} class="sb-palette__description">
                       {entry.entry.description}
+                    </span>
+                    <span :if={entry[:returnable]} class="sb-palette__returnable">
+                      Returnable step
                     </span>
                   </span>
                 </button>

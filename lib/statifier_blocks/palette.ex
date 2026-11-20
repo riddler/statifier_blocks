@@ -161,10 +161,10 @@ defmodule StatifierBlocks.Palette do
       is deliberately not `types`/`recipes`' rule, because those are lookups
       and this is not.
 
-  It refuses one thing, and raises `ArgumentError` rather than building a
-  palette a host would misread: two entries of one palette-browser
-  **group** declaring the same `order` (see "Ordering a group" in the
-  moduledoc). Types and recipes are checked together, because the browser
+  It refuses three things, and raises `ArgumentError` rather than building
+  a palette a host would misread. The first is two entries of one
+  palette-browser **group** declaring the same `order` (see "Ordering a
+  group" in the moduledoc). Types and recipes are checked together, because the browser
   draws them into one group. An entry whose module is not loaded, exports
   no `palette_entry/0`, or declares no `order` is skipped, not refused, and
   a composite beside its own derived recipe is admitted - that pair is one
@@ -174,12 +174,30 @@ defmodule StatifierBlocks.Palette do
   merges maps - the shape `core_types/0` documents - never goes through
   `from_modules/2`, and the collision is the same mount-time programmer
   error whichever builder produced it.
+
+  The other two are about a `types` entry whose module is loadable and
+  declares `c:StatifierBlocks.BlockType.returnable?/1` (ADR-0002's
+  2026-11-20 amendment, `C12b`), checked after the order check and naming
+  the entry's type name:
+
+    * a **composite** that declares it is refused - whether an expansion as
+      a whole is a step that can be returned to is not decided;
+    * its answer for a **fresh block's config** - the config `new_block/2`
+      starts a block of that type from - must be `true` or `false`. Any
+      other answer is refused, and so is a raise, a throw or an exit while
+      building that config or making the call; the message says which it
+      was.
+
+  One config is asked, not every config, and the check claims no more: a
+  type whose answer for some other config is not a boolean is read as not
+  returnable for that block by `StatifierBlocks.BlockType.returnable?/2`.
   """
   @spec new(%{optional(Block.type_name()) => type_ref()}, keyword()) :: t()
   def new(types \\ %{}, opts \\ []) when is_map(types) do
     recipes = Keyword.get(opts, :recipes, %{})
 
     refute_duplicate_orders!(types, recipes)
+    refute_bad_returnables!(types)
 
     %__MODULE__{
       types: types,
@@ -503,6 +521,75 @@ defmodule StatifierBlocks.Palette do
     end
   end
 
+  # ADR-0002's 2026-11-20 amendment, `C12b`: every `types` entry that
+  # declares `returnable?/1`, in type-name order so the entry a palette
+  # with two bad ones names does not depend on map ordering.
+  @spec refute_bad_returnables!(%{optional(Block.type_name()) => type_ref()}) :: :ok
+  defp refute_bad_returnables!(types) do
+    types
+    |> Enum.filter(fn {_name, ref} -> declares?(ref, :returnable?, 1) end)
+    |> Enum.sort_by(fn {name, _ref} -> name end)
+    |> Enum.each(&refute_bad_returnable!/1)
+  end
+
+  @spec refute_bad_returnable!({Block.type_name(), type_ref()}) :: :ok
+  defp refute_bad_returnable!({name, ref}) do
+    if StatifierBlocks.Composite.composite?(ref) do
+      raise ArgumentError,
+            "palette entry #{inspect(name)} (#{inspect(ref)}) is a composite and declares " <>
+              "returnable?/1; a composite's block cannot be declared a returnable step"
+    end
+
+    case fresh_returnable_answer(ref) do
+      {:answered, answer} when is_boolean(answer) ->
+        :ok
+
+      {:answered, answer} ->
+        raise ArgumentError,
+              "palette entry #{inspect(name)} (#{inspect(ref)}): returnable?/1 answered " <>
+                "#{inspect(answer)} for a fresh block's config, which is not a boolean"
+
+      {step, kind, reason} ->
+        raise ArgumentError,
+              "palette entry #{inspect(name)} (#{inspect(ref)}): #{describe_kind(kind)} " <>
+                "#{describe_step(step)}: #{describe_reason(kind, reason)}"
+    end
+  end
+
+  # The fresh block's config is `new_block/2`'s, through the same helper,
+  # so the answer checked is the one an author's first insert would get.
+  @spec fresh_returnable_answer(type_ref()) ::
+          {:answered, term()} | {:config | :call, :error | :throw | :exit, term()}
+  defp fresh_returnable_answer(ref) do
+    config =
+      try do
+        {:ok, fresh_config(ref)}
+      catch
+        kind, reason -> {:config, kind, reason}
+      end
+
+    with {:ok, config} <- config do
+      try do
+        {:answered, call(ref, :returnable?, [config], false)}
+      catch
+        kind, reason -> {:call, kind, reason}
+      end
+    end
+  end
+
+  @spec describe_kind(:error | :throw | :exit) :: String.t()
+  defp describe_kind(:error), do: "raised"
+  defp describe_kind(:throw), do: "threw"
+  defp describe_kind(:exit), do: "exited"
+
+  @spec describe_step(:config | :call) :: String.t()
+  defp describe_step(:config), do: "while building a fresh block's config for returnable?/1"
+  defp describe_step(:call), do: "in returnable?/1 for a fresh block's config"
+
+  @spec describe_reason(:error | :throw | :exit, term()) :: String.t()
+  defp describe_reason(:error, reason), do: Exception.message(Exception.normalize(:error, reason))
+  defp describe_reason(_kind, reason), do: inspect(reason)
+
   @spec register(registration(), %{optional(Block.type_name()) => type_ref()}) ::
           %{optional(Block.type_name()) => type_ref()}
   defp register({type_name, module}, types)
@@ -571,7 +658,7 @@ defmodule StatifierBlocks.Palette do
       degrade a stateful type into the absent-callback path, which looks
       exactly like a type that declared nothing;
     * **the absent-callback default**, which is why this takes four
-      arguments and not three: ten of the fifteen callbacks are optional
+      arguments and not three: eleven of the sixteen callbacks are optional
       and every site is a probe followed by a fallback, so folding the
       probe into the seam is what makes the arity arithmetic unrepeatable;
     * **the `state`-prepending**, which is the whole of what a caller must
@@ -691,20 +778,25 @@ defmodule StatifierBlocks.Palette do
   def new_block(%__MODULE__{} = palette, type_name) do
     case fetch(palette, type_name) do
       {:ok, ref} ->
-        config =
-          ref
-          |> call(:config_schema, [%{}], [])
-          |> Map.new(fn %{key: key, default: default} -> {key, default} end)
-
         {:ok,
          Block.new(type_name,
-           config: config,
+           config: fresh_config(ref),
            type_version: call(ref, :current_version, [], nil)
          )}
 
       _error ->
         :error
     end
+  end
+
+  # A fresh block's config: the type's `config_schema(%{})` defaults. Shared
+  # by `new_block/2` and `new/2`'s returnable check, which asks about exactly
+  # the block `new_block/2` builds.
+  @spec fresh_config(type_ref()) :: Block.config()
+  defp fresh_config(ref) do
+    ref
+    |> call(:config_schema, [%{}], [])
+    |> Map.new(fn %{key: key, default: default} -> {key, default} end)
   end
 
   @typedoc """
