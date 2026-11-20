@@ -174,6 +174,49 @@ defmodule StatifierBlocks.Core.Subchart do
   does: a subchart may not name the document it sits in. See
   `StatifierBlocks.Compiler.SelfReference`, which also says why a cycle
   through two or more documents is the host resolver's to refuse.
+
+  ## Naming the child from data: `chart_from`
+
+  A block names its child by exactly one of two keys (ADR-0004's
+  Amendment of 2026-11-19, J1). `chart` is the literal document id above.
+  `chart_from` is a datamodel path, in the grammar `assign_to` takes,
+  whose value when the invocation starts is the document id to run; it is
+  written verbatim as the `<invoke>`'s `srcexpr` in place of `src`, and
+  stamped as coming from `chart_from` so a finding inside it anchors on
+  the field the author typed. Both keys non-empty is one finding on
+  `chart_from`; neither is the finding `chart` has always raised. An empty
+  string reads as absent.
+
+      <invoke id="blk_SETUP" srcexpr="onboarding.setup_document"
+              type="statifier_blocks:subchart">
+        <param expr="'done skipped error'" name="statifier_blocks:outcomes"/>
+      </invoke>
+
+  A `chart_from` block's `<invoke>` carries one more `<param>` after the
+  author's `params` rows (J2): `statifier_blocks:outcomes`, a single-quoted
+  string of `outcome_names/1` joined by single spaces. The handler reads
+  the block's declared outcomes from it, because neither handler's context
+  carries the parent document, and removes it before the child is started,
+  so it never reaches the child's datamodel. A block naming its child by
+  `chart` emits no such param, which is how the literal form keeps the
+  bytes it always had and how the handler tells the two forms apart.
+
+  The engine evaluates the path when the invocation starts. A path that
+  fails to evaluate raises `error.execution` and calls no handler; one
+  that evaluates to anything but a string is refused `unknown_document`
+  by the handler without the host's resolver being called; any string is
+  the host's `resolve_chart/2` to answer.
+
+  The compile-time checks that need the id stay with `chart`: the
+  self-reference refusal reads `src` only (J4), and the compile records a
+  child reference only for a block that names a literal `chart`, so the
+  publish-time graph checks have nothing to judge for a `chart_from`
+  block (J5).
+
+  `io/1` is unchanged for a `chart_from` block: the path is not reported
+  as a read for the typed environment, the same reading the block already
+  gives its `params` paths, and its value is a document id rather than a
+  datum the chart computes with.
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -193,6 +236,8 @@ defmodule StatifierBlocks.Core.Subchart do
 
   @default_outcome "done"
 
+  @outcomes_param "statifier_blocks:outcomes"
+
   @impl true
   def current_version, do: 1
 
@@ -210,6 +255,13 @@ defmodule StatifierBlocks.Core.Subchart do
   """
   @spec invoke_type() :: String.t()
   def invoke_type, do: @invoke_type
+
+  # The reserved `<param>` name a `chart_from` block's `<invoke>` carries
+  # its declared outcomes on (ADR-0004's Amendment of 2026-11-19, J2): the
+  # one definition site, read by the runtime handlers that remove it.
+  @doc false
+  @spec outcomes_param() :: String.t()
+  def outcomes_param, do: @outcomes_param
 
   @doc """
   One `zero_or_one` slot per declared outcome, named `on_<outcome>`, in
@@ -275,18 +327,20 @@ defmodule StatifierBlocks.Core.Subchart do
   @impl true
   def validate_config(config) do
     []
-    |> check_chart(config)
+    |> check_child(config)
     |> check_outcomes(config)
     |> check_assign_to(config)
     |> check_params(config)
     |> Config.verdict()
   end
 
-  defp check_chart(findings, config) do
-    if chart?(Map.get(config, "chart")) do
-      findings
-    else
-      [{"chart", "names the document to run, like bdoc_01JWIZ"} | findings]
+  # J1: exactly one of `chart` and `chart_from`. With no `chart_from` the
+  # rule is `chart`'s own, finding for finding, so a config that never
+  # carried the new key validates exactly as it did before it existed.
+  defp check_child(findings, config) do
+    case child_source(config) do
+      {:ok, _source} -> findings
+      {:error, [finding]} -> [finding | findings]
     end
   end
 
@@ -418,17 +472,11 @@ defmodule StatifierBlocks.Core.Subchart do
   @impl true
   def emit(%Block{config: config}, context) do
     with {:ok, running} <- Context.role_id(context, "running"),
-         {:ok, chart} <- chart(Map.get(config, "chart")),
+         {:ok, source} <- child_source(config),
          {:ok, rows} <- params(Map.get(config, "params")),
          {:ok, result} <- assign(Map.get(config, "assign_to")),
          {:ok, routes} <- routes(context, config) do
-      call =
-        "invoke"
-        |> Emission.element(
-          [{"id", context.block_id}, {"src", chart}, {"type", @invoke_type}],
-          Enum.map(rows, &param/1)
-        )
-        |> Emission.attribute_from_config("src", "chart")
+      call = invoke(context.block_id, source, Enum.map(rows, &param/1), config)
 
       inner =
         Emit.state(
@@ -659,14 +707,77 @@ defmodule StatifierBlocks.Core.Subchart do
     name |> String.replace("_", " ") |> String.capitalize()
   end
 
-  @spec chart(term()) :: {:ok, String.t()} | {:error, [{String.t(), String.t()}]}
-  defp chart(value) do
+  # The `<invoke>` itself. The literal form is built exactly as it was
+  # before `chart_from` existed - the same attributes, the same children,
+  # the same stamp - which is what keeps its bytes (J1). The data-driven
+  # form writes the path as `srcexpr` and appends the reserved outcomes
+  # param after the author's rows (J2).
+  @spec invoke(Block.id(), {:chart | :chart_from, String.t()}, [Emission.t()], Block.config()) ::
+          Emission.t()
+  defp invoke(block_id, {:chart, chart}, params, _config) do
+    "invoke"
+    |> Emission.element([{"id", block_id}, {"src", chart}, {"type", @invoke_type}], params)
+    |> Emission.attribute_from_config("src", "chart")
+  end
+
+  defp invoke(block_id, {:chart_from, path}, params, config) do
+    "invoke"
+    |> Emission.element(
+      [{"id", block_id}, {"srcexpr", path}, {"type", @invoke_type}],
+      params ++ [outcomes_carrier(config)]
+    )
+    |> Emission.attribute_from_config("srcexpr", "chart_from")
+  end
+
+  # Composed here from `outcome_names/1` rather than copied from a field,
+  # so it carries no config stamp, for the reason the routing conditions
+  # carry none: a finding in bytes this type generated is not the author's
+  # to fix. An outcome name is an identifier, so it holds no space and no
+  # quote, and the single-quoted literal needs no escaping.
+  @spec outcomes_carrier(Block.config()) :: Emission.t()
+  defp outcomes_carrier(config) do
+    expr = "'" <> Enum.join(outcome_names(config), " ") <> "'"
+    Emission.element("param", [{"expr", expr}, {"name", @outcomes_param}])
+  end
+
+  # Which key names the child (J1). An empty string reads as absent, as it
+  # does for `outcomes`, `assign_to` and `params`. With `chart_from` absent
+  # the answer is exactly the literal rule this type has always applied.
+  @spec child_source(Block.config()) ::
+          {:ok, {:chart | :chart_from, String.t()}} | {:error, [{String.t(), String.t()}]}
+  defp child_source(config) do
+    chart = Map.get(config, "chart")
+    chart_from = Map.get(config, "chart_from")
+
+    cond do
+      blank?(chart_from) ->
+        chart_source(chart)
+
+      not blank?(chart) ->
+        {:error,
+         [{"chart_from", "names the document by chart or by chart_from, never both; clear one"}]}
+
+      Config.datamodel_path?(chart_from) ->
+        {:ok, {:chart_from, chart_from}}
+
+      true ->
+        {:error,
+         [{"chart_from", "must be a datamodel path holding a document id, like onboarding.next"}]}
+    end
+  end
+
+  @spec chart_source(term()) ::
+          {:ok, {:chart, String.t()}} | {:error, [{String.t(), String.t()}]}
+  defp chart_source(value) do
     if chart?(value) do
-      {:ok, value}
+      {:ok, {:chart, value}}
     else
       {:error, [{"chart", "names the document to run, like bdoc_01JWIZ"}]}
     end
   end
+
+  @spec blank?(term()) :: boolean()
+  defp blank?(value), do: value in [nil, ""]
 
   # Deliberately loose, for the reason `core.invoke`'s path check is: the
   # value is a **document id** the host's handler resolves (ADR-0004's

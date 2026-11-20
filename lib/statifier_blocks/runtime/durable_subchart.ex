@@ -72,7 +72,10 @@ defmodule StatifierBlocks.Runtime.DurableSubchart do
   ## What it answers
 
   `{:start_child, %{invoke | content: scxml}, {:invoke, invoke}}` on a
-  successful resolve - the same instruction shape the in-memory module
+  successful resolve, with a `chart_from` block's reserved
+  `statifier_blocks:outcomes` param removed from the first payload's
+  params (ADR-0004's Amendment of 2026-11-19, J2) - the same instruction
+  shape the in-memory module
   plans, unrenamed and unwrapped, because the effect vocabulary is
   `statifier`'s and only the executor differs (ADR-0008 decision 3). The
   driver creates the child run inside the parent's own exclusion, records
@@ -193,7 +196,7 @@ defmodule StatifierBlocks.Runtime.DurableSubchart do
     invoke = payload!(context)
 
     case Resolution.resolve(invoke, context, host) do
-      {:ok, scxml} -> {:start_child, %{invoke | content: scxml}, {:invoke, invoke}}
+      {:ok, scxml} -> {:start_child, Resolution.child_invoke(invoke, scxml), {:invoke, invoke}}
       {:refuse, reason, detail} -> {:error, reason: reason, detail: detail}
     end
   end
