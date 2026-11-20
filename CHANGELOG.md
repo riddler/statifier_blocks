@@ -11,6 +11,44 @@ fragment in
 the fragments are assembled into a version section at release. See that README
 for the format and for when a change warrants an entry at all.
 
+## [0.46.0] 2026-11-20
+
+0.46.0 adds Back, the point of no return and a child named from data.
+Under Added: `core.subchart` may name its child by a datamodel path with
+`chart_from`, and both subchart handlers refuse a `chart_from` child whose
+root declares an outcome the block does not; a block type may declare its
+instances returnable steps with the optional `returnable?/1` callback, and
+a document with a returnable step compiles with a trail and with Back on
+the reserved event `statifier_blocks.back`; `core.checkpoint` clears that
+trail; and `StatifierBlocks.Runtime.Back.offered?/3` answers whether Back
+would re-enter a step. Under Changed, the one-time hash move a host opts
+into. Upgrading a host: nothing needs migrating and no stored document has
+to change. A document with no returnable step compiles to the bytes and
+chart identity it compiled to on 0.45.0, a block that names its child by
+`chart` included. A host that declares a block type returnable moves the
+bytes and chart identity of every document using an instance that answers
+true, once, when it adds the declaration. The core palette offers
+`core.checkpoint`. `StatifierBlocks.Compiler.compiler_version/0` answers
+the new package version, and a compiled record carries it. The package
+gains no Hex dependency.
+
+### Added
+
+- Both subchart handlers refuse a `chart_from` child whose root declares an outcome the block does not declare, with the reason `child_outcome_undeclared` and a `detail` naming the document id, the child's outcomes outside the block's set and the block's set, before the child is started (no child execution is created in the durable handler); a child declaring fewer outcomes starts as before, and a block that names its child by `chart` is not checked. `core.subchart`'s `chart_from` field is declared a read expecting a string, so the typed environment no longer lists it as an untyped write.
+- `core.checkpoint`, a core block an author places as a point of no return: passing it clears Back's trail in its scope, so no returnable step before it can be returned to from a step after it. It has no slots, no config and the one outcome `done`, is not itself a returnable step, sits last in the palette's "Structure" group, and compiles to a step that does nothing, with the clear only where its scope has a returnable step. The core palette's manifest gains `{"core.checkpoint", 1}`, the shipped block document schema a `core.checkpoint` definition, and the default icon set a `flag` glyph; a document that does not use the block compiles to the same bytes as before.
+- `core.subchart` can name its child from data with the optional `chart_from` config key, a datamodel path whose value names the document to run when the invocation starts: it compiles to `<invoke srcexpr>` plus one reserved `statifier_blocks:outcomes` param carrying the block's declared outcomes, which both subchart handlers remove before the child starts. `chart` and `chart_from` are exclusive, a value that is not a string is refused `unknown_document` without the resolver being called, and a block that names its child by `chart` compiles to the same bytes as before.
+- A block type may declare its instances returnable steps with the optional `returnable?/1` callback (config in, boolean out), read through `StatifierBlocks.BlockType.returnable?/2`, which answers `true` only for exactly `true`; `use StatifierBlocks.BlockType` does not inject it, so a type that changes nothing is unaffected.
+- `StatifierBlocks.Palette.new/2` raises `ArgumentError` for a composite that declares `returnable?/1`, and for a declaring type whose answer for a fresh block's config is not a boolean or raises, throws or exits.
+- A palette entry in the view model carries `returnable: true` when its type declares `returnable?/1`, and the palette browser draws that entry with `data-returnable="true"` and a "Returnable step" marker.
+- The editor's config form for `core.subchart` offers `chart_from` beside `chart`, so an author can name the child document by its id or by a datamodel path read when the child starts; a form that fills in both is refused with one finding on `chart_from`. `config_schema/1` lists `chart_from` after `chart` as a path field and no longer marks `chart` required, a new block carries both keys empty, the block's sentence reads "Run the chart named at <path> and wait" for a `chart_from` block, and the shipped JSON Schema's `core.subchart` definition admits a config that names its child by either key. A new how-to page shows a branch library choosing a setup document at run time with the host's `resolve_chart/2` as the allow-list.
+- A document with a returnable step compiles with a trail in the chart's own datamodel: one root per trail scope that holds a returnable step (the document, a `core.foreach` body, a `core.parallel` lane), named for the scope state with `__trail` appended and declared empty, and an `<onentry>` first in each returnable step's state that pushes the step's state id unless it is already on top; the trail holds state ids only, and a document with no returnable step compiles to the same bytes as before.
+- A document with a returnable step compiles with Back: delivering the reserved event `statifier_blocks.back` re-enters the most recent returnable step behind the current position and pops the trail, does nothing when nothing is behind it or the scope has finished, and never crosses a `core.subchart`, `core.map`, `core.foreach` or `core.parallel` boundary, a loop iteration or a parallel lane; a document with no returnable step compiles to the same bytes as before.
+- `StatifierBlocks.Runtime.Back.offered?/3` answers, from an execution's datamodel, its active leaf states and its document, whether delivering the reserved event `statifier_blocks.back` would re-enter a returnable step: `true` when a trail around the current position holds a step behind it, `false` at a first step, past a checkpoint, in a finished scope and for a document with no returnable step.
+
+### Changed
+
+- Upgrading moves no compiled bytes and no chart identity: a document with no returnable step compiles to the same bytes and chart identity as on 0.45.0. A host that declares a block type returnable (its `returnable?/1` answering `true`) moves the bytes and chart identity of every document using an instance that answers true, once, when it adds the declaration.
+
 ## [0.45.0] 2026-11-17
 
 0.45.0 adds two optional surfaces. Under Added: `core.await` takes an
@@ -4004,6 +4042,7 @@ changed from.
   path. `StatifierBlocks.Edit.Targets.droppable_slots/3` answers `[]` for the
   root rather than crashing, so a caller no longer has to guard around it.
 
+[0.46.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.46.0
 [0.45.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.45.0
 [0.44.1]: https://github.com/riddler/statifier_blocks/releases/tag/v0.44.1
 [0.44.0]: https://github.com/riddler/statifier_blocks/releases/tag/v0.44.0

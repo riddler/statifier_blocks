@@ -1,7 +1,7 @@
-# Upgrading a host from 0.31 to 0.45
+# Upgrading a host from 0.31 to 0.46
 
 This page says what a host changes to move `statifier_blocks` from 0.31.0 to
-0.45.0, one minor at a time. A host here is the code that embeds the package:
+0.46.0, one minor at a time. A host here is the code that embeds the package:
 the palette it builds, the compile it calls, the documents it stores and the
 publish step it runs. What each release added is in
 [CHANGELOG.md](../CHANGELOG.md); this page lists only what a host has to do
@@ -11,8 +11,9 @@ Take the minors in order, and move the pin with each one, as the README
 recommends: `{:statifier_blocks, "~> 0.32.0"}`, then `"~> 0.33.0"`,
 `"~> 0.34.0"`, `"~> 0.35.0"`, `"~> 0.36.0"`, `"~> 0.37.0"`, `"~> 0.38.0"`,
 `"~> 0.39.0"`, `"~> 0.40.0"`, `"~> 0.41.0"`, `"~> 0.42.0"`, `"~> 0.43.0"`,
-`"~> 0.44.0"` and `"~> 0.45.0"`. A patch release rides its minor's pin, so each
-section below covers the patches of the minor it moves to.
+`"~> 0.44.0"`, `"~> 0.45.0"` and `"~> 0.46.0"`. A patch release rides its
+minor's pin, so each section below covers the patches of the minor it moves
+to.
 
 One value moves at every release, a patch included, and the sections below
 do not repeat it: the compiler version. `StatifierBlocks.Compiler.compiler_version/0`
@@ -521,3 +522,36 @@ gains no dependency.
   `:block_id` is the composite block's own id, so a member's config can
   name the composite it was expanded from. `subtree/1` is unchanged. A
   module that defines both, or neither, does not compile.
+
+## 0.45 to 0.46
+
+**NONE** for a host that declares no block type returnable: nothing needs
+migrating, no stored document has to change, a document with no returnable
+step compiles to the bytes and chart identity it compiled to on 0.45, a
+`core.subchart` that names its child by `chart` included, and the package
+gains no dependency.
+
+- **If you want a `core.subchart` to choose its child at run time**, give
+  it `chart_from`, a datamodel path whose value names the document to run
+  when the invocation starts, instead of `chart`; the two are exclusive.
+  A string the path held goes to your `resolve_chart/2`, which alone
+  decides which ids resolve, so it is the allow-list; any other value is
+  refused `unknown_document` without the resolver being called. Both
+  subchart handlers refuse a `chart_from` child whose root declares an
+  outcome the block does not declare, with the reason
+  `child_outcome_undeclared`, before the child starts; a child declaring
+  fewer outcomes starts as before.
+- **If you declare a block type returnable**, with the optional
+  `returnable?/1` callback answering `true` for a block's config, that
+  block is a returnable step: the document compiles with a trail in the
+  chart's own datamodel and with Back on the reserved event
+  `statifier_blocks.back`, and `StatifierBlocks.Runtime.Back.offered?/3`
+  answers whether delivering it would re-enter a step. The declaration
+  moves the bytes and chart identity of every document using an instance
+  that answers true, once, when you add it. A composite may not declare
+  `returnable?/1`: `StatifierBlocks.Palette.new/2` raises for one.
+- **If you show the core palette**, it now offers `core.checkpoint`, last
+  in its "Structure" group: a point of no return an author places so that
+  no returnable step before it can be returned to from a step after it.
+  The shipped block document schema admits it, and the default icon set
+  draws it with a `flag` glyph.
