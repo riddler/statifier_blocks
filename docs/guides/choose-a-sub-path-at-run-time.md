@@ -55,7 +55,10 @@ The block cannot read the documents its path may name, so it declares the
 outcomes they finish with in **It can finish with**, one per line, and gets
 one `on_<outcome>` slot for each, with `on_error` last. A child that finishes
 with fewer outcomes is fine: a slot the child never reaches is simply not
-taken.
+taken. A child whose root declares an outcome the block does not list is
+not started: the block receives `error.communication.invoke.<block id>`
+with the reason `child_outcome_undeclared`, and its `detail` names the
+outcomes the block is missing.
 
 The three setups finish this way:
 

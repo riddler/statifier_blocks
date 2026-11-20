@@ -213,15 +213,22 @@ defmodule StatifierBlocks.Core.Subchart do
   publish-time graph checks have nothing to judge for a `chart_from`
   block (J5).
 
-  `io/1` is unchanged for a `chart_from` block: the path is not reported
-  as a read for the typed environment, the same reading the block already
-  gives its `params` paths, and its value is a document id rather than a
-  datum the chart computes with.
+  `io/1` is unchanged for a `chart_from` block: it reports no `consumes`,
+  the same reading the block already gives its `params` paths. The path
+  is declared a read on the field instead (below), because its value is
+  a document id the block reads when its child starts.
+
+  A `chart_from` child must fit the block: each outcome its root declares
+  must be among `outcome_names/1`, or the handler refuses it
+  `child_outcome_undeclared` before it is started (J3). The carrier param
+  above is how the handler learns the block's set. A literal `chart`
+  block's child is not judged this way.
 
   ### How the form offers the two keys
 
-  `config_schema/1` lists `chart_from` after `chart`, as a `{:path, %{}}`
-  field, for every config, and neither is `required?`: the rule that
+  `config_schema/1` lists `chart_from` after `chart`, as a
+  `{:path, %{expects: "string"}}` field, for every config, and neither is
+  `required?`: the rule that
   exactly one of them holds a value is `validate_config/1`'s, and it is
   the rule the form keeps. The form draws both, `chart_from` labelled as
   the alternative to `chart`, so the author can name the child either
@@ -236,10 +243,12 @@ defmodule StatifierBlocks.Core.Subchart do
   offered the declared datamodel paths as candidates and draws the
   undeclared-path advisory, as `assign_to` does; the host's
   `chart_outcomes` candidates stay keyed on `chart`, because a path names
-  no document until it is read. A `{:path, %{}}` field that declares
-  neither `expects` nor `writes` is also what `StatifierBlocks.Environment`
-  reads as a write that leaves the path untyped, so a `chart_from` path is
-  listed among the block's write signatures with the type `:unknown`.
+  no document until it is read. The field declares `expects: "string"`,
+  so `StatifierBlocks.Environment` lists the path among the block's read
+  signatures, expecting a string there, and never among its write
+  signatures: the block reads the document id and leaves the path as it
+  found it, so a type a host declared there stays declared for the steps
+  after it.
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -326,7 +335,7 @@ defmodule StatifierBlocks.Core.Subchart do
       },
       %{
         key: "chart_from",
-        type: {:path, %{}},
+        type: {:path, %{expects: "string"}},
         label: "Or run the chart whose id is at",
         required?: false,
         default: ""

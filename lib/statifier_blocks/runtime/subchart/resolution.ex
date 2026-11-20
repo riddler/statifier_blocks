@@ -2,7 +2,7 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
   @moduledoc """
   The half of the `statifier_blocks:subchart` handler that is pure in both
   variants: turning the document id on `src` into a compiled child chart,
-  or into one of the three shared refusal reasons.
+  or into one of the four shared refusal reasons.
 
   `src` is the literal id a `chart` block emits, or the value a
   `chart_from` block's `srcexpr` evaluated to when the invocation started;
@@ -22,6 +22,25 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
   The resolver contract itself, the behaviour, and every word of
   documentation about it stay on `StatifierBlocks.Runtime.Subchart`: this
   module mints nothing and is not part of the package's public surface.
+
+  ## A `chart_from` child must fit the block's declared outcomes
+
+  A `chart_from` block's `<invoke>` carries the block's declared outcomes
+  on the reserved `statifier_blocks:outcomes` param (ADR-0004's Amendment
+  of 2026-11-19, J2). When the payload carries it, the child that resolved
+  and compiled is judged last: each outcome its root declares - the
+  `declared_outcomes` of the compiled artifact's `interface`, whether this
+  module compiled it or the host's resolver handed it back compiled - must
+  be among the block's, or the start is refused
+  `"child_outcome_undeclared"` (J3), with `detail` naming the document id,
+  the child's outcomes outside the set in the child's order, and the
+  block's set in its own order. A child that declares fewer outcomes fits,
+  and so does an artifact whose `interface` declares none.
+
+  A literal `chart` block emits no carrier, so its child is not judged here
+  and starts exactly as it always has. A carrier whose value is not a
+  string is not one this package's emission produces, and it is read as no
+  carrier.
 
   ## `:known_invoke_types` is passed only when the ctx can supply it
 
@@ -72,13 +91,13 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
     {:refuse, "unknown_document", %{"chart" => inspect(src)}}
   end
 
-  def resolve(%Invoke{src: src}, ctx, host) do
+  def resolve(%Invoke{src: src} = invoke, ctx, host) do
     case host.resolve_chart(src, ctx) do
       {:ok, %Document{} = document} ->
-        compile_child(document, ctx, host, src)
+        document |> compile_child(ctx, host, src) |> fit(invoke)
 
-      {:ok, %Compiled{scxml: scxml}} ->
-        {:ok, scxml}
+      {:ok, %Compiled{} = compiled} ->
+        fit({:ok, compiled}, invoke)
 
       {:cycle, path} when is_list(path) ->
         {:refuse, "cycle_refused", %{"chart" => src, "cycle" => path}}
@@ -117,13 +136,53 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
 
   defp without_carrier(params), do: params
 
-  @spec compile_child(Document.t(), map(), module(), String.t()) :: t()
+  # The last check, after resolution and the child compile have both
+  # answered (J3's order): a payload carrying the block's declared outcomes
+  # is a `chart_from` block's, and its child's root outcomes must all be
+  # among them. Without the carrier - a literal `chart` block - the child
+  # is not judged and its chart is answered as it stands.
+  @spec fit({:ok, Compiled.t()} | {:refuse, reason(), map()}, Invoke.t()) :: t()
+  defp fit({:refuse, _reason, _detail} = refusal, _invoke), do: refusal
+
+  defp fit({:ok, %Compiled{scxml: scxml, interface: interface}}, %Invoke{} = invoke) do
+    with {:ok, declared} <- carried_outcomes(invoke),
+         [_ | _] = undeclared <- undeclared(interface, declared) do
+      {:refuse, "child_outcome_undeclared",
+       %{"chart" => invoke.src, "outcomes" => undeclared, "declared" => declared}}
+    else
+      _fits -> {:ok, scxml}
+    end
+  end
+
+  # The child's root outcomes outside the block's set, in the child's own
+  # order. An `interface` with no `declared_outcomes` declares nothing to
+  # judge, so it fits.
+  @spec undeclared(map(), [String.t()]) :: [String.t()]
+  defp undeclared(interface, declared) do
+    interface |> Map.get(:declared_outcomes, []) |> Enum.reject(&(&1 in declared))
+  end
+
+  # The block's declared outcomes off the reserved carrier: a single-quoted
+  # string literal of `outcome_names/1` joined by single spaces, which the
+  # engine hands on evaluated, so the param's value is the joined string.
+  @spec carried_outcomes(Invoke.t()) :: {:ok, [String.t()]} | :no_carrier
+  defp carried_outcomes(%Invoke{params: params}) when is_map(params) do
+    case Map.get(params, Subchart.outcomes_param()) do
+      carrier when is_binary(carrier) -> {:ok, String.split(carrier, " ", trim: true)}
+      _absent -> :no_carrier
+    end
+  end
+
+  defp carried_outcomes(%Invoke{}), do: :no_carrier
+
+  @spec compile_child(Document.t(), map(), module(), String.t()) ::
+          {:ok, Compiled.t()} | {:refuse, reason(), map()}
   defp compile_child(document, ctx, host, src) do
     opts = [child_use: true] ++ lint_opts(ctx)
 
     case Compiler.compile(document, host.palette(), opts) do
-      {:ok, %Compiled{scxml: scxml}} ->
-        {:ok, scxml}
+      {:ok, %Compiled{} = compiled} ->
+        {:ok, compiled}
 
       {:error, findings} ->
         {:refuse, "child_compile_findings",

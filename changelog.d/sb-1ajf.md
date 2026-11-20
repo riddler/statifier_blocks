@@ -1,0 +1,3 @@
+### Added
+
+- Both subchart handlers refuse a `chart_from` child whose root declares an outcome the block does not declare, with the reason `child_outcome_undeclared` and a `detail` naming the document id, the child's outcomes outside the block's set and the block's set, before the child is started (no child execution is created in the durable handler); a child declaring fewer outcomes starts as before, and a block that names its child by `chart` is not checked. `core.subchart`'s `chart_from` field is declared a read expecting a string, so the typed environment no longer lists it as an untyped write.

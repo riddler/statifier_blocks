@@ -5646,3 +5646,48 @@ so Back sent to the finished registration takes no transition and
   any other, and nothing in this package stores it.
 
 Filed with `sb-q6pf`.
+
+## Note (2026-11-20): `J1`'s `chart_from` field is a typed read, `{:path, %{expects: "string"}}`, and the environment never reads it as a write
+
+A dated Note rather than an amendment. It records one change to how `J1`
+of the Amendment of 2026-11-19 declares the `chart_from` field, decided by
+the conductor under a standing consent, 2026-11-20, and decides nothing
+else. `J1`, `J2` to `J7` and every section above this line stand as
+written, and no text above is edited.
+
+**What `J1` printed, and what it reads now.** `J1` declares `chart_from` in
+`config_schema/1` "as a `{:path, %{}}` field". A path field that declares
+neither `expects` nor `writes` is what `StatifierBlocks.Environment` reads
+as a write of `:unknown` (`lib/statifier_blocks/environment.ex`, `defp
+writes?/1` and `defp written_type/1`, read at `b4327d0`), so with that
+declaration `write_signatures/3` for a `chart_from` block answered
+`{"chart_from", path, :unknown}`, and a type a host declared at that path
+read as untyped for the steps after the block. The block writes nothing
+there: it reads the document id when its child starts. The field is
+therefore declared `{:path, %{expects: "string"}}`: the environment lists
+the path among the block's read signatures, expecting a string, and never
+among its write signatures (`defp field_reads/2` and `defp writes?/1`,
+same file, read at `b4327d0`). A host datamodel that types the path as
+something other than a string now meets the read check every other
+`expects` field meets.
+
+**The open item this answers.** The Amendment's "What this Amendment does
+not decide" leaves to the request that builds `J1` "whether `io/1` reports
+the `chart_from` path as a read for the typed environment". `io/1` is
+unchanged: it reports no `consumes` for a `chart_from` block. The read is
+declared on the field instead, which is where `ADR-0011` decision 2 puts
+a block's reads and writes.
+
+**What else reads the same way.** `ADR-0002`'s Note of 2026-11-19 prints
+decision 10's `core.subchart` row with `chart_from`: `{:path, %{}}`, from
+`J1`; with this change that cell reads `chart_from`:
+`{:path, %{expects: "string"}}`. That Note is not edited.
+
+**What is unchanged.** The emission: a `chart_from` block compiles to the
+bytes it compiled to before this change, and a `chart` block to the bytes
+it compiled to at `3ef9f55`. `current_version/0` stays `1`, and no stored
+config changes meaning. No published version of this package carries
+`chart_from`, so no host has met the earlier declaration. This Note carries
+no `Status:` line, which is this file's convention for a Note.
+
+Filed with `sb-1ajf`.
