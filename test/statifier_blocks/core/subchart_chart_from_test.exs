@@ -10,11 +10,33 @@ defmodule StatifierBlocks.Core.SubchartChartFromTest do
 
   use ExUnit.Case, async: true
 
-  alias StatifierBlocks.{Block, Compiler, Document, Palette}
+  alias StatifierBlocks.{Block, Compiler, Document, Environment, Palette}
   alias StatifierBlocks.Compiler.Context
   alias StatifierBlocks.Core.Subchart
 
   @setup %{"chart_from" => "onboarding.setup_document", "outcomes" => "done\nskipped"}
+
+  describe "the typed environment reads chart_from and never writes it" do
+    # sabotage: declared `chart_from` as `{:path, %{}}` again -> the path is
+    # listed among the write signatures as `:unknown`, it leaves the read
+    # signatures, and both assertions go red (verified)
+    test "the path is a read expecting a string, and no write" do
+      block = Block.new("core.subchart", id: "blk_SETUP", config: @setup)
+      document = Document.new(block, id: "bdoc_ONBOARD")
+      palette = Palette.core()
+
+      assert {"chart_from", "onboarding.setup_document", "string"} in Environment.read_signatures(
+               palette,
+               document,
+               block
+             )
+
+      refute Enum.any?(
+               Environment.write_signatures(palette, document, block),
+               fn {key, _path, _type} -> key == "chart_from" end
+             )
+    end
+  end
 
   describe "validate_config/1 (J1)" do
     # sabotage: let `child_source/1` ignore `chart_from` and fall through to

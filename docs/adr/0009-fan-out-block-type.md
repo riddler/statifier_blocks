@@ -1403,3 +1403,27 @@ this Note, fails when an identifier of the shapes it defines is added to a
 Markdown file in this directory or to an `.ex` file under `lib/`.
 
 Filed with `sb-4wh3`.
+
+## Note (2026-11-20): section 8's `child_run_creation_failed` is emitted as `child_execution_creation_failed`
+
+A dated Note rather than an amendment. It records the spelling
+`statifier_persistence` emits for the reason section 8 inherits from
+`ADR-0008` decision 5, and decides nothing. Section 8 and every section
+above this line stand as written, and no text above is edited.
+
+Section 8's table and its paragraph on a partial fan-out spell the reason
+`child_run_creation_failed`. `StatifierPersistence.Driver` emits
+`child_execution_creation_failed` (`statifier_persistence`,
+`lib/statifier_persistence/driver.ex`, the `{:start_child, %Invoke{} =
+resolved, {:invoke, %Invoke{}}}` clause, read at `46746e4`), and
+`ADR-0008`'s Note of 2026-11-20 records the same spelling for decision 5.
+Wherever section 8 writes `child_run_creation_failed`, it reads
+`child_execution_creation_failed`; what the reason means, and what the
+block does with it under `all` and under `first_error`, are unchanged.
+
+`ADR-0004`'s Amendment of 2026-11-19 adds `child_outcome_undeclared` for a
+`core.subchart` that names its child by `chart_from` only; `core.map` is
+unchanged by it (its `J7`), so section 8's set for this handler is not
+widened. This Note carries no `Status:` line.
+
+Filed with `sb-1ajf` (folding `sb-mkmc`).

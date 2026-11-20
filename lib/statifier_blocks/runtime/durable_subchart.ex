@@ -92,20 +92,28 @@ defmodule StatifierBlocks.Runtime.DurableSubchart do
 
   ## The refusal set, and which half raises which reason
 
-  ADR-0008 decision 5 closes the set at four, and the two packages satisfy
-  it jointly:
+  ADR-0008 decision 5 closes the set at four, ADR-0004's Amendment of
+  2026-11-19 (J3) adds one reason both handlers share, and the two
+  packages satisfy the set jointly:
 
   | Reason | Raised by |
   |---|---|
   | `unknown_document` | this module |
   | `child_compile_findings` | this module |
   | `cycle_refused` | this module |
-  | `child_run_creation_failed` | `StatifierPersistence.Driver`, from its own `start_child` refusals |
+  | `child_outcome_undeclared` | this module, for a `chart_from` block's child only |
+  | `child_execution_creation_failed` | `StatifierPersistence.Driver`, from its own `start_child` refusals |
 
-  The fourth is the durable-only reason, and it belongs where it is
-  raised: creating the child run happens after this module has answered,
-  inside the parent's serialized step, so this module has no way to
-  observe it and does not pretend to. Nothing here can emit a fifth.
+  `child_outcome_undeclared` is judged last, after the child has resolved
+  and compiled: a child whose root declares an outcome the block did not
+  declare is refused, so no child execution is created. A literal `chart`
+  block's child is not judged this way.
+
+  `child_execution_creation_failed` is the durable-only reason, and it
+  belongs where it is raised: creating the child execution happens after
+  this module has answered, inside the parent's serialized step, so this
+  module has no way to observe it and does not pretend to. Nothing here
+  can emit a reason outside the set.
 
   ## What is deliberately absent
 

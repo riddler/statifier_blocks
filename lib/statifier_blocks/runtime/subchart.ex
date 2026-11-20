@@ -50,8 +50,8 @@ defmodule StatifierBlocks.Runtime.Subchart do
 
       @callback palette() :: StatifierBlocks.Palette.t()
 
-  Four answers, matching the closed three-reason refusal set below plus
-  the pre-compiled convenience:
+  Four answers, matching three reasons of the closed refusal set below
+  plus the pre-compiled convenience:
 
     * `{:ok, %StatifierBlocks.Document{}}` - compiled here with
       `child_use: true` against `palette/0` and `known_invoke_types:
@@ -80,7 +80,7 @@ defmodule StatifierBlocks.Runtime.Subchart do
     2. A **return outside the four answers raises `ArgumentError`**, naming
        the offending module and the value returned. That is a host program
        defect, not an author-facing chart problem, and folding it into one
-       of the three reasons below would report a bug in the host's own code
+       of the reasons below would report a bug in the host's own code
        as a refusal of the author's chart - the same posture
        `docs/extending.md` states for the engine itself ("the library never
        rescues them"), pinned downstream by `Statifier.Testing.HandlerCase`
@@ -88,8 +88,15 @@ defmodule StatifierBlocks.Runtime.Subchart do
 
   ## The closed refusal set
 
-  Exactly three reasons, never a fourth: `"unknown_document"`,
-  `"child_compile_findings"`, `"cycle_refused"`. Every refusal is planned
+  Exactly four reasons, never a fifth: `"unknown_document"`,
+  `"child_compile_findings"`, `"cycle_refused"` and
+  `"child_outcome_undeclared"`. The fourth is judged last, and only for a
+  `chart_from` block: a child whose root declares an outcome the block did
+  not declare is refused before it is started (ADR-0004's Amendment of
+  2026-11-19, J3), with `detail` naming the document id (`"chart"`), the
+  child's outcomes outside the block's set (`"outcomes"`) and the block's
+  set (`"declared"`). A literal `chart` block's child is not judged this
+  way and starts as it always has. Every refusal is planned
   as one `{:raise, :platform, ...}` instruction carrying the reason and a
   JSON-shaped `detail` map - never an `{:error, _}` from `start/2`, which
   the engine turns into a data-less `error.execution`
@@ -135,7 +142,7 @@ defmodule StatifierBlocks.Runtime.Subchart do
 
   That variant is `StatifierBlocks.Runtime.DurableSubchart`, a **second
   module beside this one** (ADR-0008 decision 1), and nothing about this
-  one changes when a host wires it: same resolver contract, same three
+  one changes when a host wires it: same resolver contract, same four
   reasons, same `{:start_child, ...}` instruction, same purity. What the
   two share - resolving the document id and compiling the child - is
   `StatifierBlocks.Runtime.Subchart.Resolution`, one implementation used

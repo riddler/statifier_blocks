@@ -1366,3 +1366,40 @@ None reverses what the Amendment decides.
   release the fragments are assembled into a single version section and
   deleted, and the release commit `49c6b5b` did that: the same line is
   `CHANGELOG.md`'s 0.44.0 Changed entry (`:47`), and the fragment is gone.
+
+## Note (2026-11-20): the durable-only reason is emitted as `child_execution_creation_failed`
+
+A dated Note rather than an amendment. It records the spelling
+`statifier_persistence` emits for decision 5's durable-only reason, and
+decides nothing. Decision 5, its Note of 2026-09-01 and every section
+above this line stand as written, and no text above is edited.
+
+**The spelling a host matches.** Decision 5's table, its prose, and the
+Note of 2026-09-01's table and prose spell the durable-only reason
+`child_run_creation_failed`. `StatifierPersistence.Driver` emits
+`child_execution_creation_failed`: its `{:start_child, ...}` dispatch arm
+turns a `{:refused, detail}` from `start_child/3` into `{:failed, reason:
+"child_execution_creation_failed", detail: detail}`
+(`statifier_persistence`, `lib/statifier_persistence/driver.ex`, the
+`{:start_child, %Invoke{} = resolved, {:invoke, %Invoke{}}}` clause, read
+at `46746e4`). A host that matches `_event.data.reason` on an
+`error.communication.invoke` event matches that string; the older one
+never arrives. Wherever this record writes `child_run_creation_failed`, it
+reads `child_execution_creation_failed`. The reason is still raised by the
+driver alone, after this package has answered, and still means the
+creation permanently did not happen.
+
+**Where else it is corrected.** `StatifierBlocks.Runtime.DurableSubchart`'s
+moduledoc table ("The refusal set, and which half raises which reason")
+and `docs/reference/config-fields-and-handlers.md` ("The durable variant")
+spell it `child_execution_creation_failed` in the request that adds this
+Note. `ADR-0009` section 8 carries its own Note.
+
+**The set's size.** `ADR-0004`'s Amendment of 2026-11-19, `J3`, adds
+`child_outcome_undeclared` beside decision 5's four, shared by both
+handlers and judged only for a `core.subchart` that names its child by
+`chart_from`; that section is where decision 5 reads one reason longer,
+as it says. This Note changes nothing about it. This Note carries no
+`Status:` line, which is this file's convention for a Note.
+
+Filed with `sb-1ajf` (folding `sb-mkmc`).

@@ -106,13 +106,17 @@ StatifierBlocks.Runtime.Subchart.handlers(MyApp.Charts)
 ```
 
 A refusal to run the child surfaces on `error.communication.invoke` with
-one of exactly three reasons:
+one of exactly four reasons:
 
 - `unknown_document`: the resolver could not place the id.
 - `child_compile_findings`: the resolved document failed to compile as a
   child.
 - `cycle_refused`: the resolver detected a cross-document cycle that a
   single-document compile cannot see for itself.
+- `child_outcome_undeclared`: a block that names its child by `chart_from`
+  ran a child whose root declares an outcome the block does not; the child
+  is not started. A block that names its child by `chart` is never refused
+  for this.
 
 The package ships no `mod:` application callback. A host that wants
 `Statifier.Session` to run at all, subcharts or not, adds
@@ -141,7 +145,7 @@ The child runs as its own persisted execution, linked to the parent's
 execution and invocation and pinned to the child chart's identity, and its
 completion re-enters the parent through the driver's own `done.invoke` door
 after the process that started it is gone. A durable start has one refusal
-reason the in-memory handler cannot have - `child_run_creation_failed` - and
+reason the in-memory handler cannot have - `child_execution_creation_failed` - and
 the driver raises it, since creating the child execution happens after this
 package has answered. Nesting needs no extra wiring. Fan-out (one invocation,
 N children) is named by the record and not built.
