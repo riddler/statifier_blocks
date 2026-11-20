@@ -797,14 +797,45 @@
           },
           "config": {
             "type": "object",
-            "required": [
-              "chart"
+            "anyOf": [
+              {
+                "required": [
+                  "chart"
+                ],
+                "properties": {
+                  "chart": {
+                    "type": "string",
+                    "pattern": "^[^ ]+$"
+                  }
+                }
+              },
+              {
+                "required": [
+                  "chart_from"
+                ],
+                "properties": {
+                  "chart_from": {
+                    "type": "string",
+                    "pattern": "^[^ \t\n\u000b\f\r]+$"
+                  }
+                }
+              }
             ],
             "properties": {
               "chart": {
-                "description": "The document run: non-empty, no space.",
-                "type": "string",
-                "pattern": "^[^ ]+$"
+                "description": "The document run, named by its id: non-empty, no space. Either chart or chart_from names the document; the one not used may be absent, null or an empty string.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "chart_from": {
+                "description": "The datamodel path whose value, when the child starts, is the id of the document run; or null or an empty string when chart names it.",
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[^ \t\n\u000b\f\r]*$"
               },
               "outcomes": {
                 "description": "The child's outcome names, one per line, or null or an empty string for none. The line grammar is the type's own validation.",

@@ -116,7 +116,8 @@ defmodule StatifierBlocks.SchemaDriftTest do
   @sample_configs [
     {"core.branch", %{"arms" => [%{"slot" => "arm_approved", "cond" => "approved"}]}},
     {"core.parallel", %{"lanes" => ["capture", "receipt"], "complete" => "all"}},
-    {"core.subchart", %{"chart" => "card_settlement", "outcomes" => "settled\ndeclined"}}
+    {"core.subchart", %{"chart" => "card_settlement", "outcomes" => "settled\ndeclined"}},
+    {"core.subchart", %{"chart_from" => "onboarding.setup_document", "outcomes" => "done"}}
   ]
 
   # --- the drift check ----------------------------------------------------------
