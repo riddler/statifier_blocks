@@ -490,7 +490,7 @@ Filed with `sb-tysd`.
 
 ## Amendment (2026-11-20): decision 4, the reserved back event `statifier_blocks.back` stands outside the `accepts` declaration - `4a`
 
-**Status: proposed (2026-11-20, bead `sb-ydms`).** A decision record merges
+**Status: accepted (2026-11-20, bead `sb-ydms`).** A decision record merges
 at proposed and is flipped to accepted by a separate request through the
 same `docs/adr/` gate once the Back code it reads beside (`ADR-0004`'s
 Amendment of 2026-11-20) has shipped in a published version. Additive: no
@@ -654,3 +654,50 @@ of `ADR-0004`'s Amendment's worked example, under a `core.sequence` root
   declares it takes decision 4's answer for a declared name.
 
 Filed with `sb-ydms`.
+
+## Note (2026-11-20): the Amendment of 2026-11-20, `4a`, is flipped to accepted
+
+A dated Note rather than an amendment: it carries no `Status:` line, decides
+nothing, and edits no clause. The only line this request changes above it is
+the Amendment's own Status line (`:493`), by one word, `proposed` to
+`accepted`. Everything else is this Note, at the foot of the file. The head
+`Status:` line at `:3` is not extended.
+
+The Amendment's status paragraph names the condition for its flip: the Back
+code it reads beside, `ADR-0004`'s Amendment of 2026-11-20, shipped in a
+published version. It shipped in statifier_blocks 0.46.0, published on Hex
+on 2026-11-20 from the `v0.46.0` tag at `5858bd3` by the release run
+https://github.com/riddler/statifier_blocks/actions/runs/44781747998, and
+that Amendment is flipped to accepted in the same request. Every claim `4a`
+makes was checked against `main` at `5858bd3`. The Amendment merged in
+`405543f`; after it, `lib/statifier_blocks/runtime/back.ex` was added by
+`7a18fb3`, and `lib/statifier_blocks/compiler/trail.ex`, `mix.exs`'s
+`defp statifier_dep/0` and `mix.lock` are unchanged but for the release's
+version bump.
+
+### Each claim, and where it reads today
+
+| Claim | Read at `5858bd3` |
+|---|---|
+| The Context's cites, read at `b71247e` | `@back` (`lib/statifier_blocks/compiler/trail.ex:138`), `defp scope_back/2` (`:486`) and `defp step_back/3` (`:495`) are at the lines printed, unchanged |
+| The engine's two functions | on statifier-ex, `Statifier.Chart.check_accepts/2` is in the `v2.7.0` tag and not in `v2.6.1`, so "the engine's from statifier 2.7.0 on" holds; at `76742af` its documentation says it "reports and refuses nothing". This package's requirement is `~> 2.2` (`defp statifier_dep/0`) and `mix.lock` resolves `statifier` 2.5.0 |
+| `4a`'s four bullets and its table | they read the engine's answer and decide what a host does with it; no code in this package runs an accepts check, and nothing in `lib/` treats `statifier_blocks.back` other than `ADR-0004`'s Amendment's emission |
+| "What this Amendment does not decide", the router | statifier_router's `defp judge/3` (`lib/statifier_router/contracts.ex:501`, read at `150d62b`) is where the Amendment names it |
+| Consequences, no changed compile | `CHANGELOG.md` 0.46.0 names no change for this clause; the compile ratchet (`test/statifier_blocks/compiler/compile_ratchet_test.exs`) pins the bytes of documents with no returnable step |
+
+### Sentences that name their own status
+
+They are met here, not edited.
+
+- The Amendment's status paragraph says it "merges at proposed and is
+  flipped to accepted by a separate request through the same `docs/adr/`
+  gate once the Back code it reads beside ... has shipped in a published
+  version". This is that request, and 0.46.0 is that version.
+
+### Sentences that no longer hold as written
+
+None. "How a host learns, for one execution, whether Back is offered" stays
+outside this record; 0.46.0 also ships
+`StatifierBlocks.Runtime.Back.offered?/3`
+(`lib/statifier_blocks/runtime/back.ex:99`) for it, and it reads no
+`accepts` list.
