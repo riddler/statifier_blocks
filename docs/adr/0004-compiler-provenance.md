@@ -5489,6 +5489,15 @@ and does nothing: it has no target, so no state is exited or entered, and
 it carries no assignment, so the trail is unchanged. A chart with no trail
 root has no transition on `statifier_blocks.back` at all.
 
+A finished scope is this case too. A scope state can stay active after its
+work is done: the root block's state holds its outcome `<final>` when the
+document is compiled without `terminate` (the root-termination Note of
+2026-08-29), and a lane's region holds its `<final>` while another lane is
+still running. `L6` clears the trail on entering any `<final>` that is a
+child of the scope state, so a finished document or a finished lane holds
+an empty trail and offers no Back: the event takes no transition, and
+nothing that scope finished is re-entered.
+
 ### L6. The boundaries that clear the trail
 
 A clear is `<assign location="T" expr="[]"/>`. The compiler emits one only
@@ -5502,9 +5511,13 @@ into a scope whose trail root `L1` declares:
 | a loop iteration | the body state's `<onentry>`, on every pass | the body's |
 | a parallel: `core.parallel` | its state's `<onentry>` and `<onexit>` | its scope's |
 | a parallel lane | the lane region's `<onentry>` | the lane's |
+| the scope reaches its own final: a `<final>` child of the scope state (the root block's outcome finals, a lane's `<final>`, a loop body's `<final>`) | that `<final>`'s `<onentry>` | that scope's |
 
 So no Back crosses a boundary: a step on one side has no entry on the other
-side's trail. A sub-path's child keeps its trail in its own datamodel,
+side's trail, and no Back re-enters a scope that has finished (`L5`). A
+`<final>` at the top level of the chart, which C1 and the `terminate`
+option emit, ends the execution, so nothing is left to send Back to and it
+carries no clear. A sub-path's child keeps its trail in its own datamodel,
 which starts empty. `core.checkpoint` compiles to `D5`'s shape, a state
 whose `<final>` is reached on entry, plus its clear when its scope has a
 trail; a checkpoint in a scope with no returnable step emits that shape
@@ -5543,7 +5556,9 @@ document using an instance that answers `true` (`C12e`).
   `core.foreach` block or the `core.parallel` block. A push belongs to its
   returnable step. A transition of `L4`'s first family belongs to the step
   it targets, and one of the second family to the step whose state carries
-  it. A clear belongs to the boundary block whose state carries it. None
+  it. A clear belongs to the boundary block whose state carries it, and a
+  clear on a scope's own `<final>` to the block that owns the scope state,
+  as that scope's trail root does. None
   carries a config key; the role they are recorded under is a spelling
   `StateId.role?/1` rejects, as the `:declare` Note's is, named by the
   request that builds them.
@@ -5603,7 +5618,10 @@ A patron's way through it:
 The trail column writes `[CARD, NAME]` for
 `['s_blk_CARD', ['s_blk_NAME', []]]`. Once `blk_ISSUE` has issued the card
 and `blk_CHECK` has cleared the trail, nothing before the checkpoint can be
-returned to.
+returned to. When `blk_RULES` completes, the root's outcome `<final>`,
+`s_blk_ROOT__o_done`, is entered and its `<onentry>` clears the trail too,
+so Back sent to the finished registration takes no transition and
+`blk_PICKUP` is not re-entered.
 
 ### What this Amendment does not decide
 
