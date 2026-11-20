@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "doc_branch_onboarding",
+  "revision": 1,
+  "metadata": {"name": "Branch library onboarding"},
+  "accepts": ["onboarding.setup_reviewed"],
+  "datamodel": [
+    {"id": "onboarding", "description": "The branch's onboarding: setup_document holds the id of the next setup to run."}
+  ],
+  "root": {
+    "id": "blk_ROOT", "type": "core.sequence", "type_version": 1,
+    "slots": {"body": [
+      {"id": "blk_SETUP", "type": "core.subchart", "type_version": 1,
+       "config": {"chart_from": "onboarding.setup_document",
+                  "outcomes": "done\nskipped\nneeds_site_visit"},
+       "slots": {
+         "on_needs_site_visit": [
+           {"id": "blk_VISIT", "type": "core.send", "type_version": 2,
+            "config": {"event": "onboarding.site_visit_requested"}}
+         ],
+         "on_error": [
+           {"id": "blk_REFUSED", "type": "core.await", "type_version": 1,
+            "config": {"event": "onboarding.setup_reviewed"}}
+         ]
+       }}
+    ]}
+  }
+}

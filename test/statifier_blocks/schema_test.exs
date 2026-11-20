@@ -2,6 +2,7 @@ defmodule StatifierBlocks.SchemaTest do
   use ExUnit.Case, async: true
 
   alias StatifierBlocks.{Block, ByteCorpus, Document, DocumentGenerator, Palette, Schema}
+  alias StatifierBlocks.Core.Subchart
 
   doctest StatifierBlocks.Schema
 
@@ -339,6 +340,62 @@ defmodule StatifierBlocks.SchemaTest do
       Document.new(%Block{id: "blk_A", type: "core.sequence", type_version: 1})
 
     assert root_map()["$id"] == "urn:statifier-blocks:block-document:#{version}"
+  end
+
+  # core.subchart names its child by chart or by chart_from (ADR-0004's
+  # Amendment of 2026-11-19, J1). The definition admits either, keeps the
+  # literal form's rule on chart, and refuses a config naming neither.
+  describe "the core.subchart definition and chart_from" do
+    defp subchart(config) do
+      %{"id" => "blk_SETUP", "type" => "core.subchart", "type_version" => 1, "config" => config}
+    end
+
+    # Sabotage: left "chart" in the definition's required list -> the
+    # chart_from configs are refused and this goes red.
+    test "a chart_from block validates, whatever the unused chart holds" do
+      schema = definition_schema("core.subchart")
+
+      for config <- [
+            %{"chart_from" => "onboarding.setup_document"},
+            %{"chart_from" => "onboarding.setup_document", "chart" => ""},
+            %{"chart_from" => "onboarding.setup_document", "chart" => nil},
+            %{"chart_from" => "next", "outcomes" => "done\nskipped"}
+          ] do
+        assert Subchart.validate_config(config) == :ok
+        assert validate(schema, subchart(config)) == :ok, inspect(config)
+      end
+    end
+
+    test "a chart block validates as it did, an empty or null chart_from beside it" do
+      schema = definition_schema("core.subchart")
+
+      for config <- [
+            %{"chart" => "bdoc_CATALOGUE_SYNC"},
+            %{"chart" => "bdoc_CATALOGUE_SYNC", "chart_from" => ""},
+            %{"chart" => "bdoc_CATALOGUE_SYNC", "chart_from" => nil}
+          ] do
+        assert Subchart.validate_config(config) == :ok
+        assert validate(schema, subchart(config)) == :ok, inspect(config)
+      end
+    end
+
+    # Sabotage: dropped the definition's anyOf -> a config naming neither
+    # validates and this goes red.
+    test "a config naming neither, or naming one badly, is refused by both" do
+      schema = definition_schema("core.subchart")
+
+      for config <- [
+            %{},
+            %{"chart" => "", "chart_from" => ""},
+            %{"chart" => nil},
+            %{"chart" => "bdoc CATALOGUE"},
+            %{"chart_from" => "onboarding setup"},
+            %{"chart_from" => "\t"}
+          ] do
+        assert {:error, _findings} = Subchart.validate_config(config)
+        assert match?({:error, _errors}, validate(schema, subchart(config))), inspect(config)
+      end
+    end
   end
 
   # Schema's moduledoc claims a core definition is never stricter than its

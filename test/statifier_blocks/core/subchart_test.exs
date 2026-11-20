@@ -84,7 +84,8 @@ defmodule StatifierBlocks.Core.SubchartTest do
     # is filtered out of `block_findings/5`, and this goes red (verified).
     test "the claim reads back through BlockType.datamodel_path?/1" do
       for field <- Subchart.config_schema(@eligibility) do
-        assert StatifierBlocks.BlockType.datamodel_path?(field) == (field.key == "assign_to")
+        assert StatifierBlocks.BlockType.datamodel_path?(field) ==
+                 field.key in ["chart_from", "assign_to"]
       end
     end
 

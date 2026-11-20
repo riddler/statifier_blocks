@@ -135,6 +135,69 @@ defmodule StatifierBlocks.Core.SubchartChartFromTest do
     end
   end
 
+  describe "config_schema/1 (J1)" do
+    # sabotage: dropped the chart_from declaration from `config_schema/1` ->
+    # the keys read chart, outcomes, assign_to, params and this goes red
+    test "lists chart_from after chart, as a path field, for every config" do
+      for config <- [%{}, @setup, %{"chart" => "bdoc_CATALOGUE_SYNC"}] do
+        fields = Subchart.config_schema(config)
+
+        assert Enum.map(fields, & &1.key) == [
+                 "chart",
+                 "chart_from",
+                 "outcomes",
+                 "assign_to",
+                 "params"
+               ]
+
+        assert %{type: {:path, %{}}, default: ""} = Enum.find(fields, &(&1.key == "chart_from"))
+      end
+    end
+
+    # sabotage: restored `required?: true` on chart -> this goes red
+    test "neither chart nor chart_from is required; validate_config/1 owns the one-of rule" do
+      fields = Subchart.config_schema(%{})
+
+      assert %{required?: false} = Enum.find(fields, &(&1.key == "chart"))
+      assert %{required?: false} = Enum.find(fields, &(&1.key == "chart_from"))
+    end
+
+    test "a fresh block carries both keys empty, and validate_config/1 asks for one" do
+      {:ok, block} = Palette.new_block(Palette.core(), "core.subchart")
+
+      assert %{"chart" => "", "chart_from" => ""} = block.config
+
+      assert {:error, [{"chart", _names_the_document}]} =
+               Subchart.validate_config(block.config)
+    end
+  end
+
+  describe "sentence/1" do
+    # sabotage: had `sentence/1` read chart only -> a chart_from block reads
+    # "Run a chart and wait" and this goes red
+    test "a chart_from block names the path its child is read from" do
+      assert Subchart.sentence(@setup) ==
+               "Run the chart named at onboarding.setup_document and wait"
+
+      assert Subchart.sentence(%{"chart" => "", "chart_from" => " onboarding.next "}) ==
+               "Run the chart named at onboarding.next and wait"
+    end
+
+    # sabotage: let chart_from win over a non-empty chart -> the literal
+    # line changes for a config carrying both and this goes red
+    test "a chart block reads as before, and a chart holding a value wins" do
+      assert Subchart.sentence(%{"chart" => "bdoc_CATALOGUE_SYNC", "chart_from" => ""}) ==
+               "Run bdoc_CATALOGUE_SYNC and wait"
+
+      assert Subchart.sentence(%{"chart" => "bdoc_CATALOGUE_SYNC", "chart_from" => "a.b"}) ==
+               "Run bdoc_CATALOGUE_SYNC and wait"
+
+      for config <- [%{"chart" => " ", "chart_from" => ""}, %{"chart_from" => 42}] do
+        assert Subchart.sentence(config) == "Run a chart and wait"
+      end
+    end
+  end
+
   defp compile!(config) do
     document =
       Document.new(Block.new("core.subchart", id: "blk_SETUP", config: config),

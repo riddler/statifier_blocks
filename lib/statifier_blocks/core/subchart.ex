@@ -217,6 +217,29 @@ defmodule StatifierBlocks.Core.Subchart do
   as a read for the typed environment, the same reading the block already
   gives its `params` paths, and its value is a document id rather than a
   datum the chart computes with.
+
+  ### How the form offers the two keys
+
+  `config_schema/1` lists `chart_from` after `chart`, as a `{:path, %{}}`
+  field, for every config, and neither is `required?`: the rule that
+  exactly one of them holds a value is `validate_config/1`'s, and it is
+  the rule the form keeps. The form draws both, `chart_from` labelled as
+  the alternative to `chart`, so the author can name the child either
+  way; a form that posts a value in both is refused with the one finding
+  on `chart_from`, so the editor never writes a document holding both. Both stay drawn
+  while one holds a value because an edit that empties the other key is
+  refused while the block names no child at all, and the form is drawn
+  from the document's config, not from a refused draft: a field drawn
+  only when the other key is empty could never be reached from a block
+  that already names its child, and switching from one key to the other
+  is two edits on the same form. Being a path field, `chart_from` is
+  offered the declared datamodel paths as candidates and draws the
+  undeclared-path advisory, as `assign_to` does; the host's
+  `chart_outcomes` candidates stay keyed on `chart`, because a path names
+  no document until it is read. A `{:path, %{}}` field that declares
+  neither `expects` nor `writes` is also what `StatifierBlocks.Environment`
+  reads as a write that leaves the path untyped, so a `chart_from` path is
+  listed among the block's write signatures with the type `:unknown`.
   """
 
   @behaviour StatifierBlocks.BlockType
@@ -298,7 +321,14 @@ defmodule StatifierBlocks.Core.Subchart do
         key: "chart",
         type: :string,
         label: "Run this chart",
-        required?: true,
+        required?: false,
+        default: ""
+      },
+      %{
+        key: "chart_from",
+        type: {:path, %{}},
+        label: "Or run the chart whose id is at",
+        required?: false,
         default: ""
       },
       %{
@@ -398,25 +428,46 @@ defmodule StatifierBlocks.Core.Subchart do
   store, and a line that paraphrases it names nothing the author can look
   up.
 
+  A block that names its child by `chart_from` names the path instead,
+  as the author wrote it: the id is not known until the path is read, so
+  the line says where it will be read from. A block naming its child by
+  `chart` reads exactly as it did before `chart_from` existed, and a
+  `chart` that holds a value wins, so a config carrying both - which
+  `validate_config/1` refuses - still reads as one chart rather than two.
+
   A block with no chart named yet says what it is and stops.
 
       iex> StatifierBlocks.Core.Subchart.sentence(%{"chart" => "signup.identity"})
       "Run signup.identity and wait"
+
+      iex> StatifierBlocks.Core.Subchart.sentence(%{"chart_from" => "onboarding.setup_document"})
+      "Run the chart named at onboarding.setup_document and wait"
 
       iex> StatifierBlocks.Core.Subchart.sentence(%{})
       "Run a chart and wait"
   """
   @impl true
   def sentence(config) do
-    case Map.get(config, "chart") do
-      chart when is_binary(chart) ->
-        case String.trim(chart) do
-          "" -> "Run a chart and wait"
-          trimmed -> "Run " <> trimmed <> " and wait"
+    case {named(config, "chart"), named(config, "chart_from")} do
+      {chart, _path} when is_binary(chart) -> "Run " <> chart <> " and wait"
+      {nil, path} when is_binary(path) -> "Run the chart named at " <> path <> " and wait"
+      {nil, nil} -> "Run a chart and wait"
+    end
+  end
+
+  # The trimmed value of `key` when it is a string with something in it,
+  # else `nil`: absent, empty, blank and malformed read alike.
+  @spec named(Block.config(), String.t()) :: String.t() | nil
+  defp named(config, key) do
+    case Map.get(config, key) do
+      value when is_binary(value) ->
+        case String.trim(value) do
+          "" -> nil
+          trimmed -> trimmed
         end
 
       _absent_or_malformed ->
-        "Run a chart and wait"
+        nil
     end
   end
 

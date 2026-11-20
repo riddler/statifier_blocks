@@ -110,6 +110,7 @@ walks the same path with a branch, a declared datamodel and the provenance map.
   - [How to register your own block types](docs/guides/register-block-types.md) - write a block type, declare one from a base or a subtree, and build a palette from your own types beside the core vocabulary
   - [How to type a palette](docs/typing-a-palette.md) - declare what each block type reads and writes at a datamodel path, and check a document against the records and shapes your host declares
   - [How to build common flow patterns](docs/guides/flow-patterns.md) - build the shapes a workflow commonly needs out of the core block types, starting with a step that must finish within a bound
+  - [How to choose a sub-path at run time](docs/guides/choose-a-sub-path-at-run-time.md) - let a document read which child document to run from its datamodel, and make your resolver the allow-list of the documents it may run
   - [How to publish a document](docs/guides/publish-a-document.md) - call the checks a publish step runs, in order, and decide on each finding by its severity
   - [How to write a host advisory finding](docs/host-validators.md) - put one of your own rules on the author's screen as a warning, without stopping the document from compiling
   - [How to validate a document against the schema from any language](docs/guides/validate-a-document-against-the-schema.md) - hand the JSON Schema to a service in another language and check a stored document against it
