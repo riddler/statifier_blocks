@@ -4,6 +4,11 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
   variants: turning the document id on `src` into a compiled child chart,
   or into one of the three shared refusal reasons.
 
+  `src` is the literal id a `chart` block emits, or the value a
+  `chart_from` block's `srcexpr` evaluated to when the invocation started;
+  both reach `resolve/3` the same way, and only a string is handed to the
+  host's resolver.
+
   ADR-0008 decision 2 says the resolver contract is the durable module's
   too, "in full and without additions", and that resolution is therefore
   "shared code, not a second copy". This module is that shared code.
@@ -40,6 +45,7 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
   alias Statifier.Effect.Invoke
   alias StatifierBlocks.{Compiled, Compiler, Document}
   alias StatifierBlocks.Compiler.Finding
+  alias StatifierBlocks.Core.Subchart
 
   @typedoc "The reason a start refused, always one of the closed refusal set."
   @type reason :: String.t()
@@ -56,10 +62,12 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
   `StatifierPersistence.Driver` dispatch context in the durable one.
   """
   @spec resolve(Invoke.t(), map(), module()) :: t()
-  # The non-binary-`src` totality rule: `core.subchart` only ever emits a
-  # literal document id, so a chart arriving with anything else (nil, or a
-  # `srcexpr` result) did not come from this package. Refused directly,
-  # without ever calling the resolver.
+  # The non-binary-`src` totality rule: a `chart` block's `src` is always a
+  # string, and a `chart_from` block's is whatever its path evaluated to
+  # (ADR-0004's Amendment of 2026-11-19, J5 and J6). A string, from either,
+  # goes to the host's resolver, which alone decides which ids resolve; any
+  # other value (nil, `:undefined`, a number, a map) names no document and
+  # is refused directly, its value inspected, without the resolver called.
   def resolve(%Invoke{src: src}, _ctx, _host) when not is_binary(src) do
     {:refuse, "unknown_document", %{"chart" => inspect(src)}}
   end
@@ -82,6 +90,32 @@ defmodule StatifierBlocks.Runtime.Subchart.Resolution do
         raise_non_conforming(host, other)
     end
   end
+
+  @doc false
+  # The payload a handler hands on in `{:start_child, ...}`: the resolved
+  # chart as its content, and its params without the reserved outcomes
+  # param a `chart_from` block carries (ADR-0004's Amendment of 2026-11-19,
+  # J2), so the carrier never reaches the child's datamodel. A literal
+  # `chart` block carries no such param, so its params pass unchanged.
+  @spec child_invoke(Invoke.t(), String.t()) :: Invoke.t()
+  def child_invoke(%Invoke{params: params} = invoke, scxml) do
+    %{invoke | content: scxml, params: without_carrier(params)}
+  end
+
+  # The engine hands `<param>` values on as a map keyed by name, and as
+  # `:undefined` when the element had none (`Statifier.EventData`'s params
+  # rung). A map the carrier was the only entry of is answered as
+  # `:undefined`, the shape a block with no params at all produces, so the
+  # child sees exactly what it would have seen had no carrier been emitted.
+  @spec without_carrier(term()) :: term()
+  defp without_carrier(params) when is_map(params) do
+    case Map.delete(params, Subchart.outcomes_param()) do
+      remaining when remaining == %{} and map_size(params) > 0 -> :undefined
+      remaining -> remaining
+    end
+  end
+
+  defp without_carrier(params), do: params
 
   @spec compile_child(Document.t(), map(), module(), String.t()) :: t()
   defp compile_child(document, ctx, host, src) do

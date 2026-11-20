@@ -3305,9 +3305,13 @@ defmodule StatifierBlocks.Compiler do
     own ++ children
   end
 
+  # A `core.subchart` that names its child by `chart_from` leaves `chart`
+  # empty or absent, and a path is not a document id, so it records no
+  # reference (ADR-0004's Amendment of 2026-11-19, J5): the empty-string
+  # guard is what keeps it on the fallback clause below.
   @spec reference(module(), Block.t(), declarations()) :: [Compiled.child_reference()]
   defp reference(Subchart, %Block{id: id, config: %{"chart" => chart} = config}, _declarations)
-       when is_binary(chart) do
+       when is_binary(chart) and chart != "" do
     [
       %{
         block_id: id,

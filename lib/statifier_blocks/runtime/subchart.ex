@@ -71,11 +71,12 @@ defmodule StatifierBlocks.Runtime.Subchart do
 
   ## Two things outside the four answers, decided here
 
-    1. A **non-binary `src`** (`nil`, or whatever a `srcexpr` resolves to)
-       never reaches `resolve_chart/2` at all: it refuses `unknown_document`
-       directly, with `detail` carrying the offending value inspected.
-       `core.subchart` only ever emits a literal document id, so a chart
-       arriving with anything else did not come from this package.
+    1. A **non-binary `src`** (`nil`, or a `chart_from` block's `srcexpr`
+       that evaluated to something other than a string) never reaches
+       `resolve_chart/2` at all: it refuses `unknown_document` directly,
+       with `detail` carrying the offending value inspected. A string
+       reaches it whichever key named the child, and the host's answer is
+       the whole of the decision on which ids resolve.
     2. A **return outside the four answers raises `ArgumentError`**, naming
        the offending module and the value returned. That is a host program
        defect, not an author-facing chart problem, and folding it into one
@@ -104,6 +105,14 @@ defmodule StatifierBlocks.Runtime.Subchart do
   attempt, and the engine's own failure event
   (`Statifier.Invoke.Answer.failed/4`) already reads an absent one as
   `:undefined`.
+
+  ## The outcomes carrier is removed before the child starts
+
+  A `chart_from` block's `<invoke>` carries the reserved
+  `statifier_blocks:outcomes` param after the author's own (ADR-0004's
+  Amendment of 2026-11-19, J2). The `{:start_child, ...}` payload this
+  handler plans has it removed, so it never reaches the child's datamodel;
+  the origin it is tagged with is the invocation as the engine produced it.
 
   ## Why `perform/2` is absent
 
@@ -195,8 +204,11 @@ defmodule StatifierBlocks.Runtime.Subchart do
   @spec start(Invoke.t(), Handler.ctx(), module()) :: {:ok, [Handler.instruction()]}
   def start(%Invoke{} = invoke, ctx, host) do
     case Resolution.resolve(invoke, ctx, host) do
-      {:ok, scxml} -> {:ok, [{:start_child, %{invoke | content: scxml}, {:invoke, invoke}}]}
-      {:refuse, reason, detail} -> {:ok, [refusal(invoke, reason, detail)]}
+      {:ok, scxml} ->
+        {:ok, [{:start_child, Resolution.child_invoke(invoke, scxml), {:invoke, invoke}}]}
+
+      {:refuse, reason, detail} ->
+        {:ok, [refusal(invoke, reason, detail)]}
     end
   end
 
