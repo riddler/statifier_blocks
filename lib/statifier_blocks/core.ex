@@ -28,6 +28,7 @@ defmodule StatifierBlocks.Core do
   | `core.map` | `#{inspect(__MODULE__)}.Map` | `on_done`, `on_error` |
   | `core.drafts` | `#{inspect(__MODULE__)}.Drafts` | `body` |
   | `core.placeholder` | `#{inspect(__MODULE__)}.Placeholder` | none |
+  | `core.checkpoint` | `#{inspect(__MODULE__)}.Checkpoint` | none |
 
   ## Structure, not domain
 
@@ -44,13 +45,16 @@ defmodule StatifierBlocks.Core do
   type declares `consumes` at all - inbound type is the host's business,
   and ADR-0003 decision 5's permissive default is the honest answer.
 
-  `core.placeholder` is the one type that declares no `io/1` at all, and
-  ADR-0003's amendment of 2026-08-31, section A3, is why: a gap goes
-  wherever a step goes and constrains neither neighbour, so decision 5's
-  permissive default taken in full - `kinds: [:step]`, `consumes` and
-  `produces` both `:unknown` - is the honest answer, and declaring anything
-  narrower would be this package deciding what an author's unwritten step
-  was going to do.
+  `core.placeholder` and `core.checkpoint` are the two types that declare
+  no `io/1` of their own. For `core.placeholder`, ADR-0003's amendment of
+  2026-08-31, section A3, is why: a gap goes wherever a step goes and
+  constrains neither neighbour, so decision 5's permissive default taken in
+  full - `kinds: [:step]`, `consumes` and `produces` both `:unknown` - is
+  the honest answer, and declaring anything narrower would be this package
+  deciding what an author's unwritten step was going to do. For
+  `core.checkpoint`, ADR-0002's Amendment of 2026-11-20, `C12d`, is why: it
+  reads and writes nothing an author declares, so every slot that admits an
+  unconstrained block admits it.
 
   `produces` is declared by six of the core types. `core.sequence` declares
   `{:passthrough, "body"}`: it is transparent to type flow, so whatever its

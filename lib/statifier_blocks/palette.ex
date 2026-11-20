@@ -90,10 +90,10 @@ defmodule StatifierBlocks.Palette do
       renumbered to open a hole in the middle, because an author picks a
       block by where it sits and a renumber moves every entry below it.
     * **A group is dense, and that is a consequence, not a rule.** The core
-      `"Structure"` group runs 0 through 17 with no gap: the seventeen
-      `core_types/0` entries and the `"deadline"` recipe, which took 17 as
-      the last one added. There is no free interior number, so the next
-      core entry takes 18.
+      `"Structure"` group runs 0 through 18 with no gap: the eighteen
+      `core_types/0` entries and the `"deadline"` recipe, which took 17,
+      with `core.checkpoint` at 18 as the last one added. There is no free
+      interior number, so the next core entry takes 19.
     * **A host merging into a core group numbers above the core's last.**
       `new(Map.merge(core_types(), %{...}))` puts a host's entry into the
       same `"Structure"` group, where the core numbers are already taken;
@@ -253,7 +253,8 @@ defmodule StatifierBlocks.Palette do
       "core.foreach" => Core.Foreach,
       "core.map" => Core.Map,
       "core.drafts" => Core.Drafts,
-      "core.placeholder" => Core.Placeholder
+      "core.placeholder" => Core.Placeholder,
+      "core.checkpoint" => Core.Checkpoint
     }
   end
 

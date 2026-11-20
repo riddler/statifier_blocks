@@ -49,8 +49,9 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
     # `core.invoke` is in neither document: both examples spell their host
     # call as a `myapp.*` type, which is what ADR-0002 decision 2 two-registry
     # seam looks like from the authoring side. `core.raise` and `core.assign`
-    # are leaves neither example uses yet. All three are named here rather
-    # than dropped from the comparison, so a core type falling out of the
+    # are leaves neither example uses yet, and so is `core.checkpoint`, since
+    # neither example has a returnable step for it to stop Back at. All are
+    # named here rather than dropped from the comparison, so a core type falling out of the
     # worked examples has to be admitted deliberately, and the list shrinks
     # the day an example that uses one of them lands.
     # `core.drafts` and `core.placeholder` are uncovered on different terms
@@ -64,6 +65,7 @@ defmodule StatifierBlocks.Core.SignupWizardTest do
       MapSet.new([
         "core.assign",
         "core.await",
+        "core.checkpoint",
         "core.drafts",
         "core.foreach",
         "core.invoke",

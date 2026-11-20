@@ -13,7 +13,7 @@ defmodule StatifierBlocks.Compiler.TrailTest do
 
   alias StatifierBlocks.{Block, Compiler, Document, Palette, Provenance}
   alias StatifierBlocks.Compiler.{Context, Trail}
-  alias StatifierBlocks.Core.Emit
+  alias StatifierBlocks.Core.{Checkpoint, Emit}
   alias StatifierBlocks.Emission
 
   doctest StatifierBlocks.Compiler.Trail
@@ -560,6 +560,208 @@ defmodule StatifierBlocks.Compiler.TrailTest do
     end
   end
 
+  describe "the checkpoint clears its scope's trail (L6)" do
+    # sabotage: left `Checkpoint` out of `@entry_boundaries` -> the
+    # checkpoint state carried no clear and this went red (verified)
+    test "its state's entry opens with the clear, and its exit carries none" do
+      scxml = compile!(checkpointed()).scxml
+
+      assert scxml =~
+               ~s(<state id="s_blk_CHECK" initial="s_blk_CHECK__o_done"><onentry>) <>
+                 ~s(<assign expr="[]" location="s_blk_ROOT__trail"/></onentry>) <>
+                 ~s(<final id="s_blk_CHECK__o_done"><onentry><raise event="done.outcome.s_blk_CHECK.done"/></onentry></final></state>)
+    end
+
+    # sabotage: gave `Checkpoint` the sides `[:entry, :exit]` in
+    # `collect/3` -> an `<onexit>` clear appeared and this went red
+    # (verified)
+    test "it clears on entry only" do
+      [checkpoint] =
+        Regex.run(~r{<state id="s_blk_CHECK".*?</state>}, compile!(checkpointed()).scxml)
+
+      refute checkpoint =~ "<onexit>"
+    end
+
+    # sabotage: left `Checkpoint` out of `@entry_boundaries` -> Back at the
+    # step after the checkpoint re-entered blk_CARD and this went red
+    # (verified)
+    test "once it is passed, no step before it can be returned to" do
+      state = start(checkpointed())
+      state = state |> deliver("step.submitted") |> deliver("step.submitted")
+      assert trail(state) == ["s_blk_CARD", ["s_blk_NAME", []]]
+
+      state = deliver(state, "step.submitted")
+      assert leaves(state) == ["s_blk_PICKUP__waiting"]
+      assert trail(state) == ["s_blk_PICKUP", []]
+
+      state = deliver(state, "statifier_blocks.back")
+
+      assert leaves(state) == ["s_blk_PICKUP__waiting"]
+      assert trail(state) == ["s_blk_PICKUP", []]
+
+      # and the step after the pickup still goes back to it
+      state = state |> deliver("step.submitted") |> deliver("statifier_blocks.back")
+      assert leaves(state) == ["s_blk_PICKUP__waiting"]
+    end
+
+    # sabotage: recorded the checkpoint's boundary under the root block's
+    # scope, "s_blk_ROOT", in `collect/3` -> its clear named the
+    # document's trail and this went red (verified)
+    test "inside a loop body it clears the body's trail, not the document's" do
+      check = Block.new("core.checkpoint", id: "blk_CHECK")
+      step = &Block.new("library.collect", id: &1)
+
+      root =
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [
+              step.("blk_BEFORE"),
+              Block.new("core.foreach",
+                id: "blk_F",
+                config: %{"items" => "patrons", "item_as" => "patron"},
+                slots: %{"body" => [step.("blk_B1"), check, step.("blk_B2")]}
+              )
+            ]
+          }
+        )
+
+      scxml = compile!(root, patrons("['ada']")).scxml
+
+      assert scxml =~
+               ~s(<state id="s_blk_CHECK" initial="s_blk_CHECK__o_done"><onentry>) <>
+                 ~s(<assign expr="[]" location="s_blk_F__body__trail"/></onentry>)
+
+      state = start(root, patrons("['ada']"))
+      state = state |> deliver("step.submitted") |> deliver("step.submitted")
+      assert leaves(state) == ["s_blk_B2__waiting"]
+      assert body_trail(state) == ["s_blk_B2", []]
+
+      state = deliver(state, "statifier_blocks.back")
+      assert leaves(state) == ["s_blk_B2__waiting"]
+    end
+
+    # sabotage: recorded the checkpoint's boundary under the root block's
+    # scope, "s_blk_P", in `collect/3` -> no lane trail was cleared and
+    # this went red (verified)
+    test "inside a parallel lane it clears that lane's trail only" do
+      lane = fn id, event ->
+        Block.new("library.counted", id: id, config: %{"event" => event})
+      end
+
+      root =
+        Block.new("core.parallel",
+          id: "blk_P",
+          config: %{"lanes" => ["sender", "recipient"]},
+          slots: %{
+            "lane_sender" => [Block.new("core.checkpoint", id: "blk_CHECK")],
+            "lane_recipient" => [lane.("blk_RECV", "recv.submitted")]
+          }
+        )
+
+      scxml = compile!(root, counted()).scxml
+
+      refute scxml =~ "s_blk_P__lane_sender__trail"
+
+      assert scxml =~
+               ~s(<state id="s_blk_CHECK" initial="s_blk_CHECK__o_done">) <>
+                 ~s(<final id="s_blk_CHECK__o_done">)
+
+      sender_steps =
+        Block.new("core.parallel",
+          id: "blk_P",
+          config: %{"lanes" => ["sender", "recipient"]},
+          slots: %{
+            "lane_sender" => [
+              lane.("blk_SEND", "send.submitted"),
+              Block.new("core.checkpoint", id: "blk_CHECK")
+            ],
+            "lane_recipient" => [lane.("blk_RECV", "recv.submitted")]
+          }
+        )
+
+      scxml = compile!(sender_steps, counted()).scxml
+
+      assert scxml =~
+               ~s(<state id="s_blk_CHECK" initial="s_blk_CHECK__o_done"><onentry>) <>
+                 ~s(<assign expr="[]" location="s_blk_P__lane_sender__trail"/></onentry>)
+
+      refute scxml =~
+               ~s(location="s_blk_P__lane_recipient__trail"/></onentry><final id="s_blk_CHECK)
+    end
+
+    # sabotage: matched the checkpoint by its type name rather than its
+    # module in `collect/3` -> the renamed entry carried no clear and this
+    # went red (verified)
+    test "a host's other name for the checkpoint module clears as well" do
+      palette =
+        Palette.new(
+          palette().types
+          |> Map.delete("core.checkpoint")
+          |> Map.put("library.no_return", Checkpoint)
+        )
+
+      root =
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{
+            "body" => [
+              Block.new("library.collect", id: "blk_NAME"),
+              Block.new("library.no_return", id: "blk_CHECK")
+            ]
+          }
+        )
+
+      assert compile!(root, palette).scxml =~
+               ~s(<state id="s_blk_CHECK" initial="s_blk_CHECK__o_done"><onentry>) <>
+                 ~s(<assign expr="[]" location="s_blk_ROOT__trail"/></onentry>)
+    end
+
+    # sabotage: owned a boundary's clear by its scope's state id in
+    # `boundary_additions/2` -> red (verified)
+    test "the clear belongs to the checkpoint, under the role :trail" do
+      compiled = compile!(checkpointed())
+      {state, _length} = :binary.match(compiled.scxml, ~s(<state id="s_blk_CHECK"))
+      {at, _length} = :binary.match(compiled.scxml, ~s(<assign expr="[]"), scope: {state, 200})
+
+      assert {:ok, %{block_id: "blk_CHECK", role: ":trail", config_key: nil}} =
+               Provenance.owner_at(compiled.provenance, at)
+    end
+
+    # sabotage: defined `returnable?/1` on `Checkpoint` answering `true` ->
+    # the checkpoint became a step, the declared-false document carried a
+    # trail and this went red (verified)
+    test "in a scope with no returnable step it is the step that does nothing alone" do
+      checkpoint = compile!(checkpointed(revisable: false)).scxml
+      placeholder = compile!(checkpointed(revisable: false, marker: "core.placeholder")).scxml
+
+      refute checkpoint =~ "__trail"
+      refute checkpoint =~ "statifier_blocks.back"
+
+      assert checkpoint =~
+               ~s(<state id="s_blk_CHECK" initial="s_blk_CHECK__o_done">) <>
+                 ~s(<final id="s_blk_CHECK__o_done"><onentry><raise event="done.outcome.s_blk_CHECK.done"/></onentry></final></state>)
+
+      assert checkpoint == placeholder
+    end
+
+    # sabotage: defined `returnable?/1` on `Checkpoint` answering `true` ->
+    # the checkpoint became a step, a trail root appeared and this went red
+    # (verified)
+    test "placing a checkpoint creates no returnable step" do
+      root =
+        Block.new("core.sequence",
+          id: "blk_ROOT",
+          slots: %{"body" => [Block.new("core.checkpoint", id: "blk_CHECK")]}
+        )
+
+      scxml = compile!(root).scxml
+
+      refute scxml =~ "__trail"
+      assert scxml =~ ~s(<datamodel><data id="responses"/></datamodel>)
+    end
+  end
+
   describe "provenance of Back and the clears (L9)" do
     # sabotage: owned the scope-state Back by the scope's block in
     # `scope_back/2` -> red (verified)
@@ -609,6 +811,33 @@ defmodule StatifierBlocks.Compiler.TrailTest do
           step.("blk_CARD", revisable),
           step.("blk_RULES", false),
           step.("blk_PICKUP", revisable)
+        ]
+      }
+    )
+  end
+
+  # The worked example's registration: name and card are returnable, the
+  # card is issued, the checkpoint is passed, then pickup is returnable
+  # and the rules step's config says no. `revisable: false` makes every
+  # step say no; `marker:` puts another type where the checkpoint is.
+  defp checkpointed(opts \\ []) do
+    revisable = Keyword.get(opts, :revisable, true)
+    marker = Keyword.get(opts, :marker, "core.checkpoint")
+
+    step = fn id, revisable? ->
+      Block.new("library.collect", id: id, config: %{"revisable" => revisable?})
+    end
+
+    Block.new("core.sequence",
+      id: "blk_ROOT",
+      slots: %{
+        "body" => [
+          step.("blk_NAME", revisable),
+          step.("blk_CARD", revisable),
+          Block.new("library.issue", id: "blk_ISSUE"),
+          Block.new(marker, id: "blk_CHECK"),
+          step.("blk_PICKUP", revisable),
+          step.("blk_RULES", false)
         ]
       }
     )

@@ -622,7 +622,8 @@ defmodule StatifierBlocks.ViewModelTest do
                "Placeholder",
                "Drafts",
                "Wait for event",
-               "For every item, run a chart"
+               "For every item, run a chart",
+               "Checkpoint"
              ]
     end
   end

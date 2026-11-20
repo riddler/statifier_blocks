@@ -25,6 +25,7 @@ defmodule StatifierBlocks.Palette.ManifestTest do
     {"core.assign", 1},
     {"core.await", 1},
     {"core.branch", 1},
+    {"core.checkpoint", 1},
     {"core.drafts", 1},
     {"core.foreach", 1},
     {"core.group", 1},
