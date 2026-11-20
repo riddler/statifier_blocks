@@ -15333,7 +15333,7 @@ In full:
 - `slots/1`, `config_schema/1` and `validate_config/1` are the `use`
   defaults: no slots, no fields, nothing refused. It has no config of its
   own; a block of it carries what every block carries (its id, its type,
-  its `type_version`, an optional `title` and note) and nothing else.
+  its `type_version` and its note) and nothing else.
 - `outcomes/1` is not defined, so it has the one outcome `done`;
   `failure_outcomes/1` and `donedata_type/1` are not defined.
 - It does **not** define `returnable?/1`. A checkpoint is where returning
